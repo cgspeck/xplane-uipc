@@ -1,0 +1,3 @@
+[settings]
+update_rate_hz = 20
+log_level = "info"

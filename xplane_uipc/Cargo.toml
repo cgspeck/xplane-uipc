@@ -1,0 +1,23 @@
+[package]
+name = "xplane_uipc"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "xplane_uipc"
+crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+ctrlc = "3.0"
+
+[dependencies]
+ipc_host = { path = "../ipc_host"}
+serde = { version = "1.0", features = ["derive"] }
+toml = "=0.7.8"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi", "Win32_System_DataExchange", "Win32_System_Memory"] }
+
+[build-dependencies]
+bindgen = "0.72"
+vergen-git2 = { version = "9.1.0", features = ["build", "cargo", "rustc", "si"] }
