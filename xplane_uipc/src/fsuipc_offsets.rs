@@ -7,10 +7,10 @@
 //! This module defines the raw layout, the most common well-known offsets,
 //! and the types used to read/write individual fields.
 
-use std::mem;
+use uipc_mapping::FsuipcType;
 
 /// Size of the FSUIPC shared-memory region in bytes (64 KiB).
-pub const FSUIPC_DATA_SIZE: usize = 0x10000;
+pub const FSUIPC_DATA_SIZE: usize = uipc_mapping::FSUIPC_DATA_SIZE;
 
 /// Name of the Win32 shared-memory object (Windows only).
 pub const FSUIPC_SHM_NAME: &str = "FSUIPC_Data";
@@ -91,54 +91,6 @@ pub const OFFSET_AMBIENT_TEMP: u16 = 0x0E8C; // 2 bytes, i16
 pub const OFFSET_WIND_DIR: u16 = 0x0E90; // 2 bytes
 /// Wind speed at aircraft in knots.
 pub const OFFSET_WIND_SPEED: u16 = 0x0E92; // 2 bytes
-
-// ─── Data types that can be stored at an offset ──────────────────────────────
-
-/// The type of value stored at an FSUIPC offset.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FsuipcType {
-    I8,
-    U8,
-    I16,
-    U16,
-    I32,
-    U32,
-    I64,
-    U64,
-    F32,
-    F64,
-}
-
-impl FsuipcType {
-    /// Number of bytes this type occupies in the shared region.
-    pub fn size(self) -> usize {
-        match self {
-            Self::I8 | Self::U8 => 1,
-            Self::I16 | Self::U16 => 2,
-            Self::I32 | Self::U32 | Self::F32 => 4,
-            Self::I64 | Self::U64 | Self::F64 => 8,
-        }
-    }
-}
-
-impl std::str::FromStr for FsuipcType {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "i8" => Ok(Self::I8),
-            "u8" => Ok(Self::U8),
-            "i16" => Ok(Self::I16),
-            "u16" => Ok(Self::U16),
-            "i32" => Ok(Self::I32),
-            "u32" => Ok(Self::U32),
-            "i64" => Ok(Self::I64),
-            "u64" => Ok(Self::U64),
-            "f32" => Ok(Self::F32),
-            "f64" => Ok(Self::F64),
-            other => Err(format!("unknown FSUIPC type '{}'", other)),
-        }
-    }
-}
 
 // ─── Write helpers ────────────────────────────────────────────────────────────
 
