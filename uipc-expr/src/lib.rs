@@ -1,22 +1,5 @@
-//! Minimal RPN (Reverse Polish Notation) expression evaluator.
-//!
-//! Mirrors the expression language used by XPUIPC's CFG files so that
-//! the same scaling formulas can be expressed directly in the TOML mapping.
-//!
-//! Supported tokens (whitespace-separated):
-//!   Numbers   – integer or floating point literals (may be negative: -1.5)
-//!   PI        – 3.14159…
-//!   $name     – read the value of the named operand slot (populated at eval time)
-//!   Operators – + - * / \ % ^ abs round
-//!               & |  (bitwise, after truncating to i64)
-//!               == != < > <= >=  (return 1.0 / 0.0)
-//!               ?  (ternary: cond then else – pops three, returns then if cond≠0)
-//!
-//! Example:  "$IAS 128 *"  →  IAS * 128
-
 use std::collections::HashMap;
 
-/// A compiled (tokenised) expression, ready for repeated evaluation.
 #[derive(Debug, Clone)]
 pub struct Expr {
     tokens: Vec<Token>,
@@ -35,7 +18,7 @@ enum Op {
     Sub,
     Mul,
     Div,
-    IntDiv, // backslash
+    IntDiv,
     Mod,
     Pow,
     And,
@@ -48,11 +31,10 @@ enum Op {
     Ge,
     Abs,
     Round,
-    Tern, // ?
+    Tern,
 }
 
 impl Expr {
-    /// Parse an RPN expression string into a compiled `Expr`.
     pub fn parse(src: &str) -> Result<Self, String> {
         let mut tokens = Vec::new();
         for raw in src.split_whitespace() {
@@ -87,8 +69,6 @@ impl Expr {
         Ok(Expr { tokens })
     }
 
-    /// Evaluate with a map of variable name → value.
-    /// Returns the top of the stack, or 0.0 if the expression is empty.
     pub fn eval(&self, vars: &HashMap<String, f64>) -> f64 {
         let mut stack: Vec<f64> = Vec::with_capacity(16);
 
@@ -203,7 +183,6 @@ impl Expr {
         stack.pop().unwrap_or(0.0)
     }
 
-    /// Return all variable names referenced in this expression.
     pub fn vars(&self) -> Vec<String> {
         self.tokens
             .iter()

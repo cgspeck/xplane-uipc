@@ -1,39 +1,9 @@
-//! Dataref mapping configuration.
-//!
-//! Reads a TOML file and returns a list of `DatarefMapping` entries.
-//!
-//! ## File format
-//!
-//! ```toml
-//! [settings]
-//! update_rate_hz = 20
-//!
-//! # Simple single-dataref mapping (most common case):
-//! [[mapping]]
-//! offset      = 0x02BC
-//! fsuipc_type = "i32"
-//! dataref     = "sim/flightmodel/position/indicated_airspeed"
-//! scale       = 128.0
-//! offset_add  = 0.0
-//! writable    = false
-//!
-//! # Expression-based mapping (multiple datarefs combined with RPN):
-//! [[mapping]]
-//! offset      = 0x02B4
-//! fsuipc_type = "i32"
-//! # Named datarefs used in the expression:
-//! datarefs    = { GS = "sim/flightmodel/position/groundspeed" }
-//! # RPN expression evaluated to produce the FSUIPC value:
-//! expr        = "$GS 65536 *"
-//! writable    = false
-//! ```
-
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::expr::Expr;
-use crate::fsuipc_offsets::FsuipcType;
+use crate::Expr;
+use crate::types::FsuipcType;
 
 fn default_scale() -> f64 {
     1.0
@@ -75,8 +45,6 @@ fn parse_fsuipc_type<'de, D: serde::Deserializer<'de>>(de: D) -> Result<FsuipcTy
     s.parse::<FsuipcType>().map_err(D::Error::custom)
 }
 
-// ─── Serde structures ─────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct GlobalSettings {
     #[serde(default = "default_update_rate")]
@@ -91,10 +59,8 @@ impl Default for GlobalSettings {
     }
 }
 
-/// How the value for an offset is computed.
 #[derive(Debug, Clone)]
 pub enum MappingSource {
-    /// Simple: one dataref, optional linear transform.
     Simple {
         dataref_path: String,
         array_index: i32,
@@ -104,15 +70,12 @@ pub enum MappingSource {
     Static {
         static_value: f64,
     },
-    /// Expression: one or more named datarefs fed into an RPN expression.
     Expr {
-        /// name → dataref path
-        datarefs: HashMap<String, (String, i32)>, // name → (path, array_index)
+        datarefs: HashMap<String, (String, i32)>,
         expr: Expr,
     },
 }
 
-/// A single FSUIPC offset mapping.
 #[derive(Debug, Clone)]
 pub struct DatarefMapping {
     pub offset: u16,
@@ -121,7 +84,6 @@ pub struct DatarefMapping {
     pub writable: bool,
 }
 
-/// Raw serde form – handles both simple and expr variants.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawMapping {
@@ -130,18 +92,14 @@ struct RawMapping {
     #[serde(deserialize_with = "parse_fsuipc_type")]
     fsuipc_type: FsuipcType,
 
-    // Static value fields
     static_value: Option<f64>,
 
-    // Simple fields
     dataref: Option<String>,
     #[serde(default = "default_scale")]
     scale: f64,
     #[serde(default = "default_offset_add")]
     offset_add: f64,
 
-    // Expression fields
-    /// map of name → "dataref/path" or "dataref/path[idx]"
     datarefs: Option<HashMap<String, String>>,
     expr: Option<String>,
 
@@ -151,17 +109,12 @@ struct RawMapping {
 
 #[derive(Debug, Deserialize)]
 struct MappingFile {
-    // #[serde(default)]
-    // settings: GlobalSettings,
     #[serde(default, rename = "mapping")]
     mappings: Vec<RawMapping>,
 }
 
-// ─── Public API ────────────────────────────────────────────────────────────────
-
 #[derive(Debug)]
 pub struct MappingConfig {
-    // pub settings: GlobalSettings,
     pub mappings: Vec<DatarefMapping>,
     pub load_errors: Vec<String>,
 }
@@ -177,9 +130,8 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
     let mut load_errors = Vec::new();
 
     for r in raw.mappings {
-        // Validate offset bounds at load time
         let end = r.offset as usize + r.fsuipc_type.size();
-        if end > crate::fsuipc_offsets::FSUIPC_DATA_SIZE {
+        if end > crate::FSUIPC_DATA_SIZE {
             load_errors.push(format!(
                 "offset 0x{:04X} + {} bytes exceeds FSUIPC_DATA_SIZE (0x10000)",
                 r.offset,
@@ -189,7 +141,6 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
         }
 
         let source = if let Some(expr_src) = r.expr {
-            // Expression path
             let expr = match Expr::parse(&expr_src) {
                 Ok(e) => e,
                 Err(e) => {
@@ -204,7 +155,6 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
             let raw_refs = r.datarefs.unwrap_or_default();
             let mut datarefs = HashMap::new();
             for (name, path_str) in raw_refs {
-                // Support "path/to/dr[idx]" syntax
                 let (p, idx) = parse_dataref_with_index(&path_str);
                 datarefs.insert(name, (p, idx));
             }
@@ -245,15 +195,12 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
     }
 
     Ok(MappingConfig {
-        // settings: raw.settings,
         mappings,
         load_errors,
     })
 }
 
-/// Parse "some/dataref/path[3]" → ("some/dataref/path", 3).
-/// Returns index -1 if no bracket suffix.
-fn parse_dataref_with_index(s: &str) -> (String, i32) {
+pub fn parse_dataref_with_index(s: &str) -> (String, i32) {
     if let Some(bracket) = s.rfind('[') {
         if s.ends_with(']') {
             let idx_str = &s[bracket + 1..s.len() - 1];
