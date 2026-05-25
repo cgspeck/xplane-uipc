@@ -7,10 +7,10 @@ use std::collections::HashMap;
 use std::ffi::{CString, c_int};
 use std::sync::{Arc, RwLock};
 
-use crate::expr::Expr;
-use crate::fsuipc_offsets::FsuipcType;
-pub use crate::mapping::{DatarefMapping, MappingSource};
 use ipc_host::value_table::{Table, get_value_table};
+use uipc_mapping::Expr;
+use uipc_mapping::FsuipcType;
+pub use uipc_mapping::{DatarefMapping, MappingSource};
 // use crate::shared_mem::SharedMem;
 // use crate::xplane_sdk::{self, *};
 

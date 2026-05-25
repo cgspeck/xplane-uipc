@@ -17,9 +17,7 @@ use ipc_host::{
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::{Registry, fmt, layer::SubscriberExt, reload, util::SubscriberInitExt};
 pub mod about_window;
-mod expr;
 mod fsuipc_offsets;
-mod mapping;
 pub mod menu;
 mod plugin_state;
 
@@ -311,7 +309,7 @@ pub fn load_mappings_and_init() -> Result<(), String> {
     tracing::info!("mappings_path: {}", mappings_path);
     tracing::info!("config_path: {}", config_path);
 
-    let mapping_config = mapping::load_mappings(&mappings_path)
+    let mapping_config = uipc_mapping::load_mappings(&mappings_path)
         .map_err(|e| format!("Failed to load mappings: {}", e))?;
 
     if !mapping_config.load_errors.is_empty() {

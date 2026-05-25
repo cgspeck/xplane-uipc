@@ -1269,6 +1269,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "uipc-expr"
+version = "0.1.0"
+
+[[package]]
+name = "uipc-mapping"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+ "uipc-expr",
+]
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1682,6 +1695,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "uipc-mapping",
  "vergen-git2",
  "windows 0.62.2",
 ]
