@@ -195,6 +195,53 @@ impl Expr {
             })
             .collect()
     }
+
+    pub fn token_strs(&self) -> Vec<String> {
+        self.tokens.iter().map(|t| t.to_string()).collect()
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::Num(n) => write!(f, "{}", n),
+            Token::Var(v) => write!(f, "${}", v),
+            Token::Op(op) => write!(f, "{}", op),
+        }
+    }
+}
+
+impl std::fmt::Display for Op {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Op::Add => "+",
+            Op::Sub => "-",
+            Op::Mul => "*",
+            Op::Div => "/",
+            Op::IntDiv => "\\",
+            Op::Mod => "%",
+            Op::Pow => "^",
+            Op::And => "&",
+            Op::Or => "|",
+            Op::Eq => "==",
+            Op::Ne => "!=",
+            Op::Lt => "<",
+            Op::Gt => ">",
+            Op::Le => "<=",
+            Op::Ge => ">=",
+            Op::Abs => "abs",
+            Op::Round => "round",
+            Op::Tern => "?",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let strs: Vec<String> = self.token_strs();
+        write!(f, "{}", strs.join(" "))
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,15 @@
+[package]
+name = "uipc-debug"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+uipc-mapping = { path = "../uipc-mapping" }
+ipc_host = { path = "../ipc_host" }
+anyhow = "1.0"
+ratatui = "0.29"
+crossterm = "0.28"
+clap = { version = "4.5", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = "0.4"
