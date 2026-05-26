@@ -301,7 +301,11 @@ pub unsafe fn process_mapped_view(
                     }
                 }
             } else {
-                tracing::debug!("Offset {:#07x} not found in table", record.dw_offset);
+                tracing::debug!(
+                    "Offset {:#07x} (size {} bytes) not found in table",
+                    record.dw_offset,
+                    record.n_bytes
+                );
                 if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist) {
                     tracing::warn!("Read from offset {:#07x} not in table", record.dw_offset);
                 }
