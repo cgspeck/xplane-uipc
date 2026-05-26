@@ -1,0 +1,24 @@
+# Sample FSUIPC offsets for testing
+# Format: <address>,<type>[,<size>]
+
+# Flight model
+0x02BC,i32      # Indicated airspeed (knots * 128)
+0x02B4,u32      # Ground speed (meters/sec * 65536)
+0x02C0,i32      # Vertical speed (feet/min * 256, roughly)
+0x0330,u16      # Pressure altitude (mb * 16)
+0x0578,i32      # True heading (degrees * 65536 / 360)
+
+# Position
+0x0560,i64      # Latitude (FS units)
+0x0568,i64      # Longitude (FS units)
+
+# Aircraft info
+0x3160,string,24  # ATC aircraft type
+0x3148,string,24  # ATC airline
+0x313C,string,12  # ATC tail number
+
+# Cockpit / systems
+0x0D0C,u16      # Lights (bitfield)
+0x2E80,i32      # Avionics master switch
+0x3365,u8       # In menu flag
+0x0262,bytes,2  # Pause status (writable)
