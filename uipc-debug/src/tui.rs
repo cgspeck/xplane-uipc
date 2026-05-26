@@ -106,6 +106,9 @@ impl App {
         }
         tracing::info!("Evaluated {} mappings", self.results.len());
         self.sync_table();
+        if let Some(tx) = &self.ipc_tx {
+            tx.send(IpcCommands::ResetWarnings).unwrap();
+        }
     }
 
     fn sync_table(&self) {
