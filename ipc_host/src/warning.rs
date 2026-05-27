@@ -50,7 +50,7 @@ impl WarnedSet {
             tracing::debug!("check_and_set: cat_idx out of bounds");
             return false;
         }
-        tracing::trace!("check_and_set: category={:#?}, key={:#07x}", category, key);
+        tracing::trace!("check_and_set: category={:#?}, key={:#06x}", category, key);
         let row = &self.bits[cat_idx];
         tracing::trace!("check_and_set: category row accessed");
         let (idx, bit) = Self::locate(key);

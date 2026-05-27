@@ -115,7 +115,7 @@ where
         // ── 2. dwOffset ───────────────────────────────────────────────────
         let dw_offset = read_u32_at(cur_ptr);
         tracing::trace!(
-            "dwOffset: {:#07x} ({}) @ {:p}",
+            "dwOffset: {:#06x} ({}) @ {:p}",
             dw_offset,
             dw_offset,
             cur_ptr
@@ -142,7 +142,7 @@ where
 
         if !sentinel_ok {
             tracing::debug!(
-                "Bad sentinel: reqID={:#010x}, dwOffset={:#07x}, nBytes={} at offset {:#x}, scanning forward",
+                "Bad sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, scanning forward",
                 req_id,
                 dw_offset,
                 n_bytes,
@@ -272,43 +272,43 @@ pub unsafe fn process_mapped_view(
 
         if !record.is_write {
             if let Some(entry) = table.get(record.dw_offset as u16) {
-                tracing::debug!("Offset {:#07x} found in table", record.dw_offset);
+                tracing::debug!("Offset {:#06x} found in table", record.dw_offset);
                 warned_set.clear_key(record.dw_offset as u16, WarnCategory::ReadNotExist);
                 match &entry.value {
                     Value::Integer64(v) => {
-                        tracing::trace!("Writing i64 {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing i64 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut i64, v.to_le());
                     }
                     Value::Float64(v) => {
-                        tracing::trace!("Writing f64 {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing f64 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut f64, *v)
                     }
                     Value::Bool(v) => {
-                        tracing::trace!("Writing bool {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing bool {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u8, *v as u8);
                     }
                     Value::UnsignedInteger32(v) => {
-                        tracing::trace!("Writing u32 {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing u32 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
                     }
                     Value::UnsignedInt8(v) => {
-                        tracing::trace!("Writing u8 {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
                     }
                     Value::UnsignedInt16(v) => {
-                        tracing::trace!("Writing u16 {} -> offset {:#07x}", v, record.dw_offset);
+                        tracing::trace!("Writing u16 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
                     }
                 }
             } else {
                 tracing::debug!(
-                    "Offset {:#07x} (size {} bytes) not found in table",
+                    "Offset {:#06x} (size {} bytes) not found in table",
                     record.dw_offset,
                     record.n_bytes
                 );
                 if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist) {
                     tracing::warn!(
-                        "Read from offset {:#07x}, {} bytes not in table",
+                        "Read from offset {:#06x}, {} bytes not in table",
                         record.dw_offset,
                         record.n_bytes
                     );
@@ -316,7 +316,7 @@ pub unsafe fn process_mapped_view(
             }
         } else {
             tracing::debug!(
-                "Write operation: offset {:#07x}, n_bytes {}",
+                "Write operation: offset {:#06x}, n_bytes {}",
                 record.dw_offset,
                 record.n_bytes
             );
@@ -340,7 +340,7 @@ pub unsafe fn process_mapped_view(
                     }
                 };
                 tracing::info!(
-                    "Write request: offset {:#07x} = {}",
+                    "Write request: offset {:#06x} = {}",
                     record.dw_offset,
                     value
                 );
@@ -351,14 +351,14 @@ pub unsafe fn process_mapped_view(
                         .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotWritable)
                 {
                     tracing::warn!(
-                        "Attempt to write non-writable offset {:#07x}",
+                        "Attempt to write non-writable offset {:#06x}",
                         record.dw_offset
                     );
                 } else if warned_set
                     .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotExist)
                 {
                     tracing::warn!(
-                        "Attempt to write non-active offset {:#07x}",
+                        "Attempt to write non-active offset {:#06x}",
                         record.dw_offset
                     );
                 }

@@ -307,11 +307,11 @@ impl PluginState {
         for m in &self.mappings {
             if m.offset == offset && m.writable {
                 m.write_xplane(value);
-                tracing::debug!("Wrote value {} to offset {:#07x}", value, offset);
+                tracing::debug!("Wrote value {} to offset {:#06x}", value, offset);
                 return;
             }
         }
-        tracing::warn!("No writable mapping found for offset {:#07x}", offset);
+        tracing::warn!("No writable mapping found for offset {:#06x}", offset);
     }
 
     pub fn mark_stopped(&mut self) {
