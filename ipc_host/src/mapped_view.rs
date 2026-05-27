@@ -307,7 +307,11 @@ pub unsafe fn process_mapped_view(
                     record.n_bytes
                 );
                 if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist) {
-                    tracing::warn!("Read from offset {:#07x} not in table", record.dw_offset);
+                    tracing::warn!(
+                        "Read from offset {:#07x}, {} bytes not in table",
+                        record.dw_offset,
+                        record.n_bytes
+                    );
                 }
             }
         } else {
