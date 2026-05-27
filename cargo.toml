@@ -1,5 +1,5 @@
 [workspace]
-members = ["ipc_host", "xplane_uipc", "xtask", "uipc-expr", "uipc-mapping", "uipc-debug"]
+members = ["ipc_host", "xplane_uipc", "xtask", "uipc-expr", "uipc-mapping", "uipc-debug", "expr-calculator"]
 resolver = "3"
 
 [profile.release]

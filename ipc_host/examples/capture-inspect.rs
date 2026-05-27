@@ -33,14 +33,14 @@ fn main() {
                 if record.sentinel_ok {
                     let op = if record.is_write { "WRITE" } else { "READ" };
                     println!(
-                        "#{:<4} reqID={:#010x}  offset={:#07x}  {}  {}B  ✓",
+                        "#{:<4} reqID={:#010x}  offset={:#06x}  {}  {}B  ✓",
                         record_num, record.req_id, record.dw_offset, op, record.n_bytes
                     );
                 } else {
                     any_corrupted = true;
                     if let Some(next) = record.recovery_next_offset {
                         println!(
-                            "#{:<4} ── BAD SENTINEL @ {:#07x} ──  (scan +{} → next at {:#x})",
+                            "#{:<4} ── BAD SENTINEL @ {:#06x} ──  (scan +{} → next at {:#x})",
                             record_num,
                             record.sentinel_offset,
                             next - record.sentinel_offset,
@@ -48,7 +48,7 @@ fn main() {
                         );
                     } else {
                         println!(
-                            "#{:<4} ── BAD SENTINEL @ {:#07x} ──  (no recovery, end of data)",
+                            "#{:<4} ── BAD SENTINEL @ {:#06x} ──  (no recovery, end of data)",
                             record_num, record.sentinel_offset,
                         );
                     }
