@@ -93,6 +93,24 @@ fsuipc_type = "u8"
 dataref     = "sim/cockpit2/clock_timer/zulu_time_minutes"
 writable    = true
 
+[[mapping]]
+offset      = 0x024A
+fsuipc_type = "u16"
+datarefs = { "lt_date"="livetraffic/sim/date" }
+expr = "$lt_date 10000 \\"
+
+[[mapping]]
+offset      = 0x0244
+fsuipc_type = "u8"
+datarefs = { "lt_date"="livetraffic/sim/date" }
+expr = "$lt_date 10000 % 100 \\"
+
+[[mapping]]
+offset      = 0x0245
+fsuipc_type = "u8"
+datarefs = { "lt_date"="livetraffic/sim/date" }
+expr = "$lt_date 100 %"
+
 # # =============================================================================
 # # SPEEDS
 # # 0x02B4  GS:  65536 * metres/sec  (i32)
