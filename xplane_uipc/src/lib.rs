@@ -429,7 +429,7 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     {
         let mut guard = UIPC_THREAD.lock().unwrap();
         if let Some(old) = guard.take() {
-            old.join();
+            let _ = old.join();
         }
         *guard = Some(thread_handle);
     }
@@ -462,7 +462,7 @@ pub unsafe extern "C" fn XPluginDisable() {
     tracing::info!("Cancel command sent, joining thread...");
     let mut guard = UIPC_THREAD.lock().unwrap();
     if let Some(old) = guard.take() {
-        old.join();
+        let _ = old.join();
     }
     tracing::info!("Thread joined");
 }
