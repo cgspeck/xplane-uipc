@@ -673,7 +673,7 @@ writable    = true
 
 [[mapping]]
 offset      = 0x028C
-fsuipc_type = "u16"
+fsuipc_type = "u8"
 dataref     = "sim/cockpit2/switches/landing_lights_on"
 writable    = true
 
