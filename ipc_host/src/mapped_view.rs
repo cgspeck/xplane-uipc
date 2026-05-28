@@ -77,7 +77,7 @@ pub struct ParsedRecord {
     /// If sentinel_ok is false and recovery was found, the byte offset of
     /// the next valid record header. None if end of data.
     pub recovery_next_offset: Option<usize>,
-    pub payload_ptr: *const u8,
+    pub payload_ptr: *mut u8,
 }
 
 /// Iterate over records in a mapped view buffer, calling `on_record` for each.
@@ -231,7 +231,7 @@ where
                                 sentinel_ok: false,
                                 sentinel_offset,
                                 recovery_next_offset: None,
-                                payload_ptr: std::ptr::null(),
+                                payload_ptr: std::ptr::null_mut(),
                             };
                             error_count += on_record(record);
                             break;
@@ -248,7 +248,7 @@ where
                 sentinel_ok: false,
                 sentinel_offset,
                 recovery_next_offset,
-                payload_ptr: std::ptr::null(),
+                payload_ptr: std::ptr::null_mut(),
             };
             error_count += on_record(record);
             continue;
@@ -256,7 +256,7 @@ where
         cur_ptr = cur_ptr.add(4);
 
         // ── 5. Payload ────────────────────────────────────────────────────
-        let payload_ptr = cur_ptr;
+        let payload_ptr = cur_ptr as *mut u8;
 
         let record = ParsedRecord {
             req_id,
