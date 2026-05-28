@@ -39,7 +39,8 @@ Tokens are separated by whitespace.
 | `*` | `6 7 *` | 42.0 |
 | `/` | `10 3 /` | 3.333... (division by near-zero returns 0.0) |
 | `\` | `123 10 \` | 12.0 (integer division; near-zero returns 0.0) |
-| `%` | `10 3 %` | 1.0 (modulo on i64 cast; near-zero returns 0.0) |
+| `%` | `304.75 1 %` | 0.75 (modulo on f64 cast; near-zero returns 0.0) |
+| `imod` | `10.25 3 %` | 1.0 (modulo on i64 cast; near-zero returns 0.0) |
 | `^` | `2 3 ^` | 8.0 (power) |
 
 #### Comparison
