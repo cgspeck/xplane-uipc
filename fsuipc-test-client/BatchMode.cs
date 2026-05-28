@@ -60,7 +60,7 @@ public static class BatchMode
         {
             var val = h.Value;
             entries.Add(new OffsetSnapshotEntry(
-                $"0x{h.Def.Address:X4}",
+                h.Def.Address > 0xFFFF ? $"0x{h.Def.Address:X5}" : $"0x{h.Def.Address:X4}",
                 TypeString(h.Def.Type),
                 TypeInfo.IsFixedSize(h.Def.Type) ? null : h.Def.Size,
                 val is byte[] buf ? Convert.ToHexString(buf) : val

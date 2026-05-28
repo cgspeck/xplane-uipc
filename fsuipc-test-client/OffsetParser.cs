@@ -28,7 +28,7 @@ public static class OffsetParser
 
             if (!TryParseAddress(parts[0], out var address))
             {
-                errors.Add($"Line {i + 1}: invalid offset address '{parts[0]}' — expected hex like 0x02BC");
+                errors.Add($"Line {i + 1}: invalid offset address '{parts[0]}' — expected hex 0x0000-0xFFFFF");
                 continue;
             }
 
@@ -64,8 +64,39 @@ public static class OffsetParser
         if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
             s = s[2..];
         return int.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out address)
-            && address >= 0 && address <= 0xFFFF;
+            && address >= 0 && address <= 0xFFFFF;
     }
+
+    public static void WriteFile(string path, List<OffsetDefinition> defs)
+    {
+        using var writer = new StreamWriter(path);
+        foreach (var def in defs)
+        {
+            var addr = def.Address > 0xFFFF ? $"0x{def.Address:X5}" : $"0x{def.Address:X4}";
+            var typeStr = TypeLabel(def.Type);
+            if (TypeInfo.IsFixedSize(def.Type))
+                writer.WriteLine($"{addr},{typeStr}");
+            else
+                writer.WriteLine($"{addr},{typeStr},{def.Size}");
+        }
+    }
+
+    static string TypeLabel(OffsetType t) => t switch
+    {
+        OffsetType.U8 => "u8",
+        OffsetType.I8 => "i8",
+        OffsetType.U16 => "u16",
+        OffsetType.I16 => "i16",
+        OffsetType.U32 => "u32",
+        OffsetType.I32 => "i32",
+        OffsetType.F32 => "f32",
+        OffsetType.U64 => "u64",
+        OffsetType.I64 => "i64",
+        OffsetType.F64 => "f64",
+        OffsetType.String => "string",
+        OffsetType.Bytes => "bytes",
+        _ => "?"
+    };
 
     static bool TryParseType(string s, out OffsetType type)
     {
