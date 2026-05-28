@@ -446,25 +446,28 @@ pub unsafe extern "C" fn XPluginDisable() {
     tracing::info!("Unregistering flight loop callback...");
     XPLMUnregisterFlightLoopCallback(Some(flight_loop_callback), std::ptr::null_mut());
 
+    tracing::info!("Shutting down IPC thread...");
+    {
+        let guard = IPC_COMMAND_CHANNEL.lock().unwrap();
+        if let Some(tx) = guard.as_ref() {
+            tx.send(IpcCommands::Shutdown)
+                .expect("Failed to send shutdown command");
+        }
+    }
+    {
+        let mut guard = UIPC_THREAD.lock().unwrap();
+        if let Some(old) = guard.take() {
+            let _ = old.join();
+        }
+    }
+    tracing::info!("IPC thread joined");
+
     tracing::info!("Cleaning up plugin state...");
     let mut guard = PLUGIN_STATE_PTR.lock().unwrap();
     let PluginStatePtr(ptr) = std::mem::replace(&mut *guard, PluginStatePtr(std::ptr::null_mut()));
     if !ptr.is_null() {
-        Box::from_raw(ptr as *mut PluginState);
+        drop(Box::from_raw(ptr as *mut PluginState));
     }
-
-    let guard = IPC_COMMAND_CHANNEL.lock().unwrap();
-    if let Some(tx) = guard.as_ref() {
-        tx.send(IpcCommands::Shutdown)
-            .expect("Failed to send shutdown command");
-    }
-
-    tracing::info!("Cancel command sent, joining thread...");
-    let mut guard = UIPC_THREAD.lock().unwrap();
-    if let Some(old) = guard.take() {
-        let _ = old.join();
-    }
-    tracing::info!("Thread joined");
 }
 
 #[tracing::instrument]
