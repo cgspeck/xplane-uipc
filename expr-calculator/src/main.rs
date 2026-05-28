@@ -15,6 +15,7 @@ fn main() {
         "/".into(),
         "\\".into(),
         "%".into(),
+        "imod".into(),
         "^".into(),
         "&".into(),
         "|".into(),
