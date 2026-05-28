@@ -31,8 +31,18 @@ unsafe fn read_u32_at(ptr: *const u8) -> u32 {
 /// record header (sentinel at +12). If found within `max_gap` bytes, this
 /// is a padding gap and we return how many bytes to skip. Otherwise it's
 /// a true terminator and we return None.
-unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize) -> Option<usize> {
-    for offset in 0..=max_gap {
+///
+/// `available` is the number of bytes accessible from `cur_ptr` onwards.
+/// The scan reads up to `offset + 15` so we stop when fewer than 16 bytes
+/// remain at the candidate position.
+unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize) -> Option<usize> {
+    // Need at least 16 bytes from cur_ptr + offset to read the sentinel at +12..+15
+    let safe_limit = if available >= 16 {
+        max_gap.min(available - 16)
+    } else {
+        return None;
+    };
+    for offset in 0..=safe_limit {
         let b0 = *cur_ptr.add(offset + 12);
         if b0 != 0x6C {
             continue;
@@ -67,7 +77,7 @@ pub struct ParsedRecord {
     /// If sentinel_ok is false and recovery was found, the byte offset of
     /// the next valid record header. None if end of data.
     pub recovery_next_offset: Option<usize>,
-    pub payload_ptr: *const u8,
+    pub payload_ptr: *mut u8,
 }
 
 /// Iterate over records in a mapped view buffer, calling `on_record` for each.
@@ -83,6 +93,8 @@ where
 {
     let mut cur_ptr: *const u8 = mapped_view_ptr;
     let mut error_count = 0;
+    let end_ptr = mapped_view_ptr.add(view_size);
+    let avail = |p: *const u8| -> usize { end_ptr.offset_from(p).max(0) as usize };
 
     loop {
         // ── 1. reqID ──────────────────────────────────────────────────────
@@ -94,7 +106,7 @@ where
                 "Zero reqID at {:p}, scanning for next record header",
                 cur_ptr
             );
-            match find_next_record(cur_ptr, 16) {
+            match find_next_record(cur_ptr, 16, avail(cur_ptr)) {
                 Some(0) => {
                     tracing::trace!("reqID is legitimately zero, parsing as normal record");
                 }
@@ -183,7 +195,11 @@ where
 
             // ── Phase 1: scan 16 bytes ──────────────────────────────────
             let recovery_next_offset;
-            match find_next_record(sentinel_before_ptr.add(1), 16) {
+            match find_next_record(
+                sentinel_before_ptr.add(1),
+                16,
+                avail(sentinel_before_ptr.add(1)),
+            ) {
                 Some(0) => {
                     recovery_next_offset = Some(sentinel_offset + 1);
                     cur_ptr = sentinel_before_ptr.add(1);
@@ -194,8 +210,9 @@ where
                 }
                 None => {
                     // ── Phase 2: scan the rest of the buffer ────────────
-                    let remaining = view_size.saturating_sub(sentinel_offset + 1 + 12);
-                    match find_next_record(sentinel_before_ptr.add(1), remaining) {
+                    let scan_ptr = sentinel_before_ptr.add(1);
+                    let remaining = avail(scan_ptr).saturating_sub(16);
+                    match find_next_record(scan_ptr, remaining, avail(scan_ptr)) {
                         Some(0) => {
                             recovery_next_offset = Some(sentinel_offset + 1);
                             cur_ptr = sentinel_before_ptr.add(1);
@@ -214,7 +231,7 @@ where
                                 sentinel_ok: false,
                                 sentinel_offset,
                                 recovery_next_offset: None,
-                                payload_ptr: std::ptr::null(),
+                                payload_ptr: std::ptr::null_mut(),
                             };
                             error_count += on_record(record);
                             break;
@@ -231,7 +248,7 @@ where
                 sentinel_ok: false,
                 sentinel_offset,
                 recovery_next_offset,
-                payload_ptr: std::ptr::null(),
+                payload_ptr: std::ptr::null_mut(),
             };
             error_count += on_record(record);
             continue;
@@ -239,7 +256,7 @@ where
         cur_ptr = cur_ptr.add(4);
 
         // ── 5. Payload ────────────────────────────────────────────────────
-        let payload_ptr = cur_ptr;
+        let payload_ptr = cur_ptr as *mut u8;
 
         let record = ParsedRecord {
             req_id,

@@ -81,15 +81,8 @@ pub unsafe extern "C" fn XPluginStart(
     out_sig: *mut c_char,
     out_desc: *mut c_char,
 ) -> c_int {
-    unsafe { XPLMEnableFeature(CString::new("XPLM_USE_NATIVE_PATHS").unwrap().as_ptr(), 1) };
-    unsafe {
-        XPLMEnableFeature(
-            CString::new("XPLM_USE_NATIVE_WIDGET_WINDOWS")
-                .unwrap()
-                .as_ptr(),
-            1,
-        )
-    };
+    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_PATHS".as_ptr(), 1) };
+    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_WIDGET_WINDOWS".as_ptr(), 1) };
     let copy = |s: &str, d: *mut c_char| unsafe {
         std::ptr::copy_nonoverlapping(s.as_ptr() as *const c_char, d, s.len());
     };
@@ -278,9 +271,13 @@ fn reload_config_and_apply(config_path: &str) {
     }
 }
 
+/// X-Plane SDK: return value is the interval until the next call in seconds.
+/// Positive = seconds, negative = flight loops, 0 = unregister.
+const FLIGHT_LOOP_INTERVAL: f32 = 1.0 / 20.0; // 20 Hz
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn flight_loop_callback(
-    inElapsedTimeSinceLastFlightLoop: f32,
+    _inElapsedTimeSinceLastFlightLoop: f32,
     _inElapsedTimeSinceLastCall: f32,
     _inCounter: i32,
     _inRefcon: *mut std::ffi::c_void,
@@ -299,7 +296,7 @@ unsafe extern "C" fn flight_loop_callback(
 
         state.update();
     }
-    inElapsedTimeSinceLastFlightLoop
+    FLIGHT_LOOP_INTERVAL
 }
 
 pub fn load_mappings_and_init() -> Result<(), String> {
@@ -393,10 +390,9 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     }
 
     tracing::info!("Registering flight loop callback...");
-    let interval_seconds = 1.0 / 20.0;
     XPLMRegisterFlightLoopCallback(
         Some(flight_loop_callback),
-        interval_seconds as f32,
+        FLIGHT_LOOP_INTERVAL,
         std::ptr::null_mut(),
     );
     tracing::info!("Flight loop registered at 20Hz");
@@ -433,7 +429,7 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     {
         let mut guard = UIPC_THREAD.lock().unwrap();
         if let Some(old) = guard.take() {
-            old.join();
+            let _ = old.join();
         }
         *guard = Some(thread_handle);
     }
@@ -450,25 +446,28 @@ pub unsafe extern "C" fn XPluginDisable() {
     tracing::info!("Unregistering flight loop callback...");
     XPLMUnregisterFlightLoopCallback(Some(flight_loop_callback), std::ptr::null_mut());
 
+    tracing::info!("Shutting down IPC thread...");
+    {
+        let guard = IPC_COMMAND_CHANNEL.lock().unwrap();
+        if let Some(tx) = guard.as_ref() {
+            tx.send(IpcCommands::Shutdown)
+                .expect("Failed to send shutdown command");
+        }
+    }
+    {
+        let mut guard = UIPC_THREAD.lock().unwrap();
+        if let Some(old) = guard.take() {
+            let _ = old.join();
+        }
+    }
+    tracing::info!("IPC thread joined");
+
     tracing::info!("Cleaning up plugin state...");
     let mut guard = PLUGIN_STATE_PTR.lock().unwrap();
     let PluginStatePtr(ptr) = std::mem::replace(&mut *guard, PluginStatePtr(std::ptr::null_mut()));
     if !ptr.is_null() {
-        Box::from_raw(ptr as *mut PluginState);
+        drop(Box::from_raw(ptr as *mut PluginState));
     }
-
-    let guard = IPC_COMMAND_CHANNEL.lock().unwrap();
-    if let Some(tx) = guard.as_ref() {
-        tx.send(IpcCommands::Shutdown)
-            .expect("Failed to send shutdown command");
-    }
-
-    tracing::info!("Cancel command sent, joining thread...");
-    let mut guard = UIPC_THREAD.lock().unwrap();
-    if let Some(old) = guard.take() {
-        old.join();
-    }
-    tracing::info!("Thread joined");
 }
 
 #[tracing::instrument]
