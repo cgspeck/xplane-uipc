@@ -26,11 +26,42 @@ Non-goals:
 | `fsuipc-test-client/` | .NET Console App | Reads FSUIPC offsets from any compatible host (interactive TUI or batch JSON mode) |
 | `xtask/` | Build tool | Build system tasks -- `dist`, `deploy` |
 
-## Building
+## Development
+
+### Linux (cross-compile checks)
+
+Most development can be done on Linux. The `Makefile` drives formatting, linting, cross-compilation, and testing in one command:
 
 ```shell
-cargo xtask build
-cargo xtask dist
+make          # runs: fmt, clippy, check, test (everything that can run on Linux)
+make test     # run tests only (portable crates)
+make check    # type-check Windows crates via cross-compilation
+make clippy   # lint all crates (portable natively, Windows via cross-compilation)
+make fmt      # check formatting
+```
+
+`make clippy` and `make check` cross-compile the Windows-only crates (`xplane_uipc`, `ipc_host`, `uipc-debug`) using `--target x86_64-pc-windows-msvc`. This verifies Rust type-checking and borrow-checking without needing a Windows linker. Tests for these crates can only run on Windows.
+
+**Prerequisites:**
+
+```shell
+rustup target add x86_64-pc-windows-msvc
+
+# Arch Linux
+sudo pacman -S mingw-w64-headers    # provides windows.h for bindgen
+
+# Debian/Ubuntu
+sudo apt install mingw-w64-x86-64-dev
+```
+
+### Windows (full build + deploy)
+
+Full builds, linking, and plugin deployment require Windows with LLVM installed (`winget install LLVM.LLVM`).
+
+```shell
+cargo xtask dist      # release build + package to dist/xplane-uipc/
+cargo xtask deploy    # dist + copy to C:\X-Plane 12\Resources\plugins\xplane-uipc
+cargo test            # run all tests including ipc_host
 ```
 
 ## Tools
@@ -61,25 +92,14 @@ See `uipc-debug/README.md` for full keybindings and options.
 
 ### FSUIPC Test Client (`fsuipc-test-client`)
 
-.NET console application that connects to any FSUIPC-compatible host (MSFS+FSUIPC7, X-Plane+uipc-debug IPC host) and reads offsets in real time or batch mode.
+.NET console application (Windows only, requires .NET 10 SDK + FSUIPCClientDLL) that connects to any FSUIPC-compatible host and reads offsets in real time or batch mode.
 
 ```shell
-# TUI mode (interactive)
 dotnet run --project fsuipc-test-client -- fsuipc-test-client/sample-offsets.txt
-
-# Batch mode (JSON to stdout)
 dotnet run --project fsuipc-test-client -- fsuipc-test-client/sample-offsets.txt --batch > output.json
 ```
 
 See `fsuipc-test-client/README.md` for input format, keybindings, and build instructions.
-
-### Deploying the Plugin
-
-```shell
-cargo xtask deploy
-```
-
-Builds the plugin in release mode and copies the output (`xplane-uipc.xpl`, mappings, config) to `C:\X-Plane 12\Resources\plugins\xplane-uipc`.
 
 ## License
 
@@ -88,16 +108,3 @@ GNU LGPLv3.
 FSUIPC is a trademark of Pete Dowson. This plugin is an independent implementation and is not affiliated with or endorsed by the FSUIPC project.
 
 X-Plane SDK License [viewable here](./vendor/x-plane-sdk/4.3.0/SDK/license.txt).
-
----
-
-### Prerequisites / Notes
-
-- **LLVM** (required by `bindgen` for X-Plane SDK bindings):
-
-  ```shell
-  winget install LLVM.LLVM
-  ```
-
-- The plugin is Windows-only (uses Win32 shared memory APIs in `ipc_host`).
-- `fsuipc-test-client` requires the .NET 10 SDK and the FSUIPCClientDLL (Windows-only).

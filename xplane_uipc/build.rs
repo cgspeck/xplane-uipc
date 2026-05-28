@@ -23,9 +23,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rustc-link-lib=XPLM_64");
     println!("cargo:rustc-link-lib=XPWidgets_64");
 
+    // When the build script runs on a non-Windows host (e.g. Linux cross-compiling
+    // to Windows), the X-Plane SDK header `#if IBM` would pull in <windows.h>
+    // which is unavailable. Generate a wrapper that sets LIN=1 instead -- the
+    // resulting function signatures are identical regardless of platform define.
+    let header = if cfg!(not(target_os = "windows")) {
+        let wrapper = PathBuf::from(env::var("OUT_DIR").unwrap()).join("xplane_sdk_cross.h");
+        std::fs::write(
+            &wrapper,
+            "#define LIN 1\n\
+             #define XPLM200 1\n\
+             #define XPLM210 1\n\
+             #define XPLM300 1\n\
+             #define XPLM301 1\n\
+             #define XPLM303 1\n\
+             #define XPLM400 1\n\
+             #define XPLM411 1\n\
+             #define XPLM420 1\n\
+             #include \"XPLMDataAccess.h\"\n\
+             #include \"XPLMDisplay.h\"\n\
+             #include \"XPLMGraphics.h\"\n\
+             #include \"XPLMMenus.h\"\n\
+             #include \"XPLMPlugin.h\"\n\
+             #include \"XPLMProcessing.h\"\n\
+             #include \"XPStandardWidgets.h\"\n\
+             #include \"XPWidgets.h\"\n\
+             #include \"XPLMUtilities.h\"\n",
+        )
+        .expect("Failed to write cross-compile wrapper header");
+        wrapper.to_string_lossy().into_owned()
+    } else {
+        "xplane_sdk.h".to_string()
+    };
+
     let bindings = bindgen::Builder::default()
         .wrap_unsafe_ops(true)
-        .header("xplane_sdk.h")
+        .header(&header)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .clang_arg(format!("-I{}", xplm_c_headers.display()))
         .clang_arg(format!("-I{}", xpwidgets_c_headers.display()))

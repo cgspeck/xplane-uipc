@@ -74,6 +74,7 @@ fn create_window() -> *mut std::ffi::c_void {
 
     let about_str = about_string();
     xplane_log(&about_str);
+    let about_cstr = std::ffi::CString::new(about_str).unwrap();
 
     let gLabel = unsafe {
         XPCreateWidget(
@@ -81,11 +82,11 @@ fn create_window() -> *mut std::ffi::c_void {
             labelTop,
             labelRight,
             labelBottom,
-            1,                               // visible
-            about_str.as_ptr() as *const i8, // the label text
-            0,                               // NOT a root widget (it has a parent)
-            window_ptr,                      // parent = the main window
-            xpWidgetClass_Caption,           // standard label / caption widget
+            1,                     // visible
+            about_cstr.as_ptr(),   // the label text (NUL-terminated, valid until end of scope)
+            0,                     // NOT a root widget (it has a parent)
+            window_ptr,            // parent = the main window
+            xpWidgetClass_Caption, // standard label / caption widget
         )
     };
 
