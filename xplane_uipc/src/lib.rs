@@ -271,9 +271,13 @@ fn reload_config_and_apply(config_path: &str) {
     }
 }
 
+/// X-Plane SDK: return value is the interval until the next call in seconds.
+/// Positive = seconds, negative = flight loops, 0 = unregister.
+const FLIGHT_LOOP_INTERVAL: f32 = 1.0 / 20.0; // 20 Hz
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn flight_loop_callback(
-    inElapsedTimeSinceLastFlightLoop: f32,
+    _inElapsedTimeSinceLastFlightLoop: f32,
     _inElapsedTimeSinceLastCall: f32,
     _inCounter: i32,
     _inRefcon: *mut std::ffi::c_void,
@@ -292,7 +296,7 @@ unsafe extern "C" fn flight_loop_callback(
 
         state.update();
     }
-    inElapsedTimeSinceLastFlightLoop
+    FLIGHT_LOOP_INTERVAL
 }
 
 pub fn load_mappings_and_init() -> Result<(), String> {
@@ -386,10 +390,9 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     }
 
     tracing::info!("Registering flight loop callback...");
-    let interval_seconds = 1.0 / 20.0;
     XPLMRegisterFlightLoopCallback(
         Some(flight_loop_callback),
-        interval_seconds as f32,
+        FLIGHT_LOOP_INTERVAL,
         std::ptr::null_mut(),
     );
     tracing::info!("Flight loop registered at 20Hz");
