@@ -173,7 +173,7 @@ public static class TuiMode
 
         var table = new Table()
             .Border(TableBorder.Simple)
-            .Caption($"File: {Path.GetFileName(filePath)}  |  {client.Handles.Count} offsets  |  {(client.IsConnected ? "CONNECTED" : "DISCONNECTED")}")
+            .Caption($"File: {Path.GetFileName(filePath).EscapeMarkup()}  |  {client.Handles.Count} offsets  |  {(client.IsConnected ? "CONNECTED" : "DISCONNECTED")}")
             .AddColumn(new TableColumn(" ").Width(2))
             .AddColumn(new TableColumn("Address").Width(8))
             .AddColumn(new TableColumn("Type").Width(8))
@@ -221,7 +221,7 @@ public static class TuiMode
         }
 
         if (lastError != null)
-            table.Caption($"[{lastError}]");
+            table.Caption(lastError.EscapeMarkup());
 
         return table;
     }
