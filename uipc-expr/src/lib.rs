@@ -246,9 +246,18 @@ impl Expr {
                                         0.0
                                     }
                                 }
-                                Op::Abs | Op::Round | Op::Floor | Op::Ceil
-                                | Op::Neg | Op::Sqrt | Op::Not | Op::Sin
-                                | Op::Cos | Op::Dup | Op::Swap | Op::Tern => {
+                                Op::Abs
+                                | Op::Round
+                                | Op::Floor
+                                | Op::Ceil
+                                | Op::Neg
+                                | Op::Sqrt
+                                | Op::Not
+                                | Op::Sin
+                                | Op::Cos
+                                | Op::Dup
+                                | Op::Swap
+                                | Op::Tern => {
                                     unreachable!()
                                 }
                             };
@@ -705,8 +714,18 @@ mod tests {
     #[test]
     fn test_display_new_ops_roundtrip() {
         for op in [
-            "5 dup", "3 5 swap", "3.7 floor", "3.2 ceil", "3 5 min", "3 5 max", "5 neg",
-            "9 sqrt", "0 not", "0 sin", "0 cos", "1 1 atan2",
+            "5 dup",
+            "3 5 swap",
+            "3.7 floor",
+            "3.2 ceil",
+            "3 5 min",
+            "3 5 max",
+            "5 neg",
+            "9 sqrt",
+            "0 not",
+            "0 sin",
+            "0 cos",
+            "1 1 atan2",
         ] {
             let e = Expr::parse(op).unwrap();
             let reparsed = Expr::parse(&e.to_string()).unwrap();
