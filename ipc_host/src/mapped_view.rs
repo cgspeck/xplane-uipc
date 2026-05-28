@@ -298,7 +298,7 @@ pub unsafe fn process_mapped_view(
                     }
                     Value::Float64(v) => {
                         tracing::trace!("Writing f64 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut f64, *v)
+                        std::ptr::write_unaligned(record.payload_ptr as *mut f64, f64::from_bits(v.to_bits().to_le()))
                     }
                     Value::Float32(v) => {
                         tracing::trace!("Writing f32 {} -> offset {:#06x}", v, record.dw_offset);
