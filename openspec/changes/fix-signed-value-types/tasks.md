@@ -1,11 +1,11 @@
 ## Tasks
 
-- [ ] 1. Add signed and float variants to Value enum (`ipc_host/src/value_table.rs`)
-- [ ] 2. Fix creation site: `populate_table()` (`xplane_uipc/src/plugin_state.rs`)
-- [ ] 3. Fix creation site: `update()` (`xplane_uipc/src/plugin_state.rs`)
-- [ ] 4. Fix creation site: debug TUI (`uipc-debug/src/tui.rs`)
-- [ ] 5. Add consumption arms in `process_mapped_view()` (`ipc_host/src/mapped_view.rs`)
-- [ ] 6. Add round-trip tests for all FsuipcType variants covering positive, negative, and boundary values
+- [x] 1. Add signed and float variants to Value enum (`ipc_host/src/value_table.rs`)
+- [x] 2. Fix creation site: `populate_table()` (`xplane_uipc/src/plugin_state.rs`)
+- [x] 3. Fix creation site: `update()` (`xplane_uipc/src/plugin_state.rs`)
+- [x] 4. Fix creation site: debug TUI (`uipc-debug/src/tui.rs`)
+- [x] 5. Add consumption arms in `process_mapped_view()` (`ipc_host/src/mapped_view.rs`)
+- [x] 6. Add round-trip tests for all FsuipcType variants covering positive, negative, and boundary values
 
 ### Task Details
 

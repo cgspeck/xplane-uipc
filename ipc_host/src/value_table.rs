@@ -1,9 +1,14 @@
 #[derive(Clone, Debug)]
 pub enum Value {
     UnsignedInt8(u8),
+    SignedInt8(i8),
     UnsignedInt16(u16),
+    SignedInt16(i16),
     UnsignedInteger32(u32),
+    SignedInt32(i32),
+    UnsignedInt64(u64),
     Integer64(i64),
+    Float32(f32),
     Float64(f64),
     Bool(bool),
 }
@@ -136,5 +141,99 @@ mod tests {
         );
         assert_eq!(table.active.len(), 2);
         assert_eq!(table.writable.len(), 1);
+    }
+
+    fn entry(value: Value) -> Entry {
+        Entry {
+            value,
+            source: 0,
+            destination: 0,
+            writable: false,
+        }
+    }
+
+    /// Verify that every Value variant round-trips through the table correctly.
+    #[test]
+    fn test_value_variants_round_trip() {
+        let mut table = Table::new();
+
+        let cases: Vec<(u16, Value)> = vec![
+            // Unsigned integers
+            (0, Value::UnsignedInt8(0)),
+            (1, Value::UnsignedInt8(127)),
+            (2, Value::UnsignedInt8(255)),
+            (3, Value::UnsignedInt16(0)),
+            (4, Value::UnsignedInt16(32767)),
+            (5, Value::UnsignedInt16(65535)),
+            (6, Value::UnsignedInteger32(0)),
+            (7, Value::UnsignedInteger32(2_147_483_647)),
+            (8, Value::UnsignedInteger32(4_294_967_295)),
+            (9, Value::UnsignedInt64(0)),
+            (10, Value::UnsignedInt64(u64::MAX)),
+            // Signed integers
+            (20, Value::SignedInt8(0)),
+            (21, Value::SignedInt8(127)),
+            (22, Value::SignedInt8(-1)),
+            (23, Value::SignedInt8(-128)),
+            (24, Value::SignedInt16(0)),
+            (25, Value::SignedInt16(32767)),
+            (26, Value::SignedInt16(-1)),
+            (27, Value::SignedInt16(-10)),
+            (28, Value::SignedInt16(-32768)),
+            (29, Value::SignedInt32(0)),
+            (30, Value::SignedInt32(2_147_483_647)),
+            (31, Value::SignedInt32(-1)),
+            (32, Value::SignedInt32(-2_147_483_648)),
+            (33, Value::Integer64(0)),
+            (34, Value::Integer64(i64::MAX)),
+            (35, Value::Integer64(-1)),
+            (36, Value::Integer64(i64::MIN)),
+            // Floats
+            (40, Value::Float32(0.0)),
+            (41, Value::Float32(3.14)),
+            (42, Value::Float32(-273.15)),
+            (43, Value::Float64(0.0)),
+            (44, Value::Float64(3.14159265358979)),
+            (45, Value::Float64(-273.15)),
+            // Bool
+            (50, Value::Bool(true)),
+            (51, Value::Bool(false)),
+        ];
+
+        for (offset, value) in &cases {
+            table.insert(*offset, entry(value.clone()));
+        }
+
+        for (offset, expected) in &cases {
+            let stored = &table.get(*offset).unwrap().value;
+            match (stored, expected) {
+                (Value::UnsignedInt8(a), Value::UnsignedInt8(b)) => assert_eq!(a, b),
+                (Value::SignedInt8(a), Value::SignedInt8(b)) => assert_eq!(a, b),
+                (Value::UnsignedInt16(a), Value::UnsignedInt16(b)) => assert_eq!(a, b),
+                (Value::SignedInt16(a), Value::SignedInt16(b)) => assert_eq!(a, b),
+                (Value::UnsignedInteger32(a), Value::UnsignedInteger32(b)) => assert_eq!(a, b),
+                (Value::SignedInt32(a), Value::SignedInt32(b)) => assert_eq!(a, b),
+                (Value::UnsignedInt64(a), Value::UnsignedInt64(b)) => assert_eq!(a, b),
+                (Value::Integer64(a), Value::Integer64(b)) => assert_eq!(a, b),
+                (Value::Float32(a), Value::Float32(b)) => assert_eq!(a, b),
+                (Value::Float64(a), Value::Float64(b)) => assert_eq!(a, b),
+                (Value::Bool(a), Value::Bool(b)) => assert_eq!(a, b),
+                _ => panic!(
+                    "variant mismatch at offset {}: stored {:?}, expected {:?}",
+                    offset, stored, expected
+                ),
+            }
+        }
+    }
+
+    /// The specific bug that triggered this fix: i16 with value -10 must not become 0.
+    #[test]
+    fn test_signed_int16_negative_value() {
+        let mut table = Table::new();
+        table.insert(0x0246, entry(Value::SignedInt16(-10)));
+        match &table.get(0x0246).unwrap().value {
+            Value::SignedInt16(v) => assert_eq!(*v, -10),
+            other => panic!("expected SignedInt16, got {:?}", other),
+        }
     }
 }
