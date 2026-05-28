@@ -1,5 +1,14 @@
 ## Tasks
 
+- [x] 1. Add new operators to the parser and evaluator (`uipc-expr/src/lib.rs`) — Add `Dup`, `Swap`, `Floor`, `Ceil`, `Min`, `Max`, `Neg`, `Sqrt`, `Not`, `Sin`, `Cos`, `Atan2` to Op enum, parser, evaluator, Display, and `E` constant
+- [x] 2. Add tests for all new operators (`uipc-expr/src/lib.rs`) — stack manipulation, math, logic, trig, constants, display roundtrip
+- [x] 3. Add UTC offset midnight-crossover integration test (`uipc-expr/src/lib.rs`) — test the dup/swap expression with 4 timezone scenarios
+- [x] 4. Update README documentation (`uipc-expr/README.md`) — new sections for stack manipulation, trig; add new ops to existing sections
+- [x] 5. Update expr-calculator commands and help text (`expr-calculator/src/main.rs`) — add all new operators and `E` to commands vec
+- [x] 6. Add UTC offset mapping to mappings.toml (`xplane_uipc/mappings.toml`) — replace commented-out 0x0246 with expr using dup/swap
+
+### Task Details
+
 ### 1. Add new operators to the parser and evaluator
 **File:** `uipc-expr/src/lib.rs`
 
@@ -17,8 +26,6 @@
 
 ### 2. Add tests for all new operators
 **File:** `uipc-expr/src/lib.rs`
-
-Tests to add:
 
 **Stack manipulation:**
 - `test_dup` — `5 dup *` = 25.0
@@ -61,10 +68,7 @@ Tests to add:
 ### 3. Add UTC offset midnight-crossover integration test
 **File:** `uipc-expr/src/lib.rs`
 
-Add a test that evaluates the UTC offset expression using `dup`/`swap`:
-```
-$zh 60 * $zm + $lh 60 * $lm + - dup dup 720 > 1440 0 ? swap -720 < 1440 0 ? swap - +
-```
+Expression: `$zh 60 * $zm + $lh 60 * $lm + - dup dup 720 > 1440 0 ? swap -720 < 1440 0 ? swap - +`
 
 Test cases:
 - Normal positive offset (UTC+5:30): zh=10, zm=0, lh=15, lm=30 → -330
