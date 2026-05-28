@@ -4,26 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Test
 
-The plugin targets **Windows only** (Win32 shared memory APIs, X-Plane SDK .lib files). Building requires LLVM (for `bindgen`) and the `x86_64-pc-windows-msvc` target.
+The plugin targets **Windows only** (Win32 shared memory APIs, X-Plane SDK .lib files). Full builds require Windows with LLVM (for `bindgen`). On Linux, portable crates can be tested natively and Windows crates can be cross-checked via `--target x86_64-pc-windows-msvc` (compile-check only, no linking or test execution).
 
 ```shell
-# Build (release)
-cargo xtask dist          # builds plugin + copies assets to dist/xplane-uipc/
+# ── Makefile (works on Linux) ──
+make all              # fmt + clippy + test (portable crates)
+make check            # compile-check all crates (native + cross)
+make check-windows    # cross-check Windows crates (ipc_host, uipc-debug)
+make clippy-windows   # cross-clippy Windows crates
+make test             # test portable crates (uipc-expr, uipc-mapping, expr-calculator, xtask)
 
-# Deploy to X-Plane
-cargo xtask deploy        # dist + copy to C:\X-Plane 12\Resources\plugins\xplane-uipc
+# ── Windows-only (full build) ──
+cargo xtask dist      # builds plugin + copies assets to dist/xplane-uipc/
+cargo xtask deploy    # dist + copy to C:\X-Plane 12\Resources\plugins\xplane-uipc
+cargo test            # runs all tests including ipc_host (value_table, mapped_view, warning)
 
-# Format / lint / test
-cargo fmt
-cargo test                # runs tests in uipc-expr, uipc-mapping, ipc_host (value_table, mapped_view, warning)
-cargo test -p uipc-expr   # single crate
-cargo test -p ipc_host -- test_process_single_read_integer  # single test
+# ── Single crate ──
+cargo test -p uipc-expr
+cargo test -p ipc_host -- test_process_single_read_integer
 
-# Tools
+# ── Tools ──
 cargo run -p expr-calculator                    # RPN expression REPL
 cargo run -p uipc-debug -- -m xplane_uipc/mappings.toml -s uipc-debug/state.csv --no-ipc  # offline debug TUI
 
-# .NET test client (Windows only, requires .NET 10 SDK + FSUIPCClientDLL)
+# ── .NET test client (Windows only, requires .NET 10 SDK + FSUIPCClientDLL) ──
 dotnet build fsuipc-test-client
 dotnet test fsuipc-test-client.Tests
 ```
