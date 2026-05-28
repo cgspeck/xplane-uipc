@@ -35,12 +35,13 @@ impl Table {
     }
 
     pub fn insert(&mut self, index: u16, entry: Entry) {
-        if self.entries[index as usize].is_none() {
+        let is_new = self.entries[index as usize].is_none();
+        if is_new {
             self.active.push(index);
         }
         let writable = entry.writable;
         self.entries[index as usize] = Some(entry);
-        if writable {
+        if writable && is_new {
             self.writable.push(index);
         }
     }
