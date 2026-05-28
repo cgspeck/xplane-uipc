@@ -81,15 +81,8 @@ pub unsafe extern "C" fn XPluginStart(
     out_sig: *mut c_char,
     out_desc: *mut c_char,
 ) -> c_int {
-    unsafe { XPLMEnableFeature(CString::new("XPLM_USE_NATIVE_PATHS").unwrap().as_ptr(), 1) };
-    unsafe {
-        XPLMEnableFeature(
-            CString::new("XPLM_USE_NATIVE_WIDGET_WINDOWS")
-                .unwrap()
-                .as_ptr(),
-            1,
-        )
-    };
+    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_PATHS".as_ptr(), 1) };
+    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_WIDGET_WINDOWS".as_ptr(), 1) };
     let copy = |s: &str, d: *mut c_char| unsafe {
         std::ptr::copy_nonoverlapping(s.as_ptr() as *const c_char, d, s.len());
     };
