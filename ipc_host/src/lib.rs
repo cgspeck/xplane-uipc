@@ -4,25 +4,22 @@ pub mod value_table;
 mod warning;
 
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{Arc, RwLock};
 
-// use crate::value_table::{VALUE_TABLE, Value};
-use windows::Win32::Foundation::*;
-
+use windows::Win32::Foundation::{CloseHandle, HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Foundation::{ERROR_CLASS_ALREADY_EXISTS, GetLastError, HWND};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS};
 use windows::Win32::System::{
     DataExchange::GlobalGetAtomNameA,
     Memory::{FILE_MAP_WRITE, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile, VirtualQuery},
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    DefWindowProcW, DestroyWindow, DispatchMessageW, PM_REMOVE, PeekMessageW, RegisterClassW,
-    ShowWindow, TranslateMessage, WNDCLASSW,
+    CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
+    GWLP_USERDATA, GetWindowLongPtrW, MSG, PM_REMOVE, PeekMessageW, RegisterClassW, SW_SHOW,
+    SetWindowLongPtrW, ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WM_NCCREATE, WNDCLASSW,
+    WS_OVERLAPPEDWINDOW,
 };
-use windows::{
-    Win32::Foundation::*, Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::UI::WindowsAndMessaging::*, core::*,
-};
+use windows::core::*;
 
 use crate::mapped_view::process_mapped_view;
 use crate::value_table::get_value_table;
@@ -72,18 +69,21 @@ unsafe extern "system" fn wnd_proc(
     tracing::debug!("Received message: {}", msg);
 
     if msg == WM_NCCREATE {
-        let cs = &*(lparam.0 as *const CREATESTRUCTW);
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, cs.lpCreateParams as _);
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        // SAFETY: lparam points to a valid CREATESTRUCTW for WM_NCCREATE
+        unsafe {
+            let cs = &*(lparam.0 as *const CREATESTRUCTW);
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, cs.lpCreateParams as _);
+            return DefWindowProcW(hwnd, msg, wparam, lparam);
+        }
     } else if msg < 0x8000 {
         tracing::debug!(
             "Fall-through to default message handler for message: {}",
             msg
         );
-        return DefWindowProcW(hwnd, msg, wparam, lparam);
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
     tracing::debug!("Message is a registered message (greater than WM_USER)");
-    let warned_set = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WarnedSet;
+    let warned_set = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut WarnedSet;
     tracing::trace!(
         "Retrieved warned_set pointer from window user data: {:?}",
         warned_set
@@ -142,7 +142,9 @@ unsafe extern "system" fn wnd_proc(
             "Failed to map view of file for atom name: {}",
             atom_name_str
         );
-        unsafe { CloseHandle(handle) };
+        unsafe {
+            let _ = CloseHandle(handle);
+        }
         return LRESULT(0);
     }
     tracing::trace!(
@@ -225,8 +227,8 @@ unsafe extern "system" fn wnd_proc(
 
     tracing::trace!("Finished processing mapped view, unmapping and closing handle");
     unsafe {
-        UnmapViewOfFile(mapped_view);
-        CloseHandle(handle);
+        let _ = UnmapViewOfFile(mapped_view);
+        let _ = CloseHandle(handle);
     }
 
     LRESULT(1)
@@ -236,8 +238,7 @@ unsafe extern "system" fn wnd_proc(
 pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND> {
     tracing::info!("Creating IPC Window...");
     unsafe {
-        // let instance: HINSTANCE = GetModuleHandleW(None)?;
-        let instance: HINSTANCE = unsafe { GetModuleHandleW(None)? }.into();
+        let instance: HINSTANCE = GetModuleHandleW(None)?.into();
         // let instance = GetInstance(None)?;
         let class_name = w!("UIPCMAIN"); // The 'Class Name' used for FindWindowW
 
@@ -251,7 +252,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
         tracing::info!("Registering window class...");
         // 1. Register the class with Windows
         if RegisterClassW(&wc) == 0 {
-            let last_error = unsafe { GetLastError() };
+            let last_error = GetLastError();
             if last_error != ERROR_CLASS_ALREADY_EXISTS {
                 return Err(anyhow::anyhow!(
                     "Failed to register window class: {}",
@@ -288,9 +289,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
         if false {
             // TODO: Show the window (for debugging - we can make this conditional on a debug flag or environment variable)
             tracing::info!("Showing IPC window...");
-            unsafe {
-                ShowWindow(unwrapped_hwnd, SW_SHOW).ok();
-            }
+            let _ = ShowWindow(unwrapped_hwnd, SW_SHOW).ok();
         }
 
         Ok(unwrapped_hwnd)
@@ -379,6 +378,6 @@ pub unsafe fn create_ipc_window_and_run(
         }
     }
 
-    unsafe { Box::from_raw(warned_set_ptr) };
+    unsafe { drop(Box::from_raw(warned_set_ptr)) };
     Ok(())
 }
