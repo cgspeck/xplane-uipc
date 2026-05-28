@@ -20,6 +20,7 @@ enum Op {
     Div,
     IntDiv,
     Mod,
+    IMod,
     Pow,
     And,
     Or,
@@ -57,6 +58,7 @@ impl Expr {
                 "/" => Token::Op(Op::Div),
                 "\\" => Token::Op(Op::IntDiv),
                 "%" => Token::Op(Op::Mod),
+                "imod" => Token::Op(Op::IMod),
                 "^" => Token::Op(Op::Pow),
                 "&" => Token::Op(Op::And),
                 "|" => Token::Op(Op::Or),
@@ -195,6 +197,13 @@ impl Expr {
                                     if b.abs() < 1e-300 {
                                         0.0
                                     } else {
+                                        a % b
+                                    }
+                                }
+                                Op::IMod => {
+                                    if b.abs() < 1e-300 {
+                                        0.0
+                                    } else {
                                         ((a as i64) % (b as i64)) as f64
                                     }
                                 }
@@ -308,6 +317,7 @@ impl std::fmt::Display for Op {
             Op::Div => "/",
             Op::IntDiv => "\\",
             Op::Mod => "%",
+            Op::IMod => "imod",
             Op::Pow => "^",
             Op::And => "&",
             Op::Or => "|",
@@ -397,11 +407,28 @@ mod tests {
     fn test_mod() {
         assert_eq!(eval("10 3 %", &[]), 1.0);
         assert_eq!(eval("20 6 %", &[]), 2.0);
+        assert_eq!(eval("304.75 1 %", &[]), 0.75);
+    }
+
+    #[test]
+    fn test_mod_negative() {
+        assert!((eval("-5.3 1 %", &[]) - -0.3).abs() < 1e-10);
     }
 
     #[test]
     fn test_mod_by_zero() {
-        assert_eq!(eval("5 0 %", &[]), 0.0);
+        assert_eq!(eval("5.5 0 %", &[]), 0.0);
+    }
+
+    #[test]
+    fn test_imod() {
+        assert_eq!(eval("304.75 3 imod", &[]), 1.0);
+        assert_eq!(eval("10 3 imod", &[]), 1.0);
+    }
+
+    #[test]
+    fn test_imod_by_zero() {
+        assert_eq!(eval("5 0 imod", &[]), 0.0);
     }
 
     #[test]
@@ -854,6 +881,13 @@ mod tests {
     fn test_token_strs() {
         let e = Expr::parse("$x 10 +").unwrap();
         assert_eq!(e.token_strs(), vec!["$x", "10", "+"]);
+    }
+
+    #[test]
+    fn test_token_strs_imod() {
+        let src = "$x 3 imod";
+        let e = Expr::parse(src).unwrap();
+        assert_eq!(e.to_string(), src);
     }
 
     #[test]
