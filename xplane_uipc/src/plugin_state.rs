@@ -1,7 +1,11 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+use bindings::*;
 
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -262,33 +266,11 @@ impl ResolvedMapping {
 
 pub struct PluginState {
     pub mappings: Vec<ResolvedMapping>,
-    // pub shared_mem: SharedMem,
-    pub config_path: String,
-    pub update_rate: f64,
 }
 
 impl PluginState {
-    pub fn new(
-        mappings: Vec<ResolvedMapping>,
-        // shared_mem: SharedMem,
-        config_path: String,
-        update_rate: f64,
-    ) -> Self {
-        let mut s = Self {
-            mappings,
-            // shared_mem,
-            config_path,
-            update_rate,
-        };
-        s.write_fsuipc_header();
-        s
-    }
-
-    fn write_fsuipc_header(&mut self) {
-        // let buf = self.shared_mem.as_buf_mut();
-        // fsuipc_offsets::write_u16(buf, fsuipc_offsets::OFFSET_SIM_RUNNING, 1);
-        // fsuipc_offsets::write_u32(buf, fsuipc_offsets::OFFSET_FSUIPC_VERSION, 0x0702);
-        // fsuipc_offsets::write_u32(buf, fsuipc_offsets::OFFSET_FS_VERSION, 0x0B00);
+    pub fn new(mappings: Vec<ResolvedMapping>) -> Self {
+        Self { mappings }
     }
 
     pub fn populate_table(&mut self) {
@@ -340,10 +322,5 @@ impl PluginState {
             }
         }
         tracing::warn!("No writable mapping found for offset {:#06x}", offset);
-    }
-
-    pub fn mark_stopped(&mut self) {
-        // let buf = self.shared_mem.as_buf_mut();
-        // fsuipc_offsets::write_u16(buf, fsuipc_offsets::OFFSET_SIM_RUNNING, 0);
     }
 }
