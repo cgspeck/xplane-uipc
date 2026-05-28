@@ -25,6 +25,7 @@ Tokens are separated by whitespace.
 |---|---|
 | `42` | Any f64 number |
 | `PI` | π constant |
+| `E` | Euler's number (2.71828...) |
 | `$name` | Variable reference (fetched from the vars map; missing vars default to 0.0) |
 
 ### Operators
@@ -69,6 +70,35 @@ Operands are cast to `i64`, the operation is applied, then the result is cast ba
 |---|---|---|
 | `abs` | `-5 abs` | 5.0 |
 | `round` | `3.7 round` | 4.0 |
+| `floor` | `3.7 floor` | 3.0 (toward negative infinity) |
+| `ceil` | `3.2 ceil` | 4.0 (toward positive infinity) |
+| `neg` | `5 neg` | -5.0 (flip sign) |
+| `sqrt` | `9 sqrt` | 3.0 (negative inputs return 0.0) |
+| `not` | `0 not` | 1.0 (logical negation: 0.0→1.0, nonzero→0.0) |
+
+#### Binary (min/max)
+
+| Op | Example | Result |
+|---|---|---|
+| `min` | `3 5 min` | 3.0 |
+| `max` | `3 5 max` | 5.0 |
+
+#### Trigonometry
+
+All trig functions operate in radians.
+
+| Op | Example | Result |
+|---|---|---|
+| `sin` | `PI 2 / sin` | 1.0 |
+| `cos` | `0 cos` | 1.0 |
+| `atan2` | `1 1 atan2` | 0.7854... (π/4) |
+
+#### Stack Manipulation
+
+| Op | Stack effect | Description |
+|---|---|---|
+| `dup` | `a -- a a` | Duplicate top of stack |
+| `swap` | `a b -- b a` | Swap top two values |
 
 #### Ternary
 
@@ -89,6 +119,7 @@ Example: `$enable 42 0 ?` — returns 42 when `$enable` is non-zero, 0 otherwise
 ## Safety
 
 - Division by near-zero (< 1e-300) silently returns `0.0`.
+- Square root of negative silently returns `0.0`.
 - Missing variables silently default to `0.0`.
 - Stack underflow for operators is silently ignored.
 - Empty expressions evaluate to `0.0`.
