@@ -4,13 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Test
 
-The plugin targets **Windows only** (Win32 shared memory APIs, X-Plane SDK .lib files). Full builds require Windows with LLVM (for `bindgen`). On Linux, portable crates can be tested natively and Windows crates can be cross-checked via `--target x86_64-pc-windows-msvc` (compile-check only, no linking or test execution).
+The plugin targets **Windows only** (Win32 shared memory APIs, X-Plane SDK .lib files). Full builds and linking require Windows with LLVM (for `bindgen`). On Linux, all crates can be cross-checked (compile without linking) and portable crates can be tested natively.
+
+### Linux cross-compilation prerequisites
+
+```shell
+# Rust Windows target (for cargo check/clippy --target)
+rustup target add x86_64-pc-windows-msvc
+
+# Arch Linux: mingw-w64 headers (provides windows.h for bindgen/clang)
+sudo pacman -S mingw-w64-headers
+
+# Debian/Ubuntu equivalent:
+# sudo apt install mingw-w64-x86-64-dev
+```
+
+The `xplane_uipc` build script generates a cross-compile wrapper header that uses `LIN=1` instead of `IBM=1` to avoid pulling in `<windows.h>` during bindgen. The generated bindings have identical function signatures.
 
 ```shell
 # ── Makefile (works on Linux) ──
 make all              # fmt + clippy + test (portable crates)
 make check            # compile-check all crates (native + cross)
-make check-windows    # cross-check Windows crates (ipc_host, uipc-debug)
+make check-windows    # cross-check Windows crates (ipc_host, uipc-debug, xplane_uipc)
 make clippy-windows   # cross-clippy Windows crates
 make test             # test portable crates (uipc-expr, uipc-mapping, expr-calculator, xtask)
 

@@ -4,7 +4,7 @@ WIN_TARGET = x86_64-pc-windows-msvc
 PORTABLE_CRATES = uipc-expr uipc-mapping expr-calculator xtask
 
 # Crates that require Windows (cross-check only, no linking/testing)
-WINDOWS_CRATES = ipc_host uipc-debug
+WINDOWS_CRATES = ipc_host uipc-debug xplane_uipc
 
 .PHONY: all check test fmt clippy check-windows clippy-windows clean
 
