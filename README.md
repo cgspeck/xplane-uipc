@@ -13,6 +13,12 @@ Non-goals:
 1. supporting in-process access;
 2. supporting WideFS UDP protocol;
 
+## X-Plane dependencies
+
+Check the `mapping.toml`.
+
+Livetraffic plugin required for date fields.
+
 ## Project Structure
 
 | Crate | Type | Purpose |
