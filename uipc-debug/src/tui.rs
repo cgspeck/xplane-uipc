@@ -15,7 +15,23 @@ use ratatui::widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, R
 use ratatui::{Frame, Terminal};
 
 use ipc_host::IpcCommands;
+use ipc_host::value_table::Value;
 use uipc_mapping::{FsuipcType, MappingSource};
+
+fn f64_to_value(value: f64, ty: FsuipcType) -> Value {
+    match ty {
+        FsuipcType::U8 => Value::UnsignedInt8(value as u8),
+        FsuipcType::I8 => Value::SignedInt8(value as i8),
+        FsuipcType::U16 => Value::UnsignedInt16(value as u16),
+        FsuipcType::I16 => Value::SignedInt16(value as i16),
+        FsuipcType::U32 => Value::UnsignedInteger32(value as u32),
+        FsuipcType::I32 => Value::SignedInt32(value as i32),
+        FsuipcType::U64 => Value::UnsignedInt64(value as u64),
+        FsuipcType::I64 => Value::Integer64(value as i64),
+        FsuipcType::F32 => Value::Float32(value as f32),
+        FsuipcType::F64 => Value::Float64(value),
+    }
+}
 
 use crate::eval::{EvalEngine, MappingResult};
 use crate::state;
@@ -115,43 +131,17 @@ impl App {
         if !self.ipc_enabled {
             return;
         }
-        use ipc_host::value_table::{Entry, Value, create_table_with_entries, set_value_table};
+        use ipc_host::value_table::{Entry, create_table_with_entries, set_value_table};
         let entries: Vec<(u16, Entry)> = self
             .results
             .iter()
             .filter_map(|r| {
                 let value = r.fsuipc_value?;
-                let entry = match r.fsuipc_type {
-                    FsuipcType::I8 | FsuipcType::U8 => Entry {
-                        value: Value::UnsignedInt8(value as u8),
-                        source: 0,
-                        destination: 0,
-                        writable: r.writable,
-                    },
-                    FsuipcType::I16 | FsuipcType::U16 => Entry {
-                        value: Value::UnsignedInt16(value as u16),
-                        source: 0,
-                        destination: 0,
-                        writable: r.writable,
-                    },
-                    FsuipcType::I32 | FsuipcType::U32 | FsuipcType::F32 => Entry {
-                        value: Value::UnsignedInteger32(value as u32),
-                        source: 0,
-                        destination: 0,
-                        writable: r.writable,
-                    },
-                    FsuipcType::I64 | FsuipcType::U64 => Entry {
-                        value: Value::Integer64(value as i64),
-                        source: 0,
-                        destination: 0,
-                        writable: r.writable,
-                    },
-                    FsuipcType::F64 => Entry {
-                        value: Value::Float64(value),
-                        source: 0,
-                        destination: 0,
-                        writable: r.writable,
-                    },
+                let entry = Entry {
+                    value: f64_to_value(value, r.fsuipc_type),
+                    source: 0,
+                    destination: 0,
+                    writable: r.writable,
                 };
                 Some((r.offset, entry))
             })

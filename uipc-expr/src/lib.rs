@@ -31,6 +31,18 @@ enum Op {
     Ge,
     Abs,
     Round,
+    Floor,
+    Ceil,
+    Neg,
+    Sqrt,
+    Not,
+    Sin,
+    Cos,
+    Min,
+    Max,
+    Atan2,
+    Dup,
+    Swap,
     Tern,
 }
 
@@ -56,8 +68,21 @@ impl Expr {
                 ">=" => Token::Op(Op::Ge),
                 "abs" => Token::Op(Op::Abs),
                 "round" => Token::Op(Op::Round),
+                "floor" => Token::Op(Op::Floor),
+                "ceil" => Token::Op(Op::Ceil),
+                "neg" => Token::Op(Op::Neg),
+                "sqrt" => Token::Op(Op::Sqrt),
+                "not" => Token::Op(Op::Not),
+                "sin" => Token::Op(Op::Sin),
+                "cos" => Token::Op(Op::Cos),
+                "min" => Token::Op(Op::Min),
+                "max" => Token::Op(Op::Max),
+                "atan2" => Token::Op(Op::Atan2),
+                "dup" => Token::Op(Op::Dup),
+                "swap" => Token::Op(Op::Swap),
                 "?" => Token::Op(Op::Tern),
                 "PI" => Token::Num(std::f64::consts::PI),
+                "E" => Token::Num(std::f64::consts::E),
                 s if s.starts_with('$') => Token::Var(s[1..].to_string()),
                 s => s
                     .parse::<f64>()
@@ -87,6 +112,53 @@ impl Expr {
                     Op::Round => {
                         if let Some(a) = stack.pop() {
                             stack.push(a.round());
+                        }
+                    }
+                    Op::Floor => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(a.floor());
+                        }
+                    }
+                    Op::Ceil => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(a.ceil());
+                        }
+                    }
+                    Op::Neg => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(-a);
+                        }
+                    }
+                    Op::Sqrt => {
+                        if let Some(a) = stack.pop() {
+                            let r = a.sqrt();
+                            stack.push(if r.is_nan() { 0.0 } else { r });
+                        }
+                    }
+                    Op::Not => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(if a == 0.0 { 1.0 } else { 0.0 });
+                        }
+                    }
+                    Op::Sin => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(a.sin());
+                        }
+                    }
+                    Op::Cos => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(a.cos());
+                        }
+                    }
+                    Op::Dup => {
+                        if let Some(&a) = stack.last() {
+                            stack.push(a);
+                        }
+                    }
+                    Op::Swap => {
+                        let len = stack.len();
+                        if len >= 2 {
+                            stack.swap(len - 1, len - 2);
                         }
                     }
                     Op::Tern => {
@@ -127,6 +199,9 @@ impl Expr {
                                     }
                                 }
                                 Op::Pow => a.powf(b),
+                                Op::Min => a.min(b),
+                                Op::Max => a.max(b),
+                                Op::Atan2 => a.atan2(b),
                                 Op::And => ((a as i64) & (b as i64)) as f64,
                                 Op::Or => ((a as i64) | (b as i64)) as f64,
                                 Op::Eq => {
@@ -171,7 +246,20 @@ impl Expr {
                                         0.0
                                     }
                                 }
-                                Op::Abs | Op::Round | Op::Tern => unreachable!(),
+                                Op::Abs
+                                | Op::Round
+                                | Op::Floor
+                                | Op::Ceil
+                                | Op::Neg
+                                | Op::Sqrt
+                                | Op::Not
+                                | Op::Sin
+                                | Op::Cos
+                                | Op::Dup
+                                | Op::Swap
+                                | Op::Tern => {
+                                    unreachable!()
+                                }
                             };
                             stack.push(result);
                         }
@@ -231,6 +319,18 @@ impl std::fmt::Display for Op {
             Op::Ge => ">=",
             Op::Abs => "abs",
             Op::Round => "round",
+            Op::Floor => "floor",
+            Op::Ceil => "ceil",
+            Op::Neg => "neg",
+            Op::Sqrt => "sqrt",
+            Op::Not => "not",
+            Op::Sin => "sin",
+            Op::Cos => "cos",
+            Op::Min => "min",
+            Op::Max => "max",
+            Op::Atan2 => "atan2",
+            Op::Dup => "dup",
+            Op::Swap => "swap",
             Op::Tern => "?",
         };
         write!(f, "{}", s)
@@ -465,6 +565,221 @@ mod tests {
     #[test]
     fn test_var_in_arithmetic() {
         assert_eq!(eval("$x 2 +", &[("x", 5.0)]), 7.0);
+    }
+
+    // --- Stack manipulation ---
+
+    #[test]
+    fn test_dup() {
+        assert_eq!(eval("5 dup *", &[]), 25.0);
+    }
+
+    #[test]
+    fn test_dup_stack_underflow() {
+        assert_eq!(eval("dup", &[]), 0.0);
+    }
+
+    #[test]
+    fn test_swap() {
+        assert_eq!(eval("3 5 swap -", &[]), 2.0);
+    }
+
+    #[test]
+    fn test_swap_stack_underflow() {
+        // Only one element — swap is a no-op, value stays
+        assert_eq!(eval("5 swap", &[]), 5.0);
+    }
+
+    // --- Floor / Ceil ---
+
+    #[test]
+    fn test_floor() {
+        assert_eq!(eval("3.7 floor", &[]), 3.0);
+    }
+
+    #[test]
+    fn test_floor_negative() {
+        assert_eq!(eval("-3.2 floor", &[]), -4.0);
+    }
+
+    #[test]
+    fn test_ceil() {
+        assert_eq!(eval("3.2 ceil", &[]), 4.0);
+    }
+
+    #[test]
+    fn test_ceil_negative() {
+        assert_eq!(eval("-3.7 ceil", &[]), -3.0);
+    }
+
+    // --- Min / Max ---
+
+    #[test]
+    fn test_min() {
+        assert_eq!(eval("3 5 min", &[]), 3.0);
+    }
+
+    #[test]
+    fn test_max() {
+        assert_eq!(eval("3 5 max", &[]), 5.0);
+    }
+
+    #[test]
+    fn test_min_equal() {
+        assert_eq!(eval("4 4 min", &[]), 4.0);
+    }
+
+    // --- Neg ---
+
+    #[test]
+    fn test_neg() {
+        assert_eq!(eval("5 neg", &[]), -5.0);
+    }
+
+    #[test]
+    fn test_neg_negative() {
+        assert_eq!(eval("-3 neg", &[]), 3.0);
+    }
+
+    // --- Sqrt ---
+
+    #[test]
+    fn test_sqrt() {
+        assert_eq!(eval("9 sqrt", &[]), 3.0);
+    }
+
+    #[test]
+    fn test_sqrt_negative() {
+        assert_eq!(eval("-4 sqrt", &[]), 0.0);
+    }
+
+    // --- Not ---
+
+    #[test]
+    fn test_not_zero() {
+        assert_eq!(eval("0 not", &[]), 1.0);
+    }
+
+    #[test]
+    fn test_not_nonzero() {
+        assert_eq!(eval("5 not", &[]), 0.0);
+    }
+
+    #[test]
+    fn test_not_negative() {
+        assert_eq!(eval("-1 not", &[]), 0.0);
+    }
+
+    // --- Trig ---
+
+    #[test]
+    fn test_sin_zero() {
+        assert_eq!(eval("0 sin", &[]), 0.0);
+    }
+
+    #[test]
+    fn test_sin_pi_half() {
+        assert!((eval("PI 2 / sin", &[]) - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_cos_zero() {
+        assert_eq!(eval("0 cos", &[]), 1.0);
+    }
+
+    #[test]
+    fn test_cos_pi() {
+        assert!((eval("PI cos", &[]) - (-1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_atan2_basic() {
+        assert!((eval("1 1 atan2", &[]) - std::f64::consts::FRAC_PI_4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_atan2_zero() {
+        assert_eq!(eval("0 1 atan2", &[]), 0.0);
+    }
+
+    // --- E constant ---
+
+    #[test]
+    fn test_e() {
+        assert!((eval("E", &[]) - std::f64::consts::E).abs() < 1e-12);
+    }
+
+    // --- Display roundtrip for new ops ---
+
+    #[test]
+    fn test_display_new_ops_roundtrip() {
+        for op in [
+            "5 dup",
+            "3 5 swap",
+            "3.7 floor",
+            "3.2 ceil",
+            "3 5 min",
+            "3 5 max",
+            "5 neg",
+            "9 sqrt",
+            "0 not",
+            "0 sin",
+            "0 cos",
+            "1 1 atan2",
+        ] {
+            let e = Expr::parse(op).unwrap();
+            let reparsed = Expr::parse(&e.to_string()).unwrap();
+            assert_eq!(
+                e.to_string(),
+                reparsed.to_string(),
+                "roundtrip failed for: {}",
+                op
+            );
+        }
+    }
+
+    // --- Integration: UTC offset with midnight crossover ---
+
+    #[test]
+    fn test_utc_offset_midnight_crossover() {
+        let expr_src =
+            "$zh 60 * $zm + $lh 60 * $lm + - dup dup 720 > 1440 0 ? swap -720 < 1440 0 ? swap - +";
+
+        // Normal positive offset (UTC+5:30): zulu 10:00, local 15:30 → -330
+        assert_eq!(
+            eval(
+                expr_src,
+                &[("zh", 10.0), ("zm", 0.0), ("lh", 15.0), ("lm", 30.0)]
+            ),
+            -330.0
+        );
+
+        // Normal negative offset (UTC-5): zulu 15:00, local 10:00 → 300
+        assert_eq!(
+            eval(
+                expr_src,
+                &[("zh", 15.0), ("zm", 0.0), ("lh", 10.0), ("lm", 0.0)]
+            ),
+            300.0
+        );
+
+        // Midnight crossover (UTC+10): zulu 22:00, local 08:00 next day → -600
+        assert_eq!(
+            eval(
+                expr_src,
+                &[("zh", 22.0), ("zm", 0.0), ("lh", 8.0), ("lm", 0.0)]
+            ),
+            -600.0
+        );
+
+        // Midnight crossover negative (UTC-10): zulu 02:00, local 16:00 prev day → 600
+        assert_eq!(
+            eval(
+                expr_src,
+                &[("zh", 2.0), ("zm", 0.0), ("lh", 16.0), ("lm", 0.0)]
+            ),
+            600.0
+        );
     }
 
     // --- Parse errors ---

@@ -300,6 +300,10 @@ pub unsafe fn process_mapped_view(
                         tracing::trace!("Writing f64 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut f64, *v)
                     }
+                    Value::Float32(v) => {
+                        tracing::trace!("Writing f32 {} -> offset {:#06x}", v, record.dw_offset);
+                        std::ptr::write_unaligned(record.payload_ptr as *mut f32, *v)
+                    }
                     Value::Bool(v) => {
                         tracing::trace!("Writing bool {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u8, *v as u8);
@@ -308,13 +312,29 @@ pub unsafe fn process_mapped_view(
                         tracing::trace!("Writing u32 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
                     }
+                    Value::SignedInt32(v) => {
+                        tracing::trace!("Writing i32 {} -> offset {:#06x}", v, record.dw_offset);
+                        std::ptr::write_unaligned(record.payload_ptr as *mut i32, v.to_le());
+                    }
                     Value::UnsignedInt8(v) => {
                         tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
                     }
+                    Value::SignedInt8(v) => {
+                        tracing::trace!("Writing i8 {} -> offset {:#06x}", v, record.dw_offset);
+                        std::ptr::write_unaligned(record.payload_ptr as *mut i8, v.to_le());
+                    }
                     Value::UnsignedInt16(v) => {
                         tracing::trace!("Writing u16 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
+                    }
+                    Value::SignedInt16(v) => {
+                        tracing::trace!("Writing i16 {} -> offset {:#06x}", v, record.dw_offset);
+                        std::ptr::write_unaligned(record.payload_ptr as *mut i16, v.to_le());
+                    }
+                    Value::UnsignedInt64(v) => {
+                        tracing::trace!("Writing u64 {} -> offset {:#06x}", v, record.dw_offset);
+                        std::ptr::write_unaligned(record.payload_ptr as *mut u64, v.to_le());
                     }
                 }
             } else {

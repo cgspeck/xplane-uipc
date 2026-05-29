@@ -661,8 +661,12 @@ writable    = true
 # offset      = 0x0240  – not available
 # fsuipc_type = "u16"
 
-# # 0x0246 local-UTC offset: no direct X-Plane dataref; leave as zero
-# # [[mapping]] offset = 0x0246 – not available
+# 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
+[[mapping]]
+offset      = 0x0246
+fsuipc_type = "i16"
+datarefs    = { zh = "sim/cockpit2/clock_timer/zulu_time_hours", zm = "sim/cockpit2/clock_timer/zulu_time_minutes", lh = "sim/cockpit2/clock_timer/local_time_hours", lm = "sim/cockpit2/clock_timer/local_time_minutes" }
+expr        = "$zh 60 * $zm + $lh 60 * $lm + - dup dup 720 > 1440 0 ? swap -720 < 1440 0 ? swap - +"
 
 # [[mapping]]
 # offset      = 0x0274

@@ -26,8 +26,21 @@ fn main() {
         ">=".into(),
         "abs".into(),
         "round".into(),
+        "floor".into(),
+        "ceil".into(),
+        "min".into(),
+        "max".into(),
+        "neg".into(),
+        "sqrt".into(),
+        "not".into(),
+        "sin".into(),
+        "cos".into(),
+        "atan2".into(),
+        "dup".into(),
+        "swap".into(),
         "?".into(),
         "PI".into(),
+        "E".into(),
     ];
     let completer = Box::new(DefaultCompleter::new(commands.clone()));
     // Use the interactive menu to select options from the completer
@@ -46,10 +59,12 @@ fn main() {
     let edit_mode = Box::new(Emacs::new(keybindings));
 
     println!();
-    println!("Avaliable commands: {}", commands.clone().join(", "));
-    println!("Logical comparators return 1 for true and 0 for false");
-    println!("Or `|` and ternery `?` consider any value > 0 to be true ");
-    println!("");
+    println!("Available commands: {}", commands.clone().join(", "));
+    println!("Comparisons return 1 for true and 0 for false");
+    println!("Ternary `?`: cond then else ? — nonzero cond picks then");
+    println!("Stack: `dup` duplicates top, `swap` swaps top two");
+    println!("Trig functions (sin, cos, atan2) operate in radians");
+    println!();
     let mut line_editor = Reedline::create()
         .with_highlighter(Box::new(ExampleHighlighter::new(commands)))
         .with_completer(completer)
