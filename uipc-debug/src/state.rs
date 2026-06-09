@@ -84,6 +84,7 @@ impl MappingResult {
             FsuipcType::U64 => "u64",
             FsuipcType::F32 => "f32",
             FsuipcType::F64 => "f64",
+            FsuipcType::String => "string",
         }
     }
 }

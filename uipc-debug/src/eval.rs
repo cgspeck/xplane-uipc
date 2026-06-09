@@ -54,7 +54,7 @@ impl EvalEngine {
                 let mut vars = HashMap::new();
                 let mut inputs = Vec::with_capacity(datarefs.len());
                 // datarefs: name -> (path, array_index)
-                let mut sorted: Vec<(String, &(String, i32))> =
+                let mut sorted: Vec<(String, &(String, Option<i32>))> =
                     datarefs.iter().map(|(k, v)| (k.clone(), v)).collect();
                 sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -81,6 +81,14 @@ impl EvalEngine {
                 inputs: vec![],
                 fsuipc_value: Some(*static_value),
             },
+            MappingSource::StaticStr { .. } => MappingResult {
+                offset: m.offset,
+                fsuipc_type: m.fsuipc_type,
+                writable: m.writable,
+                source: m.source.clone(),
+                inputs: vec![],
+                fsuipc_value: None,
+            },
         }
     }
 
@@ -97,6 +105,7 @@ impl EvalEngine {
                     }
                 }
                 MappingSource::Static { .. } => {}
+                MappingSource::StaticStr { .. } => {}
             }
         }
         let mut missing: Vec<String> = keys
@@ -120,6 +129,7 @@ impl EvalEngine {
                     }
                 }
                 MappingSource::Static { .. } => {}
+                MappingSource::StaticStr { .. } => {}
             }
         }
         let mut sorted: Vec<String> = keys.into_iter().collect();
@@ -139,9 +149,14 @@ mod tests {
         source: MappingSource,
         writable: bool,
     ) -> DatarefMapping {
+        let size = match fsuipc_type {
+            FsuipcType::String => 0,
+            _ => fsuipc_type.size(),
+        };
         DatarefMapping {
             offset,
             fsuipc_type,
+            size,
             source,
             writable,
         }
@@ -154,7 +169,7 @@ mod tests {
             FsuipcType::I32,
             MappingSource::Simple {
                 dataref_path: "sim/test/ias".into(),
-                array_index: -1,
+                array_index: None,
                 scale: 128.0,
                 offset_add: 0.0,
             },
@@ -181,7 +196,7 @@ mod tests {
             FsuipcType::I32,
             MappingSource::Simple {
                 dataref_path: "sim/test/ias".into(),
-                array_index: -1,
+                array_index: None,
                 scale: 128.0,
                 offset_add: 0.0,
             },
@@ -198,8 +213,8 @@ mod tests {
     #[test]
     fn test_expr_mapping() {
         let mut datarefs = HashMap::new();
-        datarefs.insert("Nav".into(), ("sim/test/nav".into(), -1));
-        datarefs.insert("Bcn".into(), ("sim/test/bcn".into(), -1));
+        datarefs.insert("Nav".into(), ("sim/test/nav".into(), None));
+        datarefs.insert("Bcn".into(), ("sim/test/bcn".into(), None));
 
         let mappings = vec![make_mapping(
             0x0D0C,
@@ -225,7 +240,7 @@ mod tests {
     #[test]
     fn test_expr_mapping_missing_var() {
         let mut datarefs = HashMap::new();
-        datarefs.insert("Nav".into(), ("sim/test/nav".into(), -1));
+        datarefs.insert("Nav".into(), ("sim/test/nav".into(), None));
 
         let mappings = vec![make_mapping(
             0x0D0C,
@@ -271,7 +286,7 @@ mod tests {
                 FsuipcType::I32,
                 MappingSource::Simple {
                     dataref_path: "sim/test/ias".into(),
-                    array_index: -1,
+                    array_index: None,
                     scale: 1.0,
                     offset_add: 0.0,
                 },
@@ -282,7 +297,7 @@ mod tests {
                 FsuipcType::I32,
                 MappingSource::Simple {
                     dataref_path: "sim/test/vvi".into(),
-                    array_index: -1,
+                    array_index: None,
                     scale: 1.0,
                     offset_add: 0.0,
                 },
@@ -302,8 +317,8 @@ mod tests {
     #[test]
     fn test_all_referenced_keys() {
         let mut datarefs = HashMap::new();
-        datarefs.insert("Nav".into(), ("sim/test/nav".into(), -1));
-        datarefs.insert("Bcn".into(), ("sim/test/bcn".into(), -1));
+        datarefs.insert("Nav".into(), ("sim/test/nav".into(), None));
+        datarefs.insert("Bcn".into(), ("sim/test/bcn".into(), None));
 
         let mappings = vec![
             make_mapping(
@@ -311,7 +326,7 @@ mod tests {
                 FsuipcType::I32,
                 MappingSource::Simple {
                     dataref_path: "sim/test/ias".into(),
-                    array_index: -1,
+                    array_index: None,
                     scale: 1.0,
                     offset_add: 0.0,
                 },

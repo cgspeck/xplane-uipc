@@ -63,15 +63,18 @@ impl Default for GlobalSettings {
 pub enum MappingSource {
     Simple {
         dataref_path: String,
-        array_index: i32,
+        array_index: Option<i32>,
         scale: f64,
         offset_add: f64,
     },
     Static {
         static_value: f64,
     },
+    StaticStr {
+        static_str: String,
+    },
     Expr {
-        datarefs: HashMap<String, (String, i32)>,
+        datarefs: HashMap<String, (String, Option<i32>)>,
         expr: Expr,
     },
 }
@@ -80,6 +83,7 @@ pub enum MappingSource {
 pub struct DatarefMapping {
     pub offset: u16,
     pub fsuipc_type: FsuipcType,
+    pub size: usize,
     pub source: MappingSource,
     pub writable: bool,
 }
@@ -92,7 +96,10 @@ struct RawMapping {
     #[serde(deserialize_with = "parse_fsuipc_type")]
     fsuipc_type: FsuipcType,
 
+    size: Option<usize>,
+
     static_value: Option<f64>,
+    static_value_str: Option<String>,
 
     dataref: Option<String>,
     #[serde(default = "default_scale")]
@@ -130,14 +137,55 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
     let mut load_errors = Vec::new();
 
     for r in raw.mappings {
-        let end = r.offset as usize + r.fsuipc_type.size();
+        let raw_size = match r.fsuipc_type {
+            FsuipcType::String => r.size.unwrap_or(0),
+            _ => r.fsuipc_type.size(),
+        };
+        let end = r.offset as usize + raw_size;
         if end > crate::FSUIPC_DATA_SIZE {
             load_errors.push(format!(
                 "offset 0x{:04X} + {} bytes exceeds FSUIPC_DATA_SIZE (0x10000)",
-                r.offset,
-                r.fsuipc_type.size()
+                r.offset, raw_size
             ));
             continue;
+        }
+
+        if r.fsuipc_type == FsuipcType::String {
+            if r.size.is_none() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: string type requires 'size' field",
+                    r.offset
+                ));
+                continue;
+            }
+            if r.expr.is_some() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: string type does not support 'expr'",
+                    r.offset
+                ));
+                continue;
+            }
+            if r.static_value.is_some() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: string type uses 'static_value_str' instead of 'static_value'",
+                    r.offset
+                ));
+                continue;
+            }
+            if r.dataref.is_none() && r.static_value_str.is_none() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: string type requires 'dataref' or 'static_value_str'",
+                    r.offset
+                ));
+                continue;
+            }
+            if r.dataref.is_some() && r.static_value_str.is_some() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: string type cannot have both 'dataref' and 'static_value_str'",
+                    r.offset
+                ));
+                continue;
+            }
         }
 
         let source = if let Some(expr_src) = r.expr {
@@ -153,7 +201,7 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
             };
 
             let raw_refs = r.datarefs.unwrap_or_default();
-            let mut datarefs = HashMap::new();
+            let mut datarefs: HashMap<String, (String, Option<i32>)> = HashMap::new();
             for (name, path_str) in raw_refs {
                 let (p, idx) = parse_dataref_with_index(&path_str);
                 datarefs.insert(name, (p, idx));
@@ -167,19 +215,27 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 scale: r.scale,
                 offset_add: r.offset_add,
             }
+        } else if let Some(s) = r.static_value_str {
+            MappingSource::StaticStr { static_str: s }
         } else if let Some(sv) = r.static_value {
             MappingSource::Static { static_value: sv }
         } else {
             load_errors.push(format!(
-                "offset 0x{:04X}: must have 'dataref', 'expr', or 'static_value'",
+                "offset 0x{:04X}: must have 'dataref', 'expr', 'static_value', or 'static_value_str'",
                 r.offset
             ));
             continue;
         };
 
+        let size = match r.fsuipc_type {
+            FsuipcType::String => r.size.unwrap_or(0),
+            _ => r.fsuipc_type.size(),
+        };
+
         mappings.push(DatarefMapping {
             offset: r.offset,
             fsuipc_type: r.fsuipc_type,
+            size,
             source,
             writable: r.writable,
         });
@@ -200,16 +256,16 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
     })
 }
 
-pub fn parse_dataref_with_index(s: &str) -> (String, i32) {
+pub fn parse_dataref_with_index(s: &str) -> (String, Option<i32>) {
     if let Some(bracket) = s.rfind('[') {
         if s.ends_with(']') {
             let idx_str = &s[bracket + 1..s.len() - 1];
             if let Ok(idx) = idx_str.parse::<i32>() {
-                return (s[..bracket].to_string(), idx);
+                return (s[..bracket].to_string(), Some(idx));
             }
         }
     }
-    (s.to_string(), -1)
+    (s.to_string(), None)
 }
 
 #[cfg(test)]
@@ -439,5 +495,122 @@ static_value = 99.0
         assert_eq!(config.load_errors.len(), 1);
         assert!(config.load_errors[0].contains("0x1002"));
         assert!(config.load_errors[0].to_lowercase().contains("expr"));
+    }
+
+    #[test]
+    fn string_static_value_str() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3160
+fsuipc_type = \"string\"
+size        = 24
+static_value_str = \"hello\"
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(config.mappings.len(), 1);
+        let m = &config.mappings[0];
+        assert_eq!(m.offset, 0x3160);
+        assert_eq!(m.fsuipc_type, FsuipcType::String);
+        assert_eq!(m.size, 24);
+        match &m.source {
+            MappingSource::StaticStr { static_str } => assert_eq!(static_str, "hello"),
+            _ => panic!("expected StaticStr source"),
+        }
+    }
+
+    #[test]
+    fn string_dataref() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3180
+fsuipc_type = \"string\"
+size        = 40
+dataref     = \"sim/test/string_dr\"
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(config.mappings.len(), 1);
+        let m = &config.mappings[0];
+        assert_eq!(m.fsuipc_type, FsuipcType::String);
+        assert_eq!(m.size, 40);
+        match &m.source {
+            MappingSource::Simple { dataref_path, .. } => {
+                assert_eq!(dataref_path, "sim/test/string_dr")
+            }
+            _ => panic!("expected Simple source"),
+        }
+    }
+
+    #[test]
+    fn string_missing_size() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3200
+fsuipc_type = \"string\"
+static_value_str = \"x\"
+",
+        );
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.unwrap_err();
+        assert!(err.contains("string type requires 'size'"));
+    }
+
+    #[test]
+    fn string_with_expr() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3200
+fsuipc_type = \"string\"
+size        = 10
+expr        = \"1 2 +\"
+",
+        );
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.unwrap_err();
+        assert!(err.contains("string type does not support 'expr'"));
+    }
+
+    #[test]
+    fn string_with_static_value_f64() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3200
+fsuipc_type = \"string\"
+size        = 10
+static_value = 42.0
+",
+        );
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.unwrap_err();
+        assert!(err.contains("static_value_str' instead of 'static_value'"));
+    }
+
+    #[test]
+    fn string_with_both_dataref_and_static_value_str() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x3200
+fsuipc_type = \"string\"
+size        = 10
+dataref     = \"sim/test/dr\"
+static_value_str = \"hello\"
+",
+        );
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.unwrap_err();
+        assert!(err.contains("cannot have both 'dataref' and 'static_value_str'"));
     }
 }

@@ -17,7 +17,38 @@ Non-goals:
 
 Check the `mapping.toml`.
 
-Livetraffic plugin required for date fields.
+* [ZIBO mod B737-800x](https://forums.x-plane.org/forums/topic/138974-b737-800x-zibo-mod-info-installation-download-links/)
+* [FlyWithLUA NG+](https://forums.x-plane.org/files/file/82888-flywithlua-ng-next-generation-plus-edition-for-x-plane-12-win-lin-mac/) to run accompanying script to inject dates and utc offsets
+* [BetterPushback](https://forums.x-plane.org/files/file/90556-better-pushback-for-x-plane-1112/)
+
+## Installation
+
+1. copy `lua\Xplane_Uipc_Helper_Set_Date_Datarefs.lua` to `C:\X-Plane 12\Resources\plugins\FlyWithLua\Scripts`
+2. extract plugin zip to `C:\X-Plane 12\Resources\plugins`
+
+## Logs and Debugging
+
+Logs are in:
+
+* `C:\X-Plane 12\Log.txt` (plugin load & startup, menu actions)
+* `C:\X-Plane 12\uipc.log` (requested missing offsets, read offsets that don't exist, trace logging etc)
+
+You can modify the trace logging level in `C:\X-Plane 12\Resources\plugins\xplane-uipc\config.toml`. Setting it to `debug` or `trace` will generate a large `uipc.log` file very quickly.
+
+You can also start/stop capture UIPC messages by clicking  "X-Plane UIPC" ->  "Start Capture" / "Stop Capture". Binary dumps of the shared memory IPC messages will be written to `C:\X-Plane 12\Resources\plugins\xplane-uipc\capture`.
+
+## List of supported Offsets
+
+See:
+
+* [SLC-OFFSETS.md](docs\SLC-OFFSETS.md)
+* [mappings.toml](xplane_uipc\mappings.toml)
+
+## Extending mappings.toml / adding your own offsets
+
+See [SLC-OFFSETS.md](docs\SLC-OFFSETS.md) for links and references.
+
+Make your changes to `C:\X-Plane 12\Resources\plugins\xplane-uipc\mappings.toml`, then click "X-Plane UIPC" ->  "Reload Mappings".
 
 ## Project Structure
 

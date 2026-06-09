@@ -30,6 +30,7 @@ fn f64_to_value(value: f64, ty: FsuipcType) -> Value {
         FsuipcType::I64 => Value::Integer64(value as i64),
         FsuipcType::F32 => Value::Float32(value as f32),
         FsuipcType::F64 => Value::Float64(value),
+        FsuipcType::String => Value::String(vec![0]),
     }
 }
 
@@ -212,6 +213,7 @@ fn source_summary(source: &MappingSource) -> String {
         }
         MappingSource::Expr { expr, .. } => expr.to_string(),
         MappingSource::Static { static_value } => format!("static({})", static_value),
+        MappingSource::StaticStr { static_str } => format!("static_str({})", static_str),
     }
 }
 
@@ -227,6 +229,7 @@ fn fsuipc_type_str(ty: FsuipcType) -> &'static str {
         FsuipcType::U64 => "u64",
         FsuipcType::F32 => "f32",
         FsuipcType::F64 => "f64",
+        FsuipcType::String => "string",
     }
 }
 
@@ -245,6 +248,9 @@ fn format_fsuipc_value(val: f64, ty: FsuipcType) -> String {
         }
         FsuipcType::F32 | FsuipcType::F64 => {
             format!("{:.4}", val)
+        }
+        FsuipcType::String => {
+            format!("{}", val as u8 as char)
         }
     }
 }

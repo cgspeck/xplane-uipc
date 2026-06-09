@@ -4,7 +4,7 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use std::collections::HashMap;
-use std::ffi::{CString, c_int};
+use std::ffi::CString;
 use std::sync::{Arc, RwLock};
 
 use ipc_host::value_table::{Table, Value, get_value_table};
@@ -24,33 +24,19 @@ fn f64_to_value(value: f64, ty: FsuipcType) -> Value {
         FsuipcType::I64 => Value::Integer64(value as i64),
         FsuipcType::F32 => Value::Float32(value as f32),
         FsuipcType::F64 => Value::Float64(value),
+        FsuipcType::String => Value::String(vec![0]),
     }
 }
-// use crate::shared_mem::SharedMem;
-// use crate::xplane_sdk::{self, *};
-
-// ─── Enumerations ───────────────────────────────────────────────────────────
-
-pub const XPLM_TYPE_INT: XPLMDataTypeID = 1;
-pub const XPLM_TYPE_FLOAT: XPLMDataTypeID = 2;
-pub const XPLM_TYPE_DOUBLE: XPLMDataTypeID = 4;
-pub const XPLM_TYPE_FLOAT_ARRAY: XPLMDataTypeID = 8;
-pub const XPLM_TYPE_INT_ARRAY: XPLMDataTypeID = 16;
-pub const XPLM_TYPE_DATA: XPLMDataTypeID = 32;
-
-pub const XPLM_FLIGHT_LOOP_PHASE_BEFORE_FLIGHT_MODEL: XPLMFlightLoopPhaseType = 0;
-pub const XPLM_FLIGHT_LOOP_PHASE_AFTER_FLIGHT_MODEL: XPLMFlightLoopPhaseType = 1;
 
 // ─── Resolved dataref handle ──────────────────────────────────────────────────
-
 #[derive(Clone)]
 pub struct ResolvedRef {
     pub handle: XPLMDataRef,
-    pub array_index: i32,
+    pub array_index: Option<i32>,
 }
 
 impl ResolvedRef {
-    fn resolve(path: &str, array_index: i32) -> Self {
+    fn resolve(path: &str, array_index: Option<i32>) -> Self {
         let handle = match CString::new(path) {
             Ok(cs) => unsafe { XPLMFindDataRef(cs.as_ptr()) },
             Err(_) => std::ptr::null_mut(),
@@ -65,37 +51,67 @@ impl ResolvedRef {
     }
 
     /// Read the scalar value from this dataref (returns None if invalid).
+    pub fn read_bytes(&self, max_len: usize) -> Option<Vec<u8>> {
+        if self.handle.is_null() {
+            return None;
+        }
+        let mut buf = vec![0u8; max_len];
+        let bytes_read = unsafe {
+            XPLMGetDatab(
+                self.handle,
+                buf.as_mut_ptr() as *mut std::ffi::c_void,
+                0,
+                max_len as i32,
+            )
+        };
+        if bytes_read == 0 {
+            return None;
+        }
+        buf.truncate(bytes_read as usize);
+        if buf.last() != Some(&0) {
+            buf.push(0);
+        }
+        Some(buf)
+    }
+
     pub fn read(&self) -> Option<f64> {
         if self.handle.is_null() {
             return None;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
-        let val = if ty & XPLM_TYPE_DOUBLE != 0 {
-            unsafe { XPLMGetDatad(self.handle) }
-        } else if ty & XPLM_TYPE_FLOAT != 0 {
-            if self.array_index >= 0 {
-                let mut v: f32 = 0.0;
-                unsafe {
-                    XPLMGetDatavf(self.handle, &mut v, self.array_index, 1);
-                }
-                v as f64
-            } else {
-                unsafe { XPLMGetDataf(self.handle) as f64 }
-            }
-        } else if ty & XPLM_TYPE_INT != 0 {
-            if self.array_index >= 0 {
-                let mut v: i32 = 0;
-                unsafe {
-                    XPLMGetDatavi(self.handle, &mut v, self.array_index, 1);
-                }
-                v as f64
-            } else {
-                unsafe { XPLMGetDatai(self.handle) as f64 }
-            }
+        let memo: Option<f64>;
+
+        if let Some(array_index) = self.array_index {
+            memo = match ty {
+                _ if (ty & xplmType_IntArray) != 0 => unsafe {
+                    let mut v: i32 = 0;
+                    XPLMGetDatavi(self.handle, &mut v, array_index, 1);
+                    tracing::trace!("retrieve array index: {}, i32 value: {}", array_index, v);
+                    Some(v as f64)
+                },
+                _ if (ty & xplmType_FloatArray) != 0 => unsafe {
+                    let mut v: f32 = 0.0;
+                    XPLMGetDatavf(self.handle, &mut v, array_index, 1);
+                    tracing::trace!("retrieve array index: {}, f32 value: {}", array_index, v);
+                    Some(v as f64)
+                },
+                _ => None,
+            };
         } else {
-            return None;
-        };
-        Some(val)
+            tracing::trace!("retrieve scalar value");
+            memo = match ty {
+                _ if (ty & xplmType_Int) != 0 => unsafe { Some(XPLMGetDatai(self.handle) as f64) },
+                _ if (ty & xplmType_Float) != 0 => unsafe {
+                    Some(XPLMGetDataf(self.handle) as f64)
+                },
+                _ if (ty & xplmType_Double) != 0 => unsafe { Some(XPLMGetDatad(self.handle)) },
+                _ => None,
+            };
+        }
+        if memo.is_none() {
+            tracing::trace!("No value retrieved");
+        }
+        memo
     }
 
     pub fn write(&self, xplane_value: f64) {
@@ -103,15 +119,15 @@ impl ResolvedRef {
             return;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
-        if ty & XPLM_TYPE_DOUBLE != 0 {
+        if ty & xplmType_Double != 0 {
             unsafe {
                 XPLMSetDatad(self.handle, xplane_value);
             }
-        } else if ty & XPLM_TYPE_FLOAT != 0 {
+        } else if ty & xplmType_Float != 0 {
             unsafe {
                 XPLMSetDataf(self.handle, xplane_value as f32);
             }
-        } else if ty & XPLM_TYPE_INT != 0 {
+        } else if ty & xplmType_Int != 0 {
             unsafe {
                 XPLMSetDatai(self.handle, xplane_value as i32);
             }
@@ -130,6 +146,9 @@ pub enum ResolvedSource {
     Static {
         static_value: Option<f64>,
     },
+    StaticStr {
+        static_str: String,
+    },
     Expr {
         /// name → resolved ref
         refs: HashMap<String, ResolvedRef>,
@@ -140,6 +159,7 @@ pub enum ResolvedSource {
 pub struct ResolvedMapping {
     pub offset: u16,
     pub fsuipc_type: FsuipcType,
+    pub size: usize,
     pub source: ResolvedSource,
     pub writable: bool,
 }
@@ -167,10 +187,12 @@ impl ResolvedMapping {
             MappingSource::Static { static_value } => ResolvedSource::Static {
                 static_value: Some(static_value),
             },
+            MappingSource::StaticStr { static_str } => ResolvedSource::StaticStr { static_str },
         };
         Self {
             offset: mapping.offset,
             fsuipc_type: mapping.fsuipc_type,
+            size: mapping.size,
             source,
             writable: mapping.writable,
         }
@@ -193,12 +215,33 @@ impl ResolvedMapping {
                 Some(expr.eval(&vars))
             }
             ResolvedSource::Static { static_value } => *static_value,
+            ResolvedSource::StaticStr { .. } => None,
         }
     }
 
     /// Write a value back to X-Plane (simple mappings only; expr write-back
     /// requires knowledge of which dataref to write and the inverse expression,
     /// which is not yet supported).
+    pub fn read_xplane_value(&self) -> Option<Value> {
+        match self.fsuipc_type {
+            FsuipcType::String => {
+                let bytes = match &self.source {
+                    ResolvedSource::Simple { dr, .. } => dr.read_bytes(self.size)?,
+                    ResolvedSource::StaticStr { static_str } => {
+                        let mut b = static_str.as_bytes().to_vec();
+                        b.push(0);
+                        b
+                    }
+                    _ => return None,
+                };
+                Some(Value::String(bytes))
+            }
+            _ => self
+                .read_xplane()
+                .map(|v| f64_to_value(v, self.fsuipc_type)),
+        }
+    }
+
     pub fn write_xplane(&self, fsuipc_value: f64) {
         if !self.writable {
             return;
@@ -252,12 +295,11 @@ impl PluginState {
         let table: Arc<RwLock<Table>> = get_value_table();
         if let Ok(mut table) = table.write() {
             for m in &self.mappings {
-                if let Some(value) = m.read_xplane() {
-                    let entry = f64_to_value(value, m.fsuipc_type);
+                if let Some(value) = m.read_xplane_value() {
                     table.insert(
                         m.offset,
                         ipc_host::value_table::Entry {
-                            value: entry,
+                            value,
                             source: 0,
                             destination: 0,
                             writable: m.writable,
@@ -274,12 +316,11 @@ impl PluginState {
         if let Ok(mut table) = table.write() {
             table.clear_active_and_writable();
             for m in &self.mappings {
-                if let Some(value) = m.read_xplane() {
-                    let entry = f64_to_value(value, m.fsuipc_type);
+                if let Some(value) = m.read_xplane_value() {
                     table.insert(
                         m.offset,
                         ipc_host::value_table::Entry {
-                            value: entry,
+                            value,
                             source: 0,
                             destination: 0,
                             writable: m.writable,
