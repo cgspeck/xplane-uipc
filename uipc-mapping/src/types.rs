@@ -12,6 +12,7 @@ pub enum FsuipcType {
     U64,
     F32,
     F64,
+    String,
 }
 
 impl FsuipcType {
@@ -21,6 +22,7 @@ impl FsuipcType {
             Self::I16 | Self::U16 => 2,
             Self::I32 | Self::U32 | Self::F32 => 4,
             Self::I64 | Self::U64 | Self::F64 => 8,
+            Self::String => 1,
         }
     }
 }
@@ -39,6 +41,7 @@ impl std::str::FromStr for FsuipcType {
             "u64" => Ok(Self::U64),
             "f32" => Ok(Self::F32),
             "f64" => Ok(Self::F64),
+            "string" => Ok(Self::String),
             other => Err(format!("unknown FSUIPC type '{}'", other)),
         }
     }

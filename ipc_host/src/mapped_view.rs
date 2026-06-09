@@ -336,6 +336,18 @@ pub unsafe fn process_mapped_view(
                         tracing::trace!("Writing u64 {} -> offset {:#06x}", v, record.dw_offset);
                         std::ptr::write_unaligned(record.payload_ptr as *mut u64, v.to_le());
                     }
+                    Value::String(bytes) => {
+                        tracing::trace!(
+                            "Writing String ({} bytes) -> offset {:#06x}",
+                            bytes.len(),
+                            record.dw_offset
+                        );
+                        let len = bytes.len().min(record.n_bytes as usize);
+                        std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
+                        for i in len..record.n_bytes as usize {
+                            *record.payload_ptr.add(i) = 0;
+                        }
+                    }
                 }
             } else {
                 tracing::debug!(
@@ -708,5 +720,74 @@ mod tests {
             unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
         // Should handle safely — zero reqID at offset 0, scan forward finds nothing, break
         assert_eq!(error_count, 0);
+    }
+
+    #[test]
+    fn test_process_read_string_value() {
+        let mut table = create_test_table();
+        let bytes: Vec<u8> = b"hello\0".to_vec();
+        table.insert(
+            300,
+            Entry {
+                value: Value::String(bytes),
+                source: 300,
+                destination: 0,
+                writable: false,
+            },
+        );
+
+        let mut data = vec![0u8; 64];
+        data[0] = 1; // reqID
+        data[4] = 44; // offset 300 (0x012C), just low byte for simplicity
+        data[5] = 1; // high byte of offset
+        data[8] = 10; // nBytes = 10
+        data[12] = 0x6C;
+        data[13] = 0x75;
+        data[14] = 0x61;
+        data[15] = 0x50; // sentinel luaP
+
+        let mut warned_set = WarnedSet::new();
+        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        // Payload starts at offset 16
+        let payload: Vec<u8> = data[16..26].to_vec();
+        assert_eq!(&payload[..6], b"hello\0");
+        // Remaining bytes should be zero-filled
+        assert_eq!(payload[6], 0);
+        assert_eq!(payload[7], 0);
+        assert_eq!(payload[8], 0);
+        assert_eq!(payload[9], 0);
+    }
+
+    #[test]
+    fn test_process_read_string_truncated_to_n_bytes() {
+        let mut table = create_test_table();
+        // String longer than n_bytes
+        let bytes: Vec<u8> = b"hello world\0".to_vec();
+        table.insert(
+            400,
+            Entry {
+                value: Value::String(bytes),
+                source: 400,
+                destination: 0,
+                writable: false,
+            },
+        );
+
+        let mut data = vec![0u8; 64];
+        data[0] = 1;
+        data[4] = 144; // offset 400 (0x0190)
+        data[5] = 1;
+        data[8] = 5; // nBytes = 5 (smaller than string length)
+        data[12] = 0x6C;
+        data[13] = 0x75;
+        data[14] = 0x61;
+        data[15] = 0x50;
+
+        let mut warned_set = WarnedSet::new();
+        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        let payload: Vec<u8> = data[16..21].to_vec();
+        assert_eq!(&payload[..], b"hello");
     }
 }

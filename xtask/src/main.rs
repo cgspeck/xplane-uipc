@@ -20,6 +20,7 @@ fn try_main() -> Result<(), DynError> {
     match task.as_deref() {
         Some("dist") => dist()?,
         Some("deploy") => deploy()?,
+        Some("mappings") => mappings()?,
         _ => print_help(),
     }
     Ok(())
@@ -31,6 +32,7 @@ fn print_help() {
 
 dist            builds application and copies assets to dist/ for packaging
 deploy          builds and deploys to X-Plane plugins directory
+mappings        deploys mappings from source  to X-Plane plugin director
 "
     )
 }
@@ -48,6 +50,13 @@ fn deploy() -> Result<(), DynError> {
         .run()
         .unwrap();
 
+    Ok(())
+}
+
+fn mappings() -> Result<(), DynError> {
+    let dest_dir = PathBuf::from(r"C:\X-Plane 12\Resources\plugins\xplane-uipc");
+    let src_mappings = project_root().join("xplane_uipc").join("mappings.toml");
+    fs::copy(&src_mappings, dest_dir.join("mappings.toml"))?;
     Ok(())
 }
 

@@ -4,20 +4,16 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use std::{
-    ffi::{CStr, CString, c_char, c_int, c_void},
+    ffi::{CStr, c_char, c_int, c_void},
     fs::OpenOptions,
     thread,
 };
 
 use crate::menu::build_menu;
-use ipc_host::{
-    IpcCommands, create_ipc_window_and_run,
-    value_table::{Entry, Value, create_table_with_entries, set_value_table},
-};
+use ipc_host::{IpcCommands, create_ipc_window_and_run};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::{Registry, fmt, layer::SubscriberExt, reload, util::SubscriberInitExt};
 pub mod about_window;
-mod fsuipc_offsets;
 pub mod menu;
 mod plugin_state;
 

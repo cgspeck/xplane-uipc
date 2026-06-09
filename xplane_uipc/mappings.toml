@@ -3,7 +3,13 @@
 # =============================================================================
 # Use Plugins ▸ FSUIPC ▸ Reload Mappings to apply changes at runtime.
 #
-# Two mapping forms are supported:
+# Three mapping forms are supported:
+#
+#   Static value
+#     [[mapping]]
+#     offset      = 0x3304
+#     fsuipc_type = "u32"
+#     static_value = 0x50000008
 #
 #   Simple (single dataref + linear transform):
 #     [[mapping]]
@@ -18,16 +24,55 @@
 #     [[mapping]]
 #     offset      = 0x0D0C
 #     fsuipc_type = "u16"
-#     datarefs    = { Nav="sim/cockpit2/switches/navigation_lights_on",
-#                     Bcn="sim/cockpit2/switches/beacon_on" }
-#     expr        = "$Nav 1 * $Bcn 2 * +"
+#     datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on" }
+#     expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * +"
 #
-# RPN operators: + - * / \ (int-div) % ^ abs round & | == != < > <= >= ?
+# TODO: update operator list below
+# RPN operators: + - * / \ % ^ abs round & | == != < > <= >= ?
 # Variable references: $name  (reads the named dataref)
 #
 # All offsets per XPUIPC Offsets PDF and XPUIPCOffsets.cfg reference.
 # Scaling formulas verified against both documents.
 # =============================================================================
+
+
+# customise below and reload mappings for your flight
+
+[[mapping]]
+offset = 0x3500  # Aircraft ATC model name
+fsuipc_type = "string"
+static_value_str = "Boeing 737-800"
+size = 24
+
+[[mapping]]
+offset = 0x3d00  # Aircraft title
+fsuipc_type = "string"
+static_value_str = "ZiboMod Boeing 737-800"
+size = 256
+
+[[mapping]]
+offset = 0x313c  # ATC ID / tail number
+fsuipc_type = "string"
+static_value_str = "VH-VYD"
+size = 12
+
+[[mapping]]
+offset = 0x2480  # Livery name - mentioned in downloaded FSUIPC changelong
+fsuipc_type = "string"
+static_value_str = "Qantas Airways (VH-VYD)"
+size = 128
+
+[[mapping]]
+offset = 0x3160  # ATC type
+fsuipc_type = "string"
+static_value_str = "B738"
+size = 24
+
+[[mapping]]
+offset = 0x3148  # ATC Airline
+fsuipc_type = "string"
+static_value_str = "QFA"
+size = 24
 
 # required for handshake - versions etc
 # =============================================================================
@@ -57,14 +102,353 @@ offset      = 0x320c
 fsuipc_type = "u32"
 static_value = 0x00000000
 
-# # =============================================================================
-# # TIME
-# # 0x0238 = hour of local time (1 byte)
-# # 0x0239 = minute of local time (1 byte)
-# # 0x023A = second of local time (1 byte)
-# # 0x023B = hour of zulu time (1 byte)
-# # 0x023C = minute of zulu time (1 byte)
-# # =============================================================================
+[[mapping]]
+offset      = 0x3364  # ready to fly indicator = loaded
+fsuipc_type = "u8"
+static_value = 0
+
+[[mapping]]
+offset = 0x3365  # in-menu
+fsuipc_type = "u8"
+static_value = 0
+
+[[mapping]]
+offset = 0x0b52  # APU gen active
+fsuipc_type = "u8"
+dataref = "sim/cockpit2/electrical/APU_generator_on"
+
+[[mapping]]
+offset = 0x0b5c  # APU volts
+fsuipc_type = "f32"
+dataref = "sim/cockpit2/electrical/APU_generator_volts"
+
+[[mapping]]
+offset = 0x0b54  # APU RPM pc / N1
+fsuipc_type = "f32"
+dataref = "sim/cockpit2/electrical/APU_N1_percent"
+
+[[mapping]]
+offset = 0x0354  # transponder code
+fsuipc_type = "u16"
+dataref = "sim/cockpit2/radios/actuators/transponder_code"
+
+[[mapping]]
+offset      = 0x0C1A  # sim rate
+fsuipc_type = "u16"
+dataref     = "sim/time/sim_speed"
+scale       = 256.0
+writable    = true
+
+[[mapping]]
+offset      = 0x0E8C  # ambient air temp at altitude
+fsuipc_type = "i16"
+dataref     = "sim/weather/aircraft/temperature_ambient_deg_c"
+scale       = 256.0
+
+[[mapping]]
+offset      = 0x0264  # pause indicator
+fsuipc_type = "u16"
+dataref     = "sim/time/paused"
+
+[[mapping]]
+offset      = 0x02BC  # IAS
+fsuipc_type = "i32"
+dataref     = "sim/flightmodel/position/indicated_airspeed"
+scale       = 128.0                    # knots → knots*128
+
+[[mapping]]
+offset = 0x6010  # gps position lat in degrees
+fsuipc_type = "f64"
+dataref = "sim/flightmodel/position/latitude"
+
+[[mapping]]
+offset = 0x6018  # gps position lng in degrees
+fsuipc_type = "f64"
+dataref = "sim/flightmodel/position/longitude"
+
+[[mapping]]
+offset      = 0x3324  # indicated altitude
+fsuipc_type = "i32"
+datarefs     = { "pilot"="sim/cockpit2/gauges/indicators/altitude_ft_pilot", "copilot"="sim/cockpit2/gauges/indicators/altitude_ft_copilot", "standby"="sim/cockpit2/gauges/indicators/altitude_ft_stby"}
+expr = "$pilot $copilot | $standby |"
+
+[[mapping]]
+offset      = 0x0580  # TRUE heading at a whacky scale
+fsuipc_type = "u32"
+dataref     = "sim/flightmodel/position/true_psi"
+scale       = 11930464.711             # degrees → *65536*65536/360
+
+[[mapping]]
+offset      = 0x0BD0  # Spolier handle position, 4800 = armed
+fsuipc_type = "u32"
+datarefs    = { SB = "sim/cockpit2/controls/speedbrake_ratio" }
+expr        = "$SB 0 > $SB 10763 * 5620 + $SB 0 < $SB -9600 * 0 ? ?"     # 0..1 → 4800..16383
+
+
+[[mapping]]
+offset      = 0x2E80  # Avionics master switch
+fsuipc_type = "u32"
+dataref     = "sim/cockpit2/switches/avionics_power_on"
+writable    = true
+
+[[mapping]]
+offset      = 0x281C  # Battery master on, problematic, because generic always seems to be on
+fsuipc_type = "u32"
+datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
+expr = "$Zibo738 $Generic |"
+
+[[mapping]]
+offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
+fsuipc_type = "u16"
+datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
+expr = "$Zibo738 $Generic |"
+
+[[mapping]]
+offset      = 0x0366  # SIM ON GROUND
+fsuipc_type = "u16"
+dataref     = "sim/flightmodel/failures/onground_any"
+
+[[mapping]]
+offset      = 0x02C8  # Vertical Speed
+fsuipc_type = "i32"
+dataref     = "sim/flightmodel/position/vh_ind"
+scale       = 256.0                    # m/s → 256*m/s
+
+
+[[mapping]]
+offset = 0x030c  # TODO: this is not meant to be updated while 0x0366 On Ground is set
+fsuipc_type = "i32"
+dataref     = "sim/flightmodel/position/vh_ind"
+scale       = 256.0                    # m/s → 256*m/s
+
+
+[[mapping]]
+offset      = 0x11BA  # G-Force, unknown units, TODO: check sign against original
+fsuipc_type = "u16"
+dataref     = "sim/flightmodel/forces/g_nrml"
+scale       = 625.0
+
+# =============================================================================
+# LIGHTS  (combined bitmask)
+# 0x0D0C  bit 0=Nav, 1=Beacon, 2=Landing, 3=Taxi, 4=Strobes  (u16)  rw
+# =============================================================================
+
+[[mapping]]
+offset      = 0x0D0C
+fsuipc_type = "u16"
+datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on" }
+expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * +"
+
+[[mapping]]
+offset      = 0x02B4   # Ground velocity
+fsuipc_type = "i32"
+dataref     = "sim/flightmodel/position/groundspeed"
+scale       = 65536.0                  # m/s → 65536*m/s
+
+[[mapping]]
+offset      = 0x2F70  # Pitch degrees
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/true_theta"
+
+[[mapping]]
+offset      = 0x2F78  # Bank degrees
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel2/position/true_phi"
+
+[[mapping]]
+offset      = 0x30A8  # pitch X rate rad/s
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/Qrad"
+
+[[mapping]]
+offset      = 0x30B0  # roll Z rate rad/s
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/Prad"
+
+[[mapping]]
+offset      = 0x30B8  # yaw Y  rate rad/s
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/Rrad"
+
+[[mapping]]
+offset      = 0x3060  # ACCELERATION BODY X (lateral/side to side)
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/forces/g_side"
+scale       = 32.174                   # G → ft/s²
+
+[[mapping]]
+offset      = 0x3068  # ACCELERATION BODY Y (vertical up/down)
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/forces/g_nrml"
+scale       = 32.174
+
+[[mapping]]
+offset      = 0x3070  # ACCELERATION BODY Z (longitudinal, forward/backward)
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/forces/g_axil"
+scale       = 32.174
+
+[[mapping]]  # TODO: check sign against OG
+offset      = 0x3098  # X (lateral, or left/right) GS-velocity in ft/sec 
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/local_vx"
+scale       = 3.28084
+
+[[mapping]]  # TODO: check sign against OG
+offset      = 0x30A0  # Y (vertical, or up/down) GS-velocity in ft/sec
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/local_vy"
+scale       = 3.28084
+
+[[mapping]]  # TODO: check sign against OG
+offset      = 0x3090  # Z (longitudinal, or forward/backward) GS-velocity in ft/sec
+fsuipc_type = "f64"
+dataref     = "sim/flightmodel/position/local_vz"
+scale       = 3.28084                  # m/s → ft/s
+
+[[mapping]]
+offset      = 0x0330  # Altimeter pressure setting (“Kollsman” window). As millibars (hectoPascals) * 16
+fsuipc_type = "u16"
+dataref     = "sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot"
+scale       = 541.82                   # inHg → mb*16  (1 inHg=33.8639 mb, *16)
+writable    = true
+
+[[mapping]]  # TODO: double check somehow if this is working
+offset = 0x126C  # Fuel Quantity Total Weight in Pounds
+fsuipc_type = "u32"
+datarefs = { Tank0 = "sim/cockpit2/fuel/fuel_quantity[0]", Tank1 = "sim/cockpit2/fuel/fuel_quantity[1]", Tank2 = "sim/cockpit2/fuel/fuel_quantity[2]", Tank3 = "sim/cockpit2/fuel/fuel_quantity[3]", Tank4 = "sim/cockpit2/fuel/fuel_quantity[4]", Tank5 = "sim/cockpit2/fuel/fuel_quantity[5]", Tank6 = "sim/cockpit2/fuel/fuel_quantity[6]", Tank7 = "sim/cockpit2/fuel/fuel_quantity[7]", Tank8 = "sim/cockpit2/fuel/fuel_quantity[8]", Tank9 = "sim/cockpit2/fuel/fuel_quantity[9]" }
+expr = "$Tank0 $Tank1 + $Tank2 + $Tank3 + $Tank4 + $Tank5 + $Tank6 + $Tank7 + $Tank8 + $Tank9 + 2.20462 *"
+
+[[mapping]]
+offset      = 0x0BC8  # parking brake
+fsuipc_type = "u16"
+dataref    = "sim/cockpit2/controls/wheel_brake_ratio_applied"
+scale        = 32767
+writable    = true
+
+[[mapping]]
+offset      = 0x0BB2  # Elevator position control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/total_pitch_ratio"
+scale       = 16383.0
+writable    = true
+
+[[mapping]]
+offset      = 0x0BB6  # Aileron control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/total_roll_ratio"
+scale       = 16383.0
+
+[[mapping]]
+offset      = 0x0BBA  # Rudder control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/total_heading_ratio"
+scale       = 16383.0
+writable    = true
+
+# 0x3328, 0x332A, 0x332C not actually called for by SLC but differentiate from 0x0BB2, 0x0BB6, 0x0BBA
+[[mapping]]
+offset      = 0x3328  # Elevator position control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/yoke_pitch_ratio"
+scale       = 16383.0
+writable    = true
+
+[[mapping]]
+offset      = 0x332A  # Aileron control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/yoke_roll_ratio"
+scale       = 16383.0
+
+[[mapping]]
+offset      = 0x332C  # Rudder control input
+fsuipc_type = "i16"
+dataref     = "sim/cockpit2/controls/yoke_heading_ratio"
+scale       = 16383.0
+writable    = true
+
+[[mapping]]
+offset      = 0x0AEC  # num engines
+# SLC requests it as a u32 but docs indicate it's an u16
+fsuipc_type = "u16"
+dataref     = "sim/aircraft/engine/acf_num_engines"
+
+
+# =============================================================================
+# ENGINE – N1  (turbine, % 0-100 → 0-16384)
+# =============================================================================
+
+[[mapping]]
+offset      = 0x0898
+# SLC requests it as a u32 but docs indicate it's an u16
+fsuipc_type = "i16"
+dataref     = "sim/flightmodel/engine/ENGN_N1_[0]"
+scale       = 163.84                   # % → 0-16384
+
+[[mapping]]
+offset      = 0x0930
+# SLC requests it as a u32 but docs indicate it's an u16
+fsuipc_type = "i16"
+dataref     = "sim/flightmodel/engine/ENGN_N1_[1]"
+scale       = 163.84
+
+[[mapping]]
+offset      = 0x09C8
+# SLC requests it as a u32 but docs indicate it's an u16
+fsuipc_type = "i16"
+dataref     = "sim/flightmodel/engine/ENGN_N1_[2]"
+scale       = 163.84
+
+[[mapping]]
+offset      = 0x0A60
+# SLC requests it as a u32 but docs indicate it's an u16
+fsuipc_type = "i16"
+dataref     = "sim/flightmodel/engine/ENGN_N1_[3]"
+scale       = 163.84
+
+# ======================================================================
+# DOORS
+#
+# There doesn't appear to be any formal documentation about what 
+# bit correspondes with what door, so this may be inaccurage
+#
+# ===================================================================
+[[mapping]]
+offset      = 0x3367
+fsuipc_type = "u8"
+datarefs    = { 738_L1  = "737u/doors/L1", 738_L2  = "737u/doors/L2", 738_R1  = "737u/doors/R1", 738_R2  = "737u/doors/R2", 738_FwdCgo = "737u/doors/Fwd_Cargo", 738_AftCgo = "737u/doors/aft_Cargo" }
+expr        = "$738_L1 $738_L2 | 1 * $738_R2 $738_R1 | 8 * + $738_FwdCgo $738_AftCgo | 32 * +"
+
+[[mapping]]
+offset = 0x341d
+fsuipc_type = "u8"
+dataref = "sim/cockpit2/switches/fasten_seat_belts"
+
+
+[[mapping]]
+offset      = 0x0840
+fsuipc_type = "u16"
+dataref     = "sim/flightmodel2/misc/has_crashed"
+
+[[mapping]]
+offset      = 0x028C
+fsuipc_type = "u8"
+dataref     = "sim/cockpit2/switches/landing_lights_on"
+writable    = true
+
+[[mapping]]
+offset      = 0x0BDC
+fsuipc_type = "u32"
+dataref     = "sim/cockpit2/controls/flap_handle_request_ratio"
+scale       = 16383.0
+writable    = true
+
+[[mapping]]
+offset      = 0x0BE8
+fsuipc_type = "u32"
+dataref     = "sim/cockpit/switches/gear_handle_status"
+scale       = 16383.0
+writable    = true
 
 [[mapping]]
 offset      = 0x0238
@@ -93,171 +477,25 @@ fsuipc_type = "u8"
 dataref     = "sim/cockpit2/clock_timer/zulu_time_minutes"
 writable    = true
 
+# 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
 [[mapping]]
-offset      = 0x024A
-fsuipc_type = "u16"
-datarefs = { "lt_date"="livetraffic/sim/date" }
-expr = "$lt_date 10000 \\"
-
-[[mapping]]
-offset      = 0x0244
-fsuipc_type = "u8"
-datarefs = { "lt_date"="livetraffic/sim/date" }
-expr = "$lt_date 10000 % 100 \\"
-
-[[mapping]]
-offset      = 0x0245
-fsuipc_type = "u8"
-datarefs = { "lt_date"="livetraffic/sim/date" }
-expr = "$lt_date 100 %"
-
-# # =============================================================================
-# # SPEEDS
-# # 0x02B4  GS:  65536 * metres/sec  (i32)
-# # 0x02B8  TAS: knots * 128         (i32)  — X-Plane gives m/s → convert
-# # 0x02BC  IAS: knots * 128         (i32)
-# # 0x02C4  Vmo (barber-pole): knots * 128
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x02B4
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/groundspeed"
-scale       = 65536.0                  # m/s → 65536*m/s
-
-[[mapping]]
-offset      = 0x02B8
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/true_airspeed"
-scale       = 248.81                   # m/s → knots*128  (1 m/s = 1.94384 kts * 128)
-
-[[mapping]]
-offset      = 0x02BC
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/indicated_airspeed"
-scale       = 128.0                    # knots → knots*128
-
-[[mapping]]
-offset      = 0x02C4
-fsuipc_type = "i32"
-dataref     = "sim/aircraft/view/acf_Vne"
-scale       = 128.0                    # knots → knots*128
-
-# # =============================================================================
-# # VERTICAL SPEED
-# # 0x02C8  VSI: 256 * metres/sec, signed  (i32)
-# #         Note: the PDF says "256 * metres/sec", NOT feet/min
-# # 0x030C  VSI copy (airborne only)
-# # 0x0842  VSI in metres/min, -ve=up  (i16)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x02C8
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/vh_ind"
-scale       = 256.0                    # m/s → 256*m/s
-
-[[mapping]]
-offset      = 0x030C
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/vh_ind"
-scale       = 256.0
-
-[[mapping]]
-offset      = 0x0842
+offset      = 0x0246
 fsuipc_type = "i16"
-datarefs    = { VVI = "sim/flightmodel/position/vh_ind" }
-expr        = "$VVI -60 *"             # m/s → m/min, negated (FSUIPC: -ve=up)
-
-
-# # =============================================================================
-# # BAROMETER
-# # 0x0330  Kollsman window: millibars * 16  (u16)  rw
-# # =============================================================================
+dataref    = "xplane-uipc-helper/time/offset_minutes_negated"
 
 [[mapping]]
-offset      = 0x0330
-fsuipc_type = "u16"
-dataref     = "sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot"
-scale       = 541.82                   # inHg → mb*16  (1 inHg=33.8639 mb, *16)
-writable    = true
+offset = 0x115e  # Time of day indicator, 0=Dawn, 1=Day, 2=Dusk, 3=Night. Set according to the local time, read for lighting effects and so on in BGLs
+fsuipc_type = "u8"
+datarefs = { sp = "sim/graphics/scenery/sun_pitch_degrees", lh = "sim/cockpit2/clock_timer/local_time_hours" }
+expr = "$sp 0 <= $sp -6 >= & dup $lh 12 < & 0 swap $lh 12 >= & 2 $sp 0 > 1 3 ? ? ?"
 
-# # =============================================================================
-# # RADIOS  (BCD format)
-# # 0x034C  ADF1 main 3 digits BCD
-# # 0x034E  COM1 4 digits BCD  (leading 1 assumed: 0x2345 = 123.45 MHz)
-# # 0x0350  NAV1 4 digits BCD  (leading 1 assumed: 0x1345 = 113.45 MHz)
-# # 0x0352  NAV2 4 digits BCD
-# # 0x0354  Transponder 4 digits BCD  rw
-# # 0x3118  COM2 4 digits BCD
-# # 0x311A  COM1 standby
-# # 0x311C  COM2 standby
-# # 0x311E  NAV1 standby
-# # 0x3120  NAV2 standby
-# #
-# # X-Plane stores radio frequencies in Hz (integer). FSUIPC uses packed BCD
-# # where 123.45 MHz → 0x2345 (leading 1xx assumed).
-# # Conversion: freq_hz / 10000 gives the 4-digit BCD integer directly
-# # e.g. 122025000 Hz → 12202500 → /10000 → 1220 ... actually:
-# # X-Plane com1_freq_hz is in Hz (e.g. 122025000 for 122.025).
-# # FSUIPC BCD: 122.025 → leading-1 stripped → 2202 (BCD) ... complex.
-# # The most reliable approach: use sim/cockpit/radios/com1_freq_hz (integer kHz*1000)
-# # and divide appropriately. For 8.33 kHz channels use com1_freq_hz_833.
-# # BCD packing is: (MHz_x100 % 10000) packed as BCD → use integer divide.
-# # For now we write raw kHz values; client software handles BCD if needed.
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0354
-fsuipc_type = "u16"
-dataref     = "sim/cockpit/radios/transponder_code"
-writable    = true
-
-# # =============================================================================
-# # ON-GROUND FLAG
-# # 0x0366  0=airborne, 1=on ground  (u16)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0366
-fsuipc_type = "u16"
-dataref     = "sim/flightmodel/failures/onground_any"
-
-# # =============================================================================
-# # STALL / OVERSPEED WARNINGS
-# # 0x036C  stall warning    (u8)
-# # 0x036D  overspeed warning (u8)
-# # =============================================================================
-
-# [[mapping]]
-# offset      = 0x036C
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit2/annunciators/stall_warning"
-
-# [[mapping]]
-# offset      = 0x036D
-# fsuipc_type = "u8"
-# datarefs    = { IAS = "sim/flightmodel/position/indicated_airspeed",                Vne = "sim/aircraft/view/acf_Vne" }
-# expr        = "$IAS $Vne >"            # 1 if IAS > Vne, else 0
-
-# # =============================================================================
-# # TURN RATE
-# # 0x037C  0=level, -512=2min left, +512=2min right  (i16)
-# # =============================================================================
-
-# [[mapping]]
-# offset      = 0x037C
-# fsuipc_type = "i16"
-# dataref     = "sim/cockpit2/gauges/indicators/turn_rate_roll_deg_pilot"
-# scale       = 25.6                     # ±20 deg/s → ±512
-
-# # =============================================================================
-# # POSITION
-# # 0x0560  Latitude  (i64) – FS units: multiply by 90/(10001750*65536*65536)
-# #         Inverse: degrees * 10001750*65536*65536/90
-# # 0x0568  Longitude (i64) – FS units: multiply by 360/(65536^4)
-# #         Inverse: degrees * 65536^4/360
-# # =============================================================================
+# =============================================================================
+# POSITION
+# 0x0560  Latitude  (i64) – FS units: multiply by 90/(10001750*65536*65536)
+#         Inverse: degrees * 10001750*65536*65536/90
+# 0x0568  Longitude (i64) – FS units: multiply by 360/(65536^4)
+#         Inverse: degrees * 65536^4/360
+# =============================================================================
 
 [[mapping]]
 offset      = 0x0560
@@ -271,35 +509,33 @@ fsuipc_type = "i64"
 dataref     = "sim/flightmodel/position/longitude"
 scale       = 12947848928.8888         # degrees → FS lon units (65536^4/360)
 
-# # =============================================================================
-# # ALTITUDE
-# # 0x0570  altitude in metres as FLOAT64 split:
-# #           high 32-bit integer (0x0574) = whole metres
-# #           low  32-bit integer (0x0570) = fractional metres * 2^32
-# #         We write the whole metres to 0x0574 and zero to 0x0570 (sufficient
-# #         for most clients which only read 0x0574).
-# # =============================================================================
+# =============================================================================
+# ALTITUDE
+# 0x0570  altitude in metres as FLOAT64 split:
+#           high 32-bit integer (0x0574) = whole metres
+#           low  32-bit integer (0x0570) = fractional metres * 2^32
+#         We write the whole metres to 0x0574 and zero to 0x0570 (sufficient
+#         for most clients which only read 0x0574).
+# =============================================================================
 
 [[mapping]]
-offset      = 0x0574
+offset      = 0x0574 # elevation in metres, whole-part only, if specifcally called
 fsuipc_type = "i32"
 dataref     = "sim/flightmodel/position/elevation"
-# elevation in metres, whole-part only
 
 [[mapping]]
-offset      = 0x0570
-fsuipc_type = "i32"
+offset      = 0x0570  # This sets the full Q-word - as it is retrieved by SLC - 8 bytes
+fsuipc_type = "i64"
 datarefs    = { elev = "sim/flightmodel/position/elevation" }
 expr        = "$elev 1 % 4294967296 *"  # fractional metres * 2^32
 
-# # =============================================================================
-# # ATTITUDE
-# # 0x0578  Pitch:   *360/(65536*65536) for degrees. 0=level, -ve=nose up
-# #         Inverse: degrees * 65536*65536/360  NOTE: X-Plane: +ve=nose up → negate
-# # 0x057C  Bank:    *360/(65536*65536), -ve=right wing down
-# #         X-Plane phi: +ve=right wing down → negate
-# # 0x0580  Heading (true): *360/(65536*65536), unsigned
-# # =============================================================================
+# =============================================================================
+# ATTITUDE
+# 0x0578  Pitch:   *360/(65536*65536) for degrees. 0=level, -ve=nose up
+#         Inverse: degrees * 65536*65536/360  NOTE: X-Plane: +ve=nose up → negate
+# 0x057C  Bank:    *360/(65536*65536), -ve=right wing down
+#         X-Plane phi: +ve=right wing down → negate
+# =============================================================================
 
 [[mapping]]
 offset      = 0x0578
@@ -313,485 +549,53 @@ fsuipc_type = "i32"
 datarefs    = { bank = "sim/flightmodel/position/phi" }
 expr        = "$bank -1 * 65536 * 65536 * 360 /"    # negate + scale
 
+
+# 0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left
+#             (port), 2=pushing back, tail to swing to right (starboard)
 [[mapping]]
-offset      = 0x0580
+offset = 0x31F0
 fsuipc_type = "u32"
-dataref     = "sim/flightmodel/position/psi"
-scale       = 11930464.711             # degrees → *65536*65536/360
-
-# # =============================================================================
-# # SLEW MODE - not mappable
-# # 0x05DC  0=off, 1=on  (u16)
-# # =============================================================================
+datarefs = { BP_Started ="bp/started", PB_Attached = "sim/aircraft/overflow/pushback_attached" }
+expr = "$BP_Started $PB_Attached | 0 3 ?"
 
 [[mapping]]
-offset      = 0x05DC
-fsuipc_type = "u16"
-static_value = 0
-
-# # =============================================================================
-# # ENGINE – N1  (turbine, % 0-100 → 0-16384)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0898
-fsuipc_type = "i16"
-dataref     = "sim/flightmodel/engine/ENGN_N1_[0]"
-scale       = 163.84                   # % → 0-16384
-
-[[mapping]]
-offset      = 0x0930
-fsuipc_type = "i16"
-dataref     = "sim/flightmodel/engine/ENGN_N1_[1]"
-scale       = 163.84
-
-[[mapping]]
-offset      = 0x09C8
-fsuipc_type = "i16"
-dataref     = "sim/flightmodel/engine/ENGN_N1_[2]"
-scale       = 163.84
-
-[[mapping]]
-offset      = 0x0A60
-fsuipc_type = "i16"
-dataref     = "sim/flightmodel/engine/ENGN_N1_[3]"
-scale       = 163.84
-
-# # =============================================================================
-# # FLIGHT CONTROLS  rw
-# # 0x0BB2  Elevator input    -16383..+16383  (i16)
-# # 0x0BB6  Aileron input     -16383..+16383  (i16)
-# # 0x0BBA  Rudder input      -16383..+16383  (i16)
-# # 0x0BC0  Elevator trim     -16383..+16383  (i16)
-# # 0x0BC4  Left brake        0..16383        (u16)
-# # 0x0BC6  Right brake       0..16383        (u16)
-# # 0x0BC8  Parking brake     0/32767         (u16)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0BB2
-fsuipc_type = "i16"
-dataref     = "sim/joystick/FC_ptch"
-scale       = 16383.0
-writable    = true
-
-[[mapping]]
-offset      = 0x0BB6
-fsuipc_type = "i16"
-dataref     = "sim/joystick/FC_roll"
-scale       = 16383.0
-writable    = true
-
-[[mapping]]
-offset      = 0x0BBA
-fsuipc_type = "i16"
-dataref     = "sim/joystick/FC_hdng"
-scale       = 16383.0
-writable    = true
-
-# [[mapping]]
-# offset      = 0x0BC0
-# fsuipc_type = "i16"
-# dataref     = "sim/cockpit2/controls/elevator_trim"
-# scale       = 16383.0
-# writable    = true
-
-# [[mapping]]
-# offset      = 0x0BC4
-# fsuipc_type = "u16"
-# dataref     = "sim/cockpit2/controls/left_brake_ratio"
-# scale       = 16383.0
-# writable    = true
-
-# [[mapping]]
-# offset      = 0x0BC6
-# fsuipc_type = "u16"
-# dataref     = "sim/cockpit2/controls/right_brake_ratio"
-# scale       = 16383.0
-# writable    = true
-
-[[mapping]]
-offset      = 0x0BC8
-fsuipc_type = "u16"
-datarefs    = { PB = "sim/cockpit2/controls/parking_brake_ratio" }
-expr        = "$PB 32767 *"
-writable    = true
-
-# # =============================================================================
-# # SPOILERS  rw
-# # 0x0BCC  Spoiler arm   (u32)
-# # 0x0BD0  Spoiler control 0/4800/5620-16383  (u32)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0BD0
-fsuipc_type = "u32"
-datarefs    = { SB = "sim/cockpit2/controls/speedbrake_ratio" }
-expr        = "$SB 11583 * 4800 +"     # 0..1 → 4800..16383
-
-# # =============================================================================
-# # FLAPS  rw
-# # 0x0BDC  Flaps control   0..16383  (u32)
-# # 0x0BE0  Flaps left pos  0..16383  (u32)
-# # 0x0BE4  Flaps right pos 0..16383  (u32)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0BDC
-fsuipc_type = "u32"
-dataref     = "sim/cockpit2/controls/flap_handle_request_ratio"
-scale       = 16383.0
-writable    = true
-
-# # =============================================================================
-# # GEAR  rw
-# # 0x0BE8  Gear control   0=up, 16383=down  (u32)
-# # 0x0BEC  Gear nose pos  0..16383  (u32)
-# # 0x0BF0  Gear right pos 0..16383  (u32)
-# # 0x0BF4  Gear left pos  0..16383  (u32)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0BE8
-fsuipc_type = "u32"
-dataref     = "sim/cockpit/switches/gear_handle_status"
-scale       = 16383.0
-writable    = true
-
-# # =============================================================================
-# # SIMULATION RATE
-# # 0x0C1A  rate * 256  (u16)  rw
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0C1A
-fsuipc_type = "u16"
-dataref     = "sim/time/sim_speed"
-scale       = 256.0
-writable    = true
-
-# # =============================================================================
-# # LIGHTS  (combined bitmask)
-# # 0x0D0C  bit 0=Nav, 1=Beacon, 2=Landing, 3=Taxi, 4=Strobes  (u16)  rw
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0D0C
-fsuipc_type = "u16"
-datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", Strb = "sim/cockpit2/switches/strobe_lights_on" }
-expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $Taxi 8 * + $Strb 16 * +"
-
-# # =============================================================================
-# # ELECTRICAL  rw
-# # 0x281C  Battery master   (u32)
-# # 0x2E80  Avionics master  (u32)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x281C
-fsuipc_type = "u32"
-dataref     = "sim/cockpit/electrical/battery_on"
-writable    = true
-
-[[mapping]]
-offset      = 0x2E80
-fsuipc_type = "u32"
-dataref     = "sim/cockpit/electrical/avionics_on"
-writable    = true
-
-# # =============================================================================
-# # ATTITUDE INDICATOR (FLOAT64)
-# # 0x2F70  Pitch degrees
-# # 0x2F78  Bank degrees
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x2F70
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/true_theta"
-
-[[mapping]]
-offset      = 0x2F78
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel2/position/true_phi"
-
-# # =============================================================================
-# # BODY-AXIS ACCELERATIONS  (FLOAT64, ft/s²)
-# # 0x3060  X (lateral)
-# # 0x3068  Y (vertical)
-# # 0x3070  Z (longitudinal)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x3060
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/forces/g_side"
-scale       = 32.174                   # G → ft/s²
-
-[[mapping]]
-offset      = 0x3068
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/forces/g_nrml"
-scale       = 32.174
-
-[[mapping]]
-offset      = 0x3070
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/forces/g_axil"
-scale       = 32.174
-
-# # =============================================================================
-# # BODY-AXIS VELOCITIES  (FLOAT64, ft/s)
-# # 0x3090  Z (forward)  rw
-# # 0x3098  X (lateral)
-# # 0x30A0  Y (vertical)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x3090
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/local_vz"
-scale       = 3.28084                  # m/s → ft/s
-
-[[mapping]]
-offset      = 0x3098
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/local_vx"
-scale       = 3.28084
-
-[[mapping]]
-offset      = 0x30A0
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/local_vy"
-scale       = 3.28084
-
-# # =============================================================================
-# # G-FORCE
-# # 0x11BA  /625 gives sensible G values  (u16)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x11BA
-fsuipc_type = "u16"
-dataref     = "sim/flightmodel/forces/g_nrml"
-scale       = 625.0
-
-# # =============================================================================
-# # TEMPERATURES
-# # 0x0E8C  OAT degrees C * 256  (i16)
-# # 0x0EC0  Surface temp C * 256  (i16)
-# # 0x11D0  TAT degrees C * 256  (i16)
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0E8C
-fsuipc_type = "i16"
-dataref     = "sim/weather/aircraft/temperature_ambient_deg_c"
-scale       = 256.0
-
-# [[mapping]]
-# offset      = 0x0EC0
-# fsuipc_type = "i16"
-# dataref     = "sim/weather/temperature_sealevel_c"
-# scale       = 256.0
-
-# [[mapping]]
-# offset      = 0x11D0
-# fsuipc_type = "i16"
-# dataref     = "sim/weather/temperature_le_c"
-# scale       = 256.0
-
-# # =============================================================================
-# # PAUSE
-# # 0x0262  Pause control  (u16)  rw
-# # 0x0264  Pause indicator (u16) r
-# # =============================================================================
-
-[[mapping]]
-offset      = 0x0262
-fsuipc_type = "u16"
-dataref     = "sim/time/paused"
-writable    = true
-
-[[mapping]]
-offset      = 0x0264
-fsuipc_type = "u16"
-dataref     = "sim/time/paused"
-
-# # =============================================================================
-# # RECONCILIATION ADDITIONS
-# # All offsets from XPUIPC_Offsets_20140803.pdf not previously covered.
-# # Offsets that have no direct dataref mapping (string buffers, TCAS structs,
-# # AI traffic blobs, read-only FS internals with no X-Plane equivalent) are
-# # listed as comments so they are documented but not silently absent.
-# # =============================================================================
-
-# # -----------------------------------------------------------------------------
-# # GROUND ALTITUDE
-# # 0x0020  ground altitude metres * 256  (i32) r
-# # 0x0B4C  ground altitude metres        (u16) r  (less precise copy)
-# # -----------------------------------------------------------------------------
-
-[[mapping]]
-offset      = 0x0020
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/elevation"
-scale       = 256.0                    # metres → metres*256  (approximation: uses aircraft elev as ground)
-
-# [[mapping]]
-# offset      = 0x0B4C
-# fsuipc_type = "u16"
-# dataref     = "sim/flightmodel/position/elevation"
-
-# # -----------------------------------------------------------------------------
-# # TIME EXTRAS
-# # 0x023E  day-of-year  (u16) rw
-# # 0x0240  year         (u16) rw
-# # 0x0246  local offset from Zulu minutes, +ve=behind  (i16) r
-# # 0x0274  frame rate = 32768/this value  (u16) r
-# # -----------------------------------------------------------------------------
-
-[[mapping]]
-offset      = 0x023E
-fsuipc_type = "u16"
-dataref     = "sim/time/local_date_days"
-writable    = true
-
-# [[mapping]]
-# offset      = 0x0240  – not available
-# fsuipc_type = "u16"
-
-# 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
-[[mapping]]
-offset      = 0x0246
-fsuipc_type = "i16"
-datarefs    = { zh = "sim/cockpit2/clock_timer/zulu_time_hours", zm = "sim/cockpit2/clock_timer/zulu_time_minutes", lh = "sim/cockpit2/clock_timer/local_time_hours", lm = "sim/cockpit2/clock_timer/local_time_minutes" }
-expr        = "$zh 60 * $zm + $lh 60 * $lm + - dup dup 720 > 1440 0 ? swap -720 < 1440 0 ? swap - +"
-
-# [[mapping]]
-# offset      = 0x0274
-# fsuipc_type = "u16"
-# datarefs    = { FPS = "sim/operation/misc/frame_rate_period" }
-# expr        = "32768 $FPS /"           # period → 32768/fps_value
-
-# # -----------------------------------------------------------------------------
-# # LIGHTS (individual byte offsets – legacy; 0x0D0C bitmask is preferred)
-# # 0x0280  NAV lights (r only, reflects NAV setting)  (u8)
-# # 0x0281  Strobe/beacon  (u8) rw
-# # 0x028C  Landing lights (u16) rw
-# # 0x029C  Pitot heat     (u16) rw
-# # -----------------------------------------------------------------------------
-
-# [[mapping]]
-# offset      = 0x0280
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit2/switches/navigation_lights_on"
-
-# [[mapping]]
-# offset      = 0x0281
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit2/switches/strobe_lights_on"
-# writable    = true
-
-[[mapping]]
-offset      = 0x028C
+offset = 0x7b91  # SquawkBox Transponder mode, 0 = normal, 1 = standby: https://squawkbox.ca/doc/sdk/fsuipc.php
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/switches/landing_lights_on"
-writable    = true
-
-# [[mapping]]
-# offset      = 0x029C
-# fsuipc_type = "u16"
-# dataref     = "sim/cockpit2/switches/pitot_heat_on"
-# writable    = true
-
-# # -----------------------------------------------------------------------------
-# # CRASH / SAFETY FLAGS
-# # 0x0840  crashed  (u16) r
-# # 0x0848  off-runway crash detection  (u16)
-# # 0x084A  can collide with dynamic scenery  (u16)
-# # -----------------------------------------------------------------------------
+datarefs = { T_Mode = "sim/cockpit2/radios/actuators/transponder_mode" }
+expr = "$T_Mode 2 <"
 
 [[mapping]]
-offset      = 0x0840
+offset = 0x023e  # Zulu day of year (TODO: 0 or 1 indexed?)
 fsuipc_type = "u16"
-dataref     = "sim/flightmodel2/misc/has_crashed"
+dataref = "sim/time/zulu_date_days"  # 0 indexed
 
-# # -----------------------------------------------------------------------------
-# # ENGINE COUNT & FUEL WEIGHT
-# # 0x0AEC  number of engines  (u16) r
-# # 0x0AF4  fuel weight lbs/gallon*256  (u16) r
-# # -----------------------------------------------------------------------------
-
+# provided by custom LUA script
 [[mapping]]
-offset      = 0x0AEC
-fsuipc_type = "u16"
-dataref     = "sim/aircraft/engine/acf_num_engines"
-
-# # -----------------------------------------------------------------------------
-# # BODY-AXIS ANGULAR ACCELERATIONS & RATES  (FLOAT64)
-# # 0x3078  pitch accel rad/s²
-# # 0x3080  roll  accel rad/s²
-# # 0x3088  yaw   accel rad/s²
-# # 0x30A8  pitch rate rad/s
-# # 0x30B0  roll  rate rad/s
-# # 0x30B8  yaw   rate rad/s
-# # -----------------------------------------------------------------------------
-
-[[mapping]]
-offset      = 0x30A8
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/Qrad"
-
-[[mapping]]
-offset      = 0x30B0
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/Prad"
-
-[[mapping]]
-offset      = 0x30B8
-fsuipc_type = "f64"
-dataref     = "sim/flightmodel/position/Rrad"
-
-# # -----------------------------------------------------------------------------
-# # ELECTRICAL INDIVIDUAL SWITCHES
-# # 0x3101  Alternator 1=on  (u8) rw
-# # 0x3102  Battery    1=on  (u8) rw  (mirrors 0x281C)
-# # 0x3103  Avionics   1=on  (u8) rw  (mirrors 0x2E80)
-# # 0x3104  Fuel pump  1=on  (u8) rw
-# # -----------------------------------------------------------------------------
-
-# [[mapping]]
-# offset      = 0x3101
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit/electrical/generator_on[0]"
-# writable    = true
-
-[[mapping]]
-offset      = 0x3102
+offset = 0x0245  # local day of month
 fsuipc_type = "u8"
-dataref     = "sim/cockpit/electrical/battery_on"
-writable    = true
-
-# [[mapping]]
-# offset      = 0x3103
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit/electrical/avionics_on"
-# writable    = true
-
-# [[mapping]]
-# offset      = 0x3104
-# fsuipc_type = "u8"
-# dataref     = "sim/cockpit/engine/fuel_pump_on[0]"
-# writable    = true
-
-# # -----------------------------------------------------------------------------
-# # ALTIMETER READOUT
-# # 0x3324  altimeter reading feet or metres  (i32) r
-# # -----------------------------------------------------------------------------
+dataref = "xplane-uipc-helper/time/local_day_of_month"
 
 [[mapping]]
-offset      = 0x3324
-fsuipc_type = "i32"
-dataref     = "sim/flightmodel/misc/h_ind"
-scale       = 3.28084                  # metres → feet (approximate; ignores metric pref)
+offset = 0x0244  # local month of year
+fsuipc_type = "u8"
+dataref = "xplane-uipc-helper/time/local_month"
+
+[[mapping]]
+offset = 0x024a  # local month of year
+fsuipc_type = "u16"
+dataref = "xplane-uipc-helper/time/local_year"
+
+[[mapping]]
+offset = 0x0240  # local month of year
+fsuipc_type = "u16"
+dataref = "xplane-uipc-helper/time/zulu_year"
+
+[[mapping]]
+offset = 0x023d  # zulu day of month
+fsuipc_type = "u8"
+dataref = "xplane-uipc-helper/time/zulu_day_of_month"
+
+[[mapping]]
+offset = 0x0242  # zulu day of month
+fsuipc_type = "u8"
+dataref = "xplane-uipc-helper/time/zulu_month"

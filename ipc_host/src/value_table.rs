@@ -11,6 +11,7 @@ pub enum Value {
     Float32(f32),
     Float64(f64),
     Bool(bool),
+    String(Vec<u8>),
 }
 
 #[derive(Clone, Debug)]
@@ -218,6 +219,7 @@ mod tests {
                 (Value::Float32(a), Value::Float32(b)) => assert_eq!(a, b),
                 (Value::Float64(a), Value::Float64(b)) => assert_eq!(a, b),
                 (Value::Bool(a), Value::Bool(b)) => assert_eq!(a, b),
+                (Value::String(a), Value::String(b)) => assert_eq!(a, b),
                 _ => panic!(
                     "variant mismatch at offset {}: stored {:?}, expected {:?}",
                     offset, stored, expected
