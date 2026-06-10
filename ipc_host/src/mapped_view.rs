@@ -331,11 +331,11 @@ pub unsafe fn process_mapped_view(
                                 f64::from_bits(v.to_bits().to_le()),
                             )
                         }
-                        Value::SignedInt8(v) => {
+                        Value::Integer8(v) => {
                             tracing::trace!("Writing i8 {} -> offset {:#06x}", v, record.dw_offset);
                             std::ptr::write_unaligned(record.payload_ptr as *mut i8, v.to_le());
                         }
-                        Value::SignedInt16(v) => {
+                        Value::Integer16(v) => {
                             tracing::trace!(
                                 "Writing i64 {} -> offset {:#06x}",
                                 v,
@@ -343,7 +343,7 @@ pub unsafe fn process_mapped_view(
                             );
                             std::ptr::write_unaligned(record.payload_ptr as *mut i16, v.to_le());
                         }
-                        Value::SignedInt32(v) => {
+                        Value::Integer32(v) => {
                             tracing::trace!(
                                 "Writing i32 {} -> offset {:#06x}",
                                 v,
@@ -359,11 +359,11 @@ pub unsafe fn process_mapped_view(
                             );
                             std::ptr::write_unaligned(record.payload_ptr as *mut i64, v.to_le());
                         }
-                        Value::UnsignedInt8(v) => {
+                        Value::UnsignedInteger8(v) => {
                             tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
                             std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
                         }
-                        Value::UnsignedInt16(v) => {
+                        Value::UnsignedInteger16(v) => {
                             tracing::trace!(
                                 "Writing u16 {} -> offset {:#06x}",
                                 v,
@@ -379,7 +379,7 @@ pub unsafe fn process_mapped_view(
                             );
                             std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
                         }
-                        Value::UnsignedInt64(v) => {
+                        Value::UnsignedInteger64(v) => {
                             tracing::trace!(
                                 "Writing u64 {} -> offset {:#06x}",
                                 v,
