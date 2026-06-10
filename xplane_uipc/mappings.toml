@@ -514,8 +514,6 @@ scale       = 12947848928.8888         # degrees → FS lon units (65536^4/360)
 # 0x0570  altitude in metres as FLOAT64 split:
 #           high 32-bit integer (0x0574) = whole metres
 #           low  32-bit integer (0x0570) = fractional metres * 2^32
-#         We write the whole metres to 0x0574 and zero to 0x0570 (sufficient
-#         for most clients which only read 0x0574).
 # =============================================================================
 
 [[mapping]]
@@ -524,7 +522,7 @@ fsuipc_type = "i32"
 dataref     = "sim/flightmodel/position/elevation"
 
 [[mapping]]
-offset      = 0x0570  # This sets the full Q-word - as it is retrieved by SLC - 8 bytes
+offset      = 0x0570
 fsuipc_type = "i64"
 datarefs    = { elev = "sim/flightmodel/position/elevation" }
 expr        = "$elev 1 % 4294967296 *"  # fractional metres * 2^32

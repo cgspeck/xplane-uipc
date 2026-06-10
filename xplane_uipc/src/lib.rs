@@ -1,7 +1,11 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+use bindings::*;
 
 use std::{
     ffi::{CStr, c_char, c_int, c_void},
@@ -77,8 +81,11 @@ pub unsafe extern "C" fn XPluginStart(
     out_sig: *mut c_char,
     out_desc: *mut c_char,
 ) -> c_int {
-    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_PATHS".as_ptr(), 1) };
-    unsafe { XPLMEnableFeature(c"XPLM_USE_NATIVE_WIDGET_WINDOWS".as_ptr(), 1) };
+    // SAFETY: X-Plane SDK calls with valid pointers provided by the host
+    unsafe {
+        XPLMEnableFeature(c"XPLM_USE_NATIVE_PATHS".as_ptr(), 1);
+        XPLMEnableFeature(c"XPLM_USE_NATIVE_WIDGET_WINDOWS".as_ptr(), 1);
+    }
     let copy = |s: &str, d: *mut c_char| unsafe {
         std::ptr::copy_nonoverlapping(s.as_ptr() as *const c_char, d, s.len());
     };
@@ -89,16 +96,16 @@ pub unsafe extern "C" fn XPluginStart(
     xplane_log(&format!("XPluginStart v{}", plugin_version()));
 
     let mut system_path_buf = [0u8; 512];
-    XPLMGetSystemPath(system_path_buf.as_mut_ptr() as *mut c_char);
-    let system_path = CStr::from_ptr(system_path_buf.as_ptr() as *const c_char)
+    unsafe { XPLMGetSystemPath(system_path_buf.as_mut_ptr() as *mut c_char) };
+    let system_path = unsafe { CStr::from_ptr(system_path_buf.as_ptr() as *const c_char) }
         .to_string_lossy()
         .into_owned();
     // [xplane-uipc] XPLMGetSystemPath: C:\X-Plane 12/
     xplane_log(&format!("XPLMGetSystemPath: {}", system_path));
 
     let mut prefs_path_buf = [0u8; 512];
-    XPLMGetPrefsPath(prefs_path_buf.as_mut_ptr() as *mut c_char);
-    let prefs_path = CStr::from_ptr(prefs_path_buf.as_ptr() as *const c_char)
+    unsafe { XPLMGetPrefsPath(prefs_path_buf.as_mut_ptr() as *mut c_char) };
+    let prefs_path = unsafe { CStr::from_ptr(prefs_path_buf.as_ptr() as *const c_char) }
         .to_string_lossy()
         .into_owned();
     // [xplane-uipc] XPLMGetPrefsPath: C:\X-Plane 12/Output/preferences/Set X-Plane.prf
@@ -209,9 +216,6 @@ static WRITE_REQUEST_RX: std::sync::LazyLock<
     std::sync::Mutex<Option<std::sync::mpsc::Receiver<ipc_host::WriteRequest>>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
 
-static FLIGHT_LOOP_ID: std::sync::LazyLock<std::sync::Mutex<Option<std::ffi::c_void>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
-
 static TRACING_FILTER_HANDLE: std::sync::OnceLock<reload::Handle<LevelFilter, Registry>> =
     std::sync::OnceLock::new();
 
@@ -273,15 +277,15 @@ const FLIGHT_LOOP_INTERVAL: f32 = 1.0 / 20.0; // 20 Hz
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn flight_loop_callback(
-    _inElapsedTimeSinceLastFlightLoop: f32,
-    _inElapsedTimeSinceLastCall: f32,
-    _inCounter: i32,
-    _inRefcon: *mut std::ffi::c_void,
+    _elapsed_since_last_flight_loop: f32,
+    _elapsed_since_last_call: f32,
+    _counter: i32,
+    _refcon: *mut std::ffi::c_void,
 ) -> f32 {
     let guard = PLUGIN_STATE_PTR.lock().unwrap();
     let PluginStatePtr(ptr) = *guard;
     if !ptr.is_null() {
-        let state = &mut *(ptr as *mut PluginState);
+        let state = unsafe { &mut *(ptr as *mut PluginState) };
 
         let write_guard = WRITE_REQUEST_RX.lock().unwrap();
         if let Some(rx) = write_guard.as_ref() {
@@ -337,11 +341,7 @@ pub fn load_mappings_and_init() -> Result<(), String> {
         state.mappings = resolved_mappings;
         tracing::info!("Mappings reloaded successfully");
     } else {
-        let state = Box::new(PluginState::new(
-            resolved_mappings,
-            config_path.to_string(),
-            20.0,
-        ));
+        let state = Box::new(PluginState::new(resolved_mappings));
         let new_ptr = Box::into_raw(state) as *mut std::ffi::c_void;
         *guard = PluginStatePtr(new_ptr);
         tracing::info!("Plugin state initialized");
@@ -386,11 +386,13 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     }
 
     tracing::info!("Registering flight loop callback...");
-    XPLMRegisterFlightLoopCallback(
-        Some(flight_loop_callback),
-        FLIGHT_LOOP_INTERVAL,
-        std::ptr::null_mut(),
-    );
+    unsafe {
+        XPLMRegisterFlightLoopCallback(
+            Some(flight_loop_callback),
+            FLIGHT_LOOP_INTERVAL,
+            std::ptr::null_mut(),
+        );
+    }
     tracing::info!("Flight loop registered at 20Hz");
 
     tracing::info!("Creating IPC_COMMAND_CHANNEL");
@@ -440,7 +442,7 @@ pub unsafe extern "C" fn XPluginDisable() {
     xplane_log("Plugin disabled");
 
     tracing::info!("Unregistering flight loop callback...");
-    XPLMUnregisterFlightLoopCallback(Some(flight_loop_callback), std::ptr::null_mut());
+    unsafe { XPLMUnregisterFlightLoopCallback(Some(flight_loop_callback), std::ptr::null_mut()) };
 
     tracing::info!("Shutting down IPC thread...");
     {
@@ -462,7 +464,7 @@ pub unsafe extern "C" fn XPluginDisable() {
     let mut guard = PLUGIN_STATE_PTR.lock().unwrap();
     let PluginStatePtr(ptr) = std::mem::replace(&mut *guard, PluginStatePtr(std::ptr::null_mut()));
     if !ptr.is_null() {
-        drop(Box::from_raw(ptr as *mut PluginState));
+        unsafe { drop(Box::from_raw(ptr as *mut PluginState)) };
     }
 }
 

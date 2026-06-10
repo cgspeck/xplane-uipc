@@ -1,12 +1,12 @@
 #[derive(Clone, Debug)]
 pub enum Value {
-    UnsignedInt8(u8),
-    SignedInt8(i8),
-    UnsignedInt16(u16),
-    SignedInt16(i16),
+    UnsignedInteger8(u8),
+    Integer8(i8),
+    UnsignedInteger16(u16),
+    Integer16(i16),
     UnsignedInteger32(u32),
-    SignedInt32(i32),
-    UnsignedInt64(u64),
+    Integer32(i32),
+    UnsignedInteger64(u64),
     Integer64(i64),
     Float32(f32),
     Float64(f64),
@@ -160,31 +160,31 @@ mod tests {
 
         let cases: Vec<(u16, Value)> = vec![
             // Unsigned integers
-            (0, Value::UnsignedInt8(0)),
-            (1, Value::UnsignedInt8(127)),
-            (2, Value::UnsignedInt8(255)),
-            (3, Value::UnsignedInt16(0)),
-            (4, Value::UnsignedInt16(32767)),
-            (5, Value::UnsignedInt16(65535)),
+            (0, Value::UnsignedInteger8(0)),
+            (1, Value::UnsignedInteger8(127)),
+            (2, Value::UnsignedInteger8(255)),
+            (3, Value::UnsignedInteger16(0)),
+            (4, Value::UnsignedInteger16(32767)),
+            (5, Value::UnsignedInteger16(65535)),
             (6, Value::UnsignedInteger32(0)),
             (7, Value::UnsignedInteger32(2_147_483_647)),
             (8, Value::UnsignedInteger32(4_294_967_295)),
-            (9, Value::UnsignedInt64(0)),
-            (10, Value::UnsignedInt64(u64::MAX)),
+            (9, Value::UnsignedInteger64(0)),
+            (10, Value::UnsignedInteger64(u64::MAX)),
             // Signed integers
-            (20, Value::SignedInt8(0)),
-            (21, Value::SignedInt8(127)),
-            (22, Value::SignedInt8(-1)),
-            (23, Value::SignedInt8(-128)),
-            (24, Value::SignedInt16(0)),
-            (25, Value::SignedInt16(32767)),
-            (26, Value::SignedInt16(-1)),
-            (27, Value::SignedInt16(-10)),
-            (28, Value::SignedInt16(-32768)),
-            (29, Value::SignedInt32(0)),
-            (30, Value::SignedInt32(2_147_483_647)),
-            (31, Value::SignedInt32(-1)),
-            (32, Value::SignedInt32(-2_147_483_648)),
+            (20, Value::Integer8(0)),
+            (21, Value::Integer8(127)),
+            (22, Value::Integer8(-1)),
+            (23, Value::Integer8(-128)),
+            (24, Value::Integer16(0)),
+            (25, Value::Integer16(32767)),
+            (26, Value::Integer16(-1)),
+            (27, Value::Integer16(-10)),
+            (28, Value::Integer16(-32768)),
+            (29, Value::Integer32(0)),
+            (30, Value::Integer32(2_147_483_647)),
+            (31, Value::Integer32(-1)),
+            (32, Value::Integer32(-2_147_483_648)),
             (33, Value::Integer64(0)),
             (34, Value::Integer64(i64::MAX)),
             (35, Value::Integer64(-1)),
@@ -208,13 +208,13 @@ mod tests {
         for (offset, expected) in &cases {
             let stored = &table.get(*offset).unwrap().value;
             match (stored, expected) {
-                (Value::UnsignedInt8(a), Value::UnsignedInt8(b)) => assert_eq!(a, b),
-                (Value::SignedInt8(a), Value::SignedInt8(b)) => assert_eq!(a, b),
-                (Value::UnsignedInt16(a), Value::UnsignedInt16(b)) => assert_eq!(a, b),
-                (Value::SignedInt16(a), Value::SignedInt16(b)) => assert_eq!(a, b),
+                (Value::UnsignedInteger8(a), Value::UnsignedInteger8(b)) => assert_eq!(a, b),
+                (Value::Integer8(a), Value::Integer8(b)) => assert_eq!(a, b),
+                (Value::UnsignedInteger16(a), Value::UnsignedInteger16(b)) => assert_eq!(a, b),
+                (Value::Integer16(a), Value::Integer16(b)) => assert_eq!(a, b),
                 (Value::UnsignedInteger32(a), Value::UnsignedInteger32(b)) => assert_eq!(a, b),
-                (Value::SignedInt32(a), Value::SignedInt32(b)) => assert_eq!(a, b),
-                (Value::UnsignedInt64(a), Value::UnsignedInt64(b)) => assert_eq!(a, b),
+                (Value::Integer32(a), Value::Integer32(b)) => assert_eq!(a, b),
+                (Value::UnsignedInteger64(a), Value::UnsignedInteger64(b)) => assert_eq!(a, b),
                 (Value::Integer64(a), Value::Integer64(b)) => assert_eq!(a, b),
                 (Value::Float32(a), Value::Float32(b)) => assert_eq!(a, b),
                 (Value::Float64(a), Value::Float64(b)) => assert_eq!(a, b),
@@ -232,9 +232,9 @@ mod tests {
     #[test]
     fn test_signed_int16_negative_value() {
         let mut table = Table::new();
-        table.insert(0x0246, entry(Value::SignedInt16(-10)));
+        table.insert(0x0246, entry(Value::Integer16(-10)));
         match &table.get(0x0246).unwrap().value {
-            Value::SignedInt16(v) => assert_eq!(*v, -10),
+            Value::Integer16(v) => assert_eq!(*v, -10),
             other => panic!("expected SignedInt16, got {:?}", other),
         }
     }

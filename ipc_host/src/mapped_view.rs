@@ -24,7 +24,7 @@ pub fn reset_logged_sentinels() {
 }
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
-    LittleEndian::read_u32(slice::from_raw_parts(ptr, 4))
+    unsafe { LittleEndian::read_u32(slice::from_raw_parts(ptr, 4)) }
 }
 
 /// From a zero reqID, scan forward one byte at a time looking for a valid
@@ -43,21 +43,24 @@ unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize)
         return None;
     };
     for offset in 0..=safe_limit {
-        let b0 = *cur_ptr.add(offset + 12);
-        if b0 != 0x6C {
-            continue;
-        }
-        let b1 = *cur_ptr.add(offset + 13);
-        if b1 != 0x75 {
-            continue;
-        }
-        let b2 = *cur_ptr.add(offset + 14);
-        if b2 != 0x61 {
-            continue;
-        }
-        let b3 = *cur_ptr.add(offset + 15);
-        if b3 != 0x50 {
-            continue;
+        // SAFETY: bounds checked by safe_limit calculation above
+        unsafe {
+            let b0 = *cur_ptr.add(offset + 12);
+            if b0 != 0x6C {
+                continue;
+            }
+            let b1 = *cur_ptr.add(offset + 13);
+            if b1 != 0x75 {
+                continue;
+            }
+            let b2 = *cur_ptr.add(offset + 14);
+            if b2 != 0x61 {
+                continue;
+            }
+            let b3 = *cur_ptr.add(offset + 15);
+            if b3 != 0x50 {
+                continue;
+            }
         }
 
         return Some(offset);
@@ -91,191 +94,198 @@ pub unsafe fn iterate_records<F>(
 where
     F: FnMut(ParsedRecord) -> usize,
 {
-    let mut cur_ptr: *const u8 = mapped_view_ptr;
-    let mut error_count = 0;
-    let end_ptr = mapped_view_ptr.add(view_size);
-    let avail = |p: *const u8| -> usize { end_ptr.offset_from(p).max(0) as usize };
+    // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid and readable
+    unsafe {
+        let mut cur_ptr: *const u8 = mapped_view_ptr;
+        let mut error_count = 0;
+        let end_ptr = mapped_view_ptr.add(view_size);
+        let avail = |p: *const u8| -> usize { end_ptr.offset_from(p).max(0) as usize };
 
-    loop {
-        // ── 1. reqID ──────────────────────────────────────────────────────
-        let req_id = read_u32_at(cur_ptr);
-        tracing::trace!("reqID: {:#010x} @ {:p}", req_id, cur_ptr);
+        loop {
+            // ── 1. reqID ──────────────────────────────────────────────────
+            let req_id = read_u32_at(cur_ptr);
+            tracing::trace!("reqID: {:#010x} @ {:p}", req_id, cur_ptr);
 
-        if req_id == 0 {
-            tracing::trace!(
-                "Zero reqID at {:p}, scanning for next record header",
-                cur_ptr
-            );
-            match find_next_record(cur_ptr, 16, avail(cur_ptr)) {
-                Some(0) => {
-                    tracing::trace!("reqID is legitimately zero, parsing as normal record");
-                }
-                Some(skip) => {
-                    tracing::trace!("Padding gap of {} bytes at {:p}, advancing", skip, cur_ptr);
-                    cur_ptr = cur_ptr.add(skip);
-                    continue;
-                }
-                None => {
-                    tracing::trace!("Zero reqID at {:p} — true terminator, done", cur_ptr);
-                    break;
-                }
-            }
-        }
-
-        cur_ptr = cur_ptr.add(4);
-
-        // ── 2. dwOffset ───────────────────────────────────────────────────
-        let dw_offset = read_u32_at(cur_ptr);
-        tracing::trace!(
-            "dwOffset: {:#06x} ({}) @ {:p}",
-            dw_offset,
-            dw_offset,
-            cur_ptr
-        );
-        cur_ptr = cur_ptr.add(4);
-
-        // ── 3. nBytes ─────────────────────────────────────────────────────
-        let raw_n = read_u32_at(cur_ptr);
-        let is_write = (raw_n & 0x8000_0000) != 0;
-        let n_bytes = raw_n & 0x7FFF_FFFF;
-        tracing::trace!(
-            "nBytes raw: {:#010x}, is_write: {}, n_bytes: {}",
-            raw_n,
-            is_write,
-            n_bytes
-        );
-        cur_ptr = cur_ptr.add(4);
-
-        // ── 4. Sentinel ───────────────────────────────────────────────────
-        let sentinel_before_ptr = cur_ptr;
-        let sentinel = read_u32_at(cur_ptr);
-        let sentinel_ok = sentinel == SENTINEL;
-        let sentinel_offset = cur_ptr.offset_from(mapped_view_ptr) as usize;
-
-        if !sentinel_ok {
-            tracing::debug!(
-                "Bad sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, scanning forward",
-                req_id,
-                dw_offset,
-                n_bytes,
-                sentinel_offset
-            );
-            error_count += 1;
-
-            // ── Once-logging of unrecognised sentinel values ─────────────
-            {
-                let mut logged = LOGGED_SENTINEL_VALUES.lock().unwrap();
-                if logged.insert(sentinel) {
-                    tracing::warn!(
-                        "Bad sentinel at offset {:#x}: value {:#010x}",
-                        sentinel_offset,
-                        sentinel
-                    );
-                }
-            }
-
-            // ── Once-logging of ":FSD" trailing text ────────────────────
-            if sentinel == FSD_SENTINEL {
-                let mut text = String::new();
-                for i in 0..255usize {
-                    let c = *sentinel_before_ptr.add(4 + i);
-                    if c == 0 || c < 0x20 || c > 0x7E {
+            if req_id == 0 {
+                tracing::trace!(
+                    "Zero reqID at {:p}, scanning for next record header",
+                    cur_ptr
+                );
+                match find_next_record(cur_ptr, 16, avail(cur_ptr)) {
+                    Some(0) => {
+                        tracing::trace!("reqID is legitimately zero, parsing as normal record");
+                    }
+                    Some(skip) => {
+                        tracing::trace!(
+                            "Padding gap of {} bytes at {:p}, advancing",
+                            skip,
+                            cur_ptr
+                        );
+                        cur_ptr = cur_ptr.add(skip);
+                        continue;
+                    }
+                    None => {
+                        tracing::trace!("Zero reqID at {:p} — true terminator, done", cur_ptr);
                         break;
                     }
-                    text.push(c as char);
-                }
-                if !text.is_empty() && FSD_LOGGED_TEXTS.lock().unwrap().insert(text.clone()) {
-                    tracing::info!(
-                        "Bad sentinel at offset {:#x}: ':FSD' followed by: \"{}\"",
-                        sentinel_offset,
-                        text
-                    );
                 }
             }
 
-            // ── Phase 1: scan 16 bytes ──────────────────────────────────
-            let recovery_next_offset;
-            match find_next_record(
-                sentinel_before_ptr.add(1),
-                16,
-                avail(sentinel_before_ptr.add(1)),
-            ) {
-                Some(0) => {
-                    recovery_next_offset = Some(sentinel_offset + 1);
-                    cur_ptr = sentinel_before_ptr.add(1);
+            cur_ptr = cur_ptr.add(4);
+
+            // ── 2. dwOffset ───────────────────────────────────────────────
+            let dw_offset = read_u32_at(cur_ptr);
+            tracing::trace!(
+                "dwOffset: {:#06x} ({}) @ {:p}",
+                dw_offset,
+                dw_offset,
+                cur_ptr
+            );
+            cur_ptr = cur_ptr.add(4);
+
+            // ── 3. nBytes ─────────────────────────────────────────────────
+            let raw_n = read_u32_at(cur_ptr);
+            let is_write = (raw_n & 0x8000_0000) != 0;
+            let n_bytes = raw_n & 0x7FFF_FFFF;
+            tracing::trace!(
+                "nBytes raw: {:#010x}, is_write: {}, n_bytes: {}",
+                raw_n,
+                is_write,
+                n_bytes
+            );
+            cur_ptr = cur_ptr.add(4);
+
+            // ── 4. Sentinel ───────────────────────────────────────────────
+            let sentinel_before_ptr = cur_ptr;
+            let sentinel = read_u32_at(cur_ptr);
+            let sentinel_ok = sentinel == SENTINEL;
+            let sentinel_offset = cur_ptr.offset_from(mapped_view_ptr) as usize;
+
+            if !sentinel_ok {
+                tracing::debug!(
+                    "Bad sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, scanning forward",
+                    req_id,
+                    dw_offset,
+                    n_bytes,
+                    sentinel_offset
+                );
+                error_count += 1;
+
+                // ── Once-logging of unrecognised sentinel values ─────────
+                {
+                    let mut logged = LOGGED_SENTINEL_VALUES.lock().unwrap();
+                    if logged.insert(sentinel) {
+                        tracing::warn!(
+                            "Bad sentinel at offset {:#x}: value {:#010x}",
+                            sentinel_offset,
+                            sentinel
+                        );
+                    }
                 }
-                Some(skip) => {
-                    recovery_next_offset = Some(sentinel_offset + 1 + skip);
-                    cur_ptr = sentinel_before_ptr.add(1 + skip);
-                }
-                None => {
-                    // ── Phase 2: scan the rest of the buffer ────────────
-                    let scan_ptr = sentinel_before_ptr.add(1);
-                    let remaining = avail(scan_ptr).saturating_sub(16);
-                    match find_next_record(scan_ptr, remaining, avail(scan_ptr)) {
-                        Some(0) => {
-                            recovery_next_offset = Some(sentinel_offset + 1);
-                            cur_ptr = sentinel_before_ptr.add(1);
-                        }
-                        Some(skip) => {
-                            recovery_next_offset = Some(sentinel_offset + 1 + skip);
-                            cur_ptr = sentinel_before_ptr.add(1 + skip);
-                        }
-                        None => {
-                            let record = ParsedRecord {
-                                req_id,
-                                dw_offset,
-                                raw_n,
-                                n_bytes,
-                                is_write,
-                                sentinel_ok: false,
-                                sentinel_offset,
-                                recovery_next_offset: None,
-                                payload_ptr: std::ptr::null_mut(),
-                            };
-                            error_count += on_record(record);
+
+                // ── Once-logging of ":FSD" trailing text ────────────────
+                if sentinel == FSD_SENTINEL {
+                    let mut text = String::new();
+                    for i in 0..255usize {
+                        let c = *sentinel_before_ptr.add(4 + i);
+                        if c == 0 || c < 0x20 || c > 0x7E {
                             break;
+                        }
+                        text.push(c as char);
+                    }
+                    if !text.is_empty() && FSD_LOGGED_TEXTS.lock().unwrap().insert(text.clone()) {
+                        tracing::info!(
+                            "Bad sentinel at offset {:#x}: ':FSD' followed by: \"{}\"",
+                            sentinel_offset,
+                            text
+                        );
+                    }
+                }
+
+                // ── Phase 1: scan 16 bytes ──────────────────────────────
+                let recovery_next_offset;
+                match find_next_record(
+                    sentinel_before_ptr.add(1),
+                    16,
+                    avail(sentinel_before_ptr.add(1)),
+                ) {
+                    Some(0) => {
+                        recovery_next_offset = Some(sentinel_offset + 1);
+                        cur_ptr = sentinel_before_ptr.add(1);
+                    }
+                    Some(skip) => {
+                        recovery_next_offset = Some(sentinel_offset + 1 + skip);
+                        cur_ptr = sentinel_before_ptr.add(1 + skip);
+                    }
+                    None => {
+                        // ── Phase 2: scan the rest of the buffer ────────
+                        let scan_ptr = sentinel_before_ptr.add(1);
+                        let remaining = avail(scan_ptr).saturating_sub(16);
+                        match find_next_record(scan_ptr, remaining, avail(scan_ptr)) {
+                            Some(0) => {
+                                recovery_next_offset = Some(sentinel_offset + 1);
+                                cur_ptr = sentinel_before_ptr.add(1);
+                            }
+                            Some(skip) => {
+                                recovery_next_offset = Some(sentinel_offset + 1 + skip);
+                                cur_ptr = sentinel_before_ptr.add(1 + skip);
+                            }
+                            None => {
+                                let record = ParsedRecord {
+                                    req_id,
+                                    dw_offset,
+                                    raw_n,
+                                    n_bytes,
+                                    is_write,
+                                    sentinel_ok: false,
+                                    sentinel_offset,
+                                    recovery_next_offset: None,
+                                    payload_ptr: std::ptr::null_mut(),
+                                };
+                                error_count += on_record(record);
+                                break;
+                            }
                         }
                     }
                 }
+                let record = ParsedRecord {
+                    req_id,
+                    dw_offset,
+                    raw_n,
+                    n_bytes,
+                    is_write,
+                    sentinel_ok: false,
+                    sentinel_offset,
+                    recovery_next_offset,
+                    payload_ptr: std::ptr::null_mut(),
+                };
+                error_count += on_record(record);
+                continue;
             }
+            cur_ptr = cur_ptr.add(4);
+
+            // ── 5. Payload ────────────────────────────────────────────────
+            let payload_ptr = cur_ptr as *mut u8;
+
             let record = ParsedRecord {
                 req_id,
                 dw_offset,
                 raw_n,
                 n_bytes,
                 is_write,
-                sentinel_ok: false,
+                sentinel_ok: true,
                 sentinel_offset,
-                recovery_next_offset,
-                payload_ptr: std::ptr::null_mut(),
+                recovery_next_offset: None,
+                payload_ptr,
             };
             error_count += on_record(record);
-            continue;
+
+            // ── 6. Advance past payload ───────────────────────────────────
+            cur_ptr = cur_ptr.add(n_bytes as usize);
         }
-        cur_ptr = cur_ptr.add(4);
 
-        // ── 5. Payload ────────────────────────────────────────────────────
-        let payload_ptr = cur_ptr as *mut u8;
-
-        let record = ParsedRecord {
-            req_id,
-            dw_offset,
-            raw_n,
-            n_bytes,
-            is_write,
-            sentinel_ok: true,
-            sentinel_offset,
-            recovery_next_offset: None,
-            payload_ptr,
-        };
-        error_count += on_record(record);
-
-        // ── 6. Advance past payload ───────────────────────────────────────
-        cur_ptr = cur_ptr.add(n_bytes as usize);
+        error_count
     }
-
-    error_count
 }
 
 pub unsafe fn process_mapped_view(
@@ -284,94 +294,135 @@ pub unsafe fn process_mapped_view(
     table: &Table,
     warned_set: &mut WarnedSet,
 ) -> usize {
-    iterate_records(mapped_view_ptr, view_size, |record| {
-        let mut record_errors = 0;
+    // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid
+    unsafe {
+        iterate_records(mapped_view_ptr, view_size, |record| {
+            let mut record_errors = 0;
 
-        if !record.is_write {
-            if let Some(entry) = table.get(record.dw_offset as u16) {
-                tracing::debug!("Offset {:#06x} found in table", record.dw_offset);
-                warned_set.clear_key(record.dw_offset as u16, WarnCategory::ReadNotExist);
-                match &entry.value {
-                    Value::Integer64(v) => {
-                        tracing::trace!("Writing i64 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut i64, v.to_le());
-                    }
-                    Value::Float64(v) => {
-                        tracing::trace!("Writing f64 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut f64, *v)
-                    }
-                    Value::Float32(v) => {
-                        tracing::trace!("Writing f32 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut f32, *v)
-                    }
-                    Value::Bool(v) => {
-                        tracing::trace!("Writing bool {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut u8, *v as u8);
-                    }
-                    Value::UnsignedInteger32(v) => {
-                        tracing::trace!("Writing u32 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
-                    }
-                    Value::SignedInt32(v) => {
-                        tracing::trace!("Writing i32 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut i32, v.to_le());
-                    }
-                    Value::UnsignedInt8(v) => {
-                        tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
-                    }
-                    Value::SignedInt8(v) => {
-                        tracing::trace!("Writing i8 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut i8, v.to_le());
-                    }
-                    Value::UnsignedInt16(v) => {
-                        tracing::trace!("Writing u16 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
-                    }
-                    Value::SignedInt16(v) => {
-                        tracing::trace!("Writing i16 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut i16, v.to_le());
-                    }
-                    Value::UnsignedInt64(v) => {
-                        tracing::trace!("Writing u64 {} -> offset {:#06x}", v, record.dw_offset);
-                        std::ptr::write_unaligned(record.payload_ptr as *mut u64, v.to_le());
-                    }
-                    Value::String(bytes) => {
-                        tracing::trace!(
-                            "Writing String ({} bytes) -> offset {:#06x}",
-                            bytes.len(),
-                            record.dw_offset
-                        );
-                        let len = bytes.len().min(record.n_bytes as usize);
-                        std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
-                        for i in len..record.n_bytes as usize {
-                            *record.payload_ptr.add(i) = 0;
+            if !record.is_write {
+                if let Some(entry) = table.get(record.dw_offset as u16) {
+                    tracing::debug!("Offset {:#06x} found in table", record.dw_offset);
+                    warned_set.clear_key(record.dw_offset as u16, WarnCategory::ReadNotExist);
+                    match &entry.value {
+                        Value::Bool(v) => {
+                            tracing::trace!(
+                                "Writing bool {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut u8, *v as u8);
                         }
+                        Value::Float32(v) => {
+                            tracing::trace!(
+                                "Writing f32 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut f32, *v)
+                        }
+                        Value::Float64(v) => {
+                            tracing::trace!(
+                                "Writing f64 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(
+                                record.payload_ptr as *mut f64,
+                                f64::from_bits(v.to_bits().to_le()),
+                            )
+                        }
+                        Value::Integer8(v) => {
+                            tracing::trace!("Writing i8 {} -> offset {:#06x}", v, record.dw_offset);
+                            std::ptr::write_unaligned(record.payload_ptr as *mut i8, v.to_le());
+                        }
+                        Value::Integer16(v) => {
+                            tracing::trace!(
+                                "Writing i64 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut i16, v.to_le());
+                        }
+                        Value::Integer32(v) => {
+                            tracing::trace!(
+                                "Writing i32 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut i32, v.to_le());
+                        }
+                        Value::Integer64(v) => {
+                            tracing::trace!(
+                                "Writing i64 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut i64, v.to_le());
+                        }
+                        Value::UnsignedInteger8(v) => {
+                            tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
+                            std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
+                        }
+                        Value::UnsignedInteger16(v) => {
+                            tracing::trace!(
+                                "Writing u16 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
+                        }
+                        Value::UnsignedInteger32(v) => {
+                            tracing::trace!(
+                                "Writing u32 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
+                        }
+                        Value::UnsignedInteger64(v) => {
+                            tracing::trace!(
+                                "Writing u64 {} -> offset {:#06x}",
+                                v,
+                                record.dw_offset
+                            );
+                            std::ptr::write_unaligned(record.payload_ptr as *mut u64, v.to_le());
+                        }
+                        Value::String(bytes) => {
+                            tracing::trace!(
+                                "Writing String ({} bytes) -> offset {:#06x}",
+                                bytes.len(),
+                                record.dw_offset
+                            );
+                            let len = bytes.len().min(record.n_bytes as usize);
+                            std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
+                            for i in len..record.n_bytes as usize {
+                                *record.payload_ptr.add(i) = 0;
+                            }
+                        }
+                    }
+                } else {
+                    tracing::debug!(
+                        "Offset {:#06x} (size {} bytes) not found in table",
+                        record.dw_offset,
+                        record.n_bytes
+                    );
+                    if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist)
+                    {
+                        tracing::warn!(
+                            "Read from offset {:#06x}, {} bytes not in table",
+                            record.dw_offset,
+                            record.n_bytes
+                        );
                     }
                 }
             } else {
                 tracing::debug!(
-                    "Offset {:#06x} (size {} bytes) not found in table",
+                    "Write operation: offset {:#06x}, n_bytes {}",
                     record.dw_offset,
                     record.n_bytes
                 );
-                if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist) {
-                    tracing::warn!(
-                        "Read from offset {:#06x}, {} bytes not in table",
-                        record.dw_offset,
-                        record.n_bytes
-                    );
-                }
-            }
-        } else {
-            tracing::debug!(
-                "Write operation: offset {:#06x}, n_bytes {}",
-                record.dw_offset,
-                record.n_bytes
-            );
-            if table.writable.contains(&(record.dw_offset as u16)) {
-                let value = unsafe {
-                    match record.n_bytes {
+                if table.writable.contains(&(record.dw_offset as u16)) {
+                    let value = match record.n_bytes {
                         1 => (*record.payload_ptr) as f64,
                         2 => LittleEndian::read_u16(&*slice::from_raw_parts(record.payload_ptr, 2))
                             as f64,
@@ -386,36 +437,36 @@ pub unsafe fn process_mapped_view(
                             record_errors += 1;
                             0.0
                         }
+                    };
+                    tracing::info!(
+                        "Write request: offset {:#06x} = {}",
+                        record.dw_offset,
+                        value
+                    );
+                    try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
+                } else {
+                    if table.active.contains(&(record.dw_offset as u16))
+                        && warned_set
+                            .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotWritable)
+                    {
+                        tracing::warn!(
+                            "Attempt to write non-writable offset {:#06x}",
+                            record.dw_offset
+                        );
+                    } else if warned_set
+                        .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotExist)
+                    {
+                        tracing::warn!(
+                            "Attempt to write non-active offset {:#06x}",
+                            record.dw_offset
+                        );
                     }
-                };
-                tracing::info!(
-                    "Write request: offset {:#06x} = {}",
-                    record.dw_offset,
-                    value
-                );
-                try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
-            } else {
-                if table.active.contains(&(record.dw_offset as u16))
-                    && warned_set
-                        .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotWritable)
-                {
-                    tracing::warn!(
-                        "Attempt to write non-writable offset {:#06x}",
-                        record.dw_offset
-                    );
-                } else if warned_set
-                    .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotExist)
-                {
-                    tracing::warn!(
-                        "Attempt to write non-active offset {:#06x}",
-                        record.dw_offset
-                    );
                 }
             }
-        }
 
-        record_errors
-    })
+            record_errors
+        })
+    }
 }
 
 #[cfg(test)]

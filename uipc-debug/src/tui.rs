@@ -20,13 +20,13 @@ use uipc_mapping::{FsuipcType, MappingSource};
 
 fn f64_to_value(value: f64, ty: FsuipcType) -> Value {
     match ty {
-        FsuipcType::U8 => Value::UnsignedInt8(value as u8),
-        FsuipcType::I8 => Value::SignedInt8(value as i8),
-        FsuipcType::U16 => Value::UnsignedInt16(value as u16),
-        FsuipcType::I16 => Value::SignedInt16(value as i16),
+        FsuipcType::U8 => Value::UnsignedInteger8(value as u8),
+        FsuipcType::I8 => Value::Integer8(value as i8),
+        FsuipcType::U16 => Value::UnsignedInteger16(value as u16),
+        FsuipcType::I16 => Value::Integer16(value as i16),
         FsuipcType::U32 => Value::UnsignedInteger32(value as u32),
-        FsuipcType::I32 => Value::SignedInt32(value as i32),
-        FsuipcType::U64 => Value::UnsignedInt64(value as u64),
+        FsuipcType::I32 => Value::Integer32(value as i32),
+        FsuipcType::U64 => Value::UnsignedInteger64(value as u64),
         FsuipcType::I64 => Value::Integer64(value as i64),
         FsuipcType::F32 => Value::Float32(value as f32),
         FsuipcType::F64 => Value::Float64(value),
