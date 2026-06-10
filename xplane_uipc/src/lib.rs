@@ -5,6 +5,7 @@
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+use atomic_float::AtomicF32;
 use bindings::*;
 
 use std::{
@@ -32,6 +33,29 @@ unsafe impl Sync for PluginStatePtr {}
 const PLUGIN_NAME: &str = "X-Plane UIPC\0";
 const PLUGIN_SIG: &str = "x-plane-uipc\0";
 const PLUGIN_DESC: &str = "Provides a local FSUIPC-compatible interface\0";
+
+static FLIGHT_LOOP_INTERVAL: AtomicF32 = AtomicF32::new(1.0 / 20.0);
+
+static UIPC_THREAD: std::sync::LazyLock<std::sync::Mutex<Option<thread::JoinHandle<()>>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+static IPC_COMMAND_CHANNEL: std::sync::LazyLock<
+    std::sync::Mutex<Option<std::sync::mpsc::Sender<IpcCommands>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+static DATAREF_RESOLUTION_REQUIRED: AtomicBool = AtomicBool::new(true);
+
+static PLUGIN_STATE_PTR: std::sync::LazyLock<std::sync::Mutex<PluginStatePtr>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(PluginStatePtr(std::ptr::null_mut())));
+
+static WRITE_REQUEST_RX: std::sync::LazyLock<
+    std::sync::Mutex<Option<std::sync::mpsc::Receiver<ipc_host::WriteRequest>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+static TRACING_FILTER_HANDLE: std::sync::OnceLock<reload::Handle<LevelFilter, Registry>> =
+    std::sync::OnceLock::new();
+
+static LOG_CONTROLLER: std::sync::OnceLock<LogController> = std::sync::OnceLock::new();
 
 #[tracing::instrument]
 fn plugin_version() -> String {
@@ -203,44 +227,24 @@ pub fn clear_log_file() {
     }
 }
 
-static UIPC_THREAD: std::sync::LazyLock<std::sync::Mutex<Option<thread::JoinHandle<()>>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
-
-static IPC_COMMAND_CHANNEL: std::sync::LazyLock<
-    std::sync::Mutex<Option<std::sync::mpsc::Sender<IpcCommands>>>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
-
-static DATAREF_RESOLUTION_REQUIRED: AtomicBool = AtomicBool::new(true);
-
-static PLUGIN_STATE_PTR: std::sync::LazyLock<std::sync::Mutex<PluginStatePtr>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(PluginStatePtr(std::ptr::null_mut())));
-
-static WRITE_REQUEST_RX: std::sync::LazyLock<
-    std::sync::Mutex<Option<std::sync::mpsc::Receiver<ipc_host::WriteRequest>>>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
-
-static TRACING_FILTER_HANDLE: std::sync::OnceLock<reload::Handle<LevelFilter, Registry>> =
-    std::sync::OnceLock::new();
-
-static LOG_CONTROLLER: std::sync::OnceLock<LogController> = std::sync::OnceLock::new();
-
 #[derive(serde::Deserialize)]
-struct TraceConfig {
-    settings: Option<TraceSettings>,
+struct Config {
+    settings: Settings,
 }
 
 #[derive(serde::Deserialize)]
-struct TraceSettings {
+struct Settings {
+    update_rate_hz: Option<u8>,
     log_level: Option<String>,
 }
 
-fn reload_config_and_apply(config_path: &str) {
+fn parse_config_and_apply(config_path: &str) {
     let content = match std::fs::read_to_string(config_path) {
         Ok(c) => c,
         Err(_) => return,
     };
 
-    let config: TraceConfig = match toml::from_str(&content) {
+    let config: Config = match toml::from_str(&content) {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!("Failed to parse config.toml: {}. Falling back to INFO.", e);
@@ -253,7 +257,7 @@ fn reload_config_and_apply(config_path: &str) {
 
     let level_str = config
         .settings
-        .and_then(|s| s.log_level)
+        .log_level
         .unwrap_or_else(|| "info".to_string());
 
     let level: LevelFilter = match level_str.parse() {
@@ -272,11 +276,13 @@ fn reload_config_and_apply(config_path: &str) {
             tracing::warn!("Failed to reload tracing filter: {}", e);
         }
     }
-}
 
-/// X-Plane SDK: return value is the interval until the next call in seconds.
-/// Positive = seconds, negative = flight loops, 0 = unregister.
-const FLIGHT_LOOP_INTERVAL: f32 = 1.0 / 20.0; // 20 Hz
+    if let Some(hz) = config.settings.update_rate_hz {
+        tracing::info!("Setting flight update rate to {} hz", hz);
+        let v = 1.0 / (hz as f32);
+        FLIGHT_LOOP_INTERVAL.store(v, Ordering::Relaxed)
+    }
+}
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn flight_loop_callback(
@@ -287,7 +293,7 @@ unsafe extern "C" fn flight_loop_callback(
 ) -> f32 {
     if DATAREF_RESOLUTION_REQUIRED.load(Ordering::Relaxed) {
         tracing::info!("resolving datarefs during flight loop callback");
-        match load_and_resolve_mappings() {
+        match find_load_and_resolve_mappings() {
             Ok(_) => tracing::info!("resolved datarefs"),
             Err(_) => tracing::error!("error loading mappings or resolving datarefs"),
         }
@@ -308,18 +314,18 @@ unsafe extern "C" fn flight_loop_callback(
 
         state.update();
     }
-    FLIGHT_LOOP_INTERVAL
+    FLIGHT_LOOP_INTERVAL.load(Ordering::Relaxed)
 }
 
-pub fn load_mappings_and_init() -> Result<(), String> {
+pub fn find_and_load_config() -> Result<(), String> {
     let system_path = get_system_path();
     let config_path = format!("{}Resources/plugins/xplane-uipc/config.toml", system_path);
     tracing::info!("config_path: {}", config_path);
-    reload_config_and_apply(&config_path);
+    parse_config_and_apply(&config_path);
     Ok(())
 }
 
-pub fn load_and_resolve_mappings() -> Result<(), String> {
+pub fn find_load_and_resolve_mappings() -> Result<(), String> {
     let system_path = get_system_path();
     let mappings_path = format!("{}Resources/plugins/xplane-uipc/mappings.toml", system_path);
     tracing::info!("mappings_path: {}", mappings_path);
@@ -384,31 +390,20 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     tracing::info!("Enabling plugin...");
     xplane_log("Plugin enabled");
 
-    tracing::info!("Loading mappings and initializing plugin state...");
-    if let Err(e) = load_mappings_and_init() {
-        tracing::error!("Failed to load mappings: {}", e);
-        xplane_log(&format!("Failed to load mappings: {}", e));
-    }
-
-    tracing::info!("Pre-populating value table before IPC thread starts...");
-    {
-        let guard = PLUGIN_STATE_PTR.lock().unwrap();
-        let PluginStatePtr(ptr) = *guard;
-        if !ptr.is_null() {
-            let state = unsafe { &mut *(ptr as *mut PluginState) };
-            state.populate_table();
-        }
+    tracing::info!("Loading config and initializing plugin state...");
+    if let Err(e) = find_and_load_config() {
+        tracing::error!("Failed to load config: {}", e);
+        xplane_log(&format!("Failed to load config: {}", e));
     }
 
     tracing::info!("Registering flight loop callback...");
     unsafe {
         XPLMRegisterFlightLoopCallback(
             Some(flight_loop_callback),
-            FLIGHT_LOOP_INTERVAL,
+            FLIGHT_LOOP_INTERVAL.load(Ordering::Relaxed),
             std::ptr::null_mut(),
         );
     }
-    tracing::info!("Flight loop registered at 20Hz");
 
     tracing::info!("Creating IPC_COMMAND_CHANNEL");
     let (ipc_tx, ipc_rx) = std::sync::mpsc::channel::<IpcCommands>();
