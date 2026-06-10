@@ -10,6 +10,7 @@ use bindings::*;
 use std::{
     ffi::{CStr, c_char, c_int, c_void},
     fs::OpenOptions,
+    sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
@@ -209,6 +210,8 @@ static IPC_COMMAND_CHANNEL: std::sync::LazyLock<
     std::sync::Mutex<Option<std::sync::mpsc::Sender<IpcCommands>>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
 
+static DATAREF_RESOLUTION_REQUIRED: AtomicBool = AtomicBool::new(true);
+
 static PLUGIN_STATE_PTR: std::sync::LazyLock<std::sync::Mutex<PluginStatePtr>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(PluginStatePtr(std::ptr::null_mut())));
 
@@ -282,6 +285,15 @@ unsafe extern "C" fn flight_loop_callback(
     _counter: i32,
     _refcon: *mut std::ffi::c_void,
 ) -> f32 {
+    if DATAREF_RESOLUTION_REQUIRED.load(Ordering::Relaxed) {
+        tracing::info!("resolving datarefs during flight loop callback");
+        match load_and_resolve_mappings() {
+            Ok(_) => tracing::info!("resolved datarefs"),
+            Err(_) => tracing::error!("error loading mappings or resolving datarefs"),
+        }
+        DATAREF_RESOLUTION_REQUIRED.store(false, Ordering::Relaxed);
+    }
+
     let guard = PLUGIN_STATE_PTR.lock().unwrap();
     let PluginStatePtr(ptr) = *guard;
     if !ptr.is_null() {
@@ -301,10 +313,16 @@ unsafe extern "C" fn flight_loop_callback(
 
 pub fn load_mappings_and_init() -> Result<(), String> {
     let system_path = get_system_path();
-    let mappings_path = format!("{}Resources/plugins/xplane-uipc/mappings.toml", system_path);
     let config_path = format!("{}Resources/plugins/xplane-uipc/config.toml", system_path);
-    tracing::info!("mappings_path: {}", mappings_path);
     tracing::info!("config_path: {}", config_path);
+    reload_config_and_apply(&config_path);
+    Ok(())
+}
+
+pub fn load_and_resolve_mappings() -> Result<(), String> {
+    let system_path = get_system_path();
+    let mappings_path = format!("{}Resources/plugins/xplane-uipc/mappings.toml", system_path);
+    tracing::info!("mappings_path: {}", mappings_path);
 
     let mapping_config = uipc_mapping::load_mappings(&mappings_path)
         .map_err(|e| format!("Failed to load mappings: {}", e))?;
@@ -326,7 +344,6 @@ pub fn load_mappings_and_init() -> Result<(), String> {
             mappings_path
         );
     }
-
     let resolved_mappings: Vec<ResolvedMapping> = mapping_config
         .mappings
         .into_iter()
@@ -346,8 +363,6 @@ pub fn load_mappings_and_init() -> Result<(), String> {
         *guard = PluginStatePtr(new_ptr);
         tracing::info!("Plugin state initialized");
     }
-
-    reload_config_and_apply(&config_path);
 
     Ok(())
 }
