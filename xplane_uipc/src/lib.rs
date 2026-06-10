@@ -492,4 +492,12 @@ pub unsafe extern "C" fn XPluginStop() {
 
 #[tracing::instrument(skip_all)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, _msg: c_int, _param: *mut c_void) {}
+pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: *mut c_void) {
+    if msg == XPLM_MSG_PLANE_LOADED {
+        let plane_index = param as isize as i32;
+        if plane_index == 0 {
+            tracing::info!("User aircraft changed, setting DATAREF_RESOLUTION_REQUIRED flag");
+            DATAREF_RESOLUTION_REQUIRED.store(true, Ordering::Release);
+        }
+    }
+}
