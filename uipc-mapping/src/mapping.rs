@@ -76,6 +76,7 @@ pub enum MappingSource {
     Expr {
         datarefs: HashMap<String, (String, Option<i32>)>,
         expr: Expr,
+        update_if_expr: Option<Expr>
     },
 }
 
@@ -109,6 +110,7 @@ struct RawMapping {
 
     datarefs: Option<HashMap<String, String>>,
     expr: Option<String>,
+    update_if_expr: Option<String>,
 
     #[serde(default = "default_writable")]
     writable: bool,
@@ -206,7 +208,24 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 let (p, idx) = parse_dataref_with_index(&path_str);
                 datarefs.insert(name, (p, idx));
             }
-            MappingSource::Expr { datarefs, expr }
+
+            let update_if_expr = match r.update_if_expr {
+                Some(v) => {
+                    match Expr::parse(&v) {
+                        Ok(e) => Some(e),
+                        Err(e) => {
+                            load_errors.push(format!(
+                                "offset 0x{:04X}: update_if_expr parse error: {}",
+                                r.offset, e
+                            ));
+                            continue;
+                        }
+                    }
+                },
+                None => None,
+            };
+
+            MappingSource::Expr { datarefs, expr, update_if_expr}
         } else if let Some(dr) = r.dataref {
             let (path, idx) = parse_dataref_with_index(&dr);
             MappingSource::Simple {

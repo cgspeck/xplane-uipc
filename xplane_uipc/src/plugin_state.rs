@@ -157,6 +157,7 @@ pub enum ResolvedSource {
         /// name → resolved ref
         refs: HashMap<String, ResolvedRef>,
         expr: Expr,
+        update_if_expr: Option<Expr>,
     },
 }
 
@@ -181,12 +182,20 @@ impl ResolvedMapping {
                 scale,
                 offset_add,
             },
-            MappingSource::Expr { datarefs, expr } => {
+            MappingSource::Expr {
+                datarefs,
+                expr,
+                update_if_expr,
+            } => {
                 let refs = datarefs
                     .into_iter()
                     .map(|(name, (path, idx))| (name, ResolvedRef::resolve(&path, idx)))
                     .collect();
-                ResolvedSource::Expr { refs, expr }
+                ResolvedSource::Expr {
+                    refs,
+                    expr,
+                    update_if_expr,
+                }
             }
             MappingSource::Static { static_value } => ResolvedSource::Static {
                 static_value: Some(static_value),
@@ -211,12 +220,26 @@ impl ResolvedMapping {
                 scale,
                 offset_add,
             } => dr.read().map(|v| v * scale + offset_add),
-            ResolvedSource::Expr { refs, expr } => {
+            ResolvedSource::Expr {
+                refs,
+                expr,
+                update_if_expr,
+            } => {
                 let mut vars = HashMap::new();
                 for (name, dr) in refs {
                     vars.insert(name.clone(), dr.read().unwrap_or(0.0));
                 }
-                Some(expr.eval(&vars))
+
+                match update_if_expr {
+                    Some(c) => {
+                        if c.eval(&vars) > 0.0 {
+                            Some(expr.eval(&vars))
+                        } else {
+                            None
+                        }
+                    }
+                    None => Some(expr.eval(&vars)),
+                }
             }
             ResolvedSource::Static { static_value } => *static_value,
             ResolvedSource::StaticStr { .. } => None,
@@ -271,26 +294,6 @@ pub struct PluginState {
 impl PluginState {
     pub fn new(mappings: Vec<ResolvedMapping>) -> Self {
         Self { mappings }
-    }
-
-    pub fn populate_table(&mut self) {
-        let table: Arc<RwLock<Table>> = get_value_table();
-        if let Ok(mut table) = table.write() {
-            for m in &self.mappings {
-                if let Some(value) = m.read_xplane_value() {
-                    table.insert(
-                        m.offset,
-                        ipc_host::value_table::Entry {
-                            value,
-                            source: 0,
-                            destination: 0,
-                            writable: m.writable,
-                        },
-                    );
-                }
-            }
-            tracing::info!("Populated table with {} entries", table.active.len());
-        }
     }
 
     pub fn update(&mut self) {
