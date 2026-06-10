@@ -100,7 +100,8 @@ fn dist_binary() -> Result<(), DynError> {
     fs::copy(&src_mappings, dist_dir().join("mappings.toml"))?;
     let src_config = project_root().join("xplane_uipc").join("config.toml");
     fs::copy(&src_config, dist_dir().join("config.toml"))?;
-
+    let expr_readme = project_root().join("uipc-expr").join("README-EXPR.md");
+    fs::copy(&expr_readme, dist_dir().join("README-EXPR.md"))?;
     Ok(())
 }
 

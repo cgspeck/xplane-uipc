@@ -26,9 +26,18 @@
 #     fsuipc_type = "u16"
 #     datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on" }
 #     expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * +"
+# 
+#   Expressions can also take an optional conditional to determine when the value is updated, e.g.:
 #
-# TODO: update operator list below
-# RPN operators: + - * / \ % ^ abs round & | == != < > <= >= ?
+#     [[mapping]]
+#     offset = 0x030c  # Aircraft vertical speed at touchdown, do not update when on ground, note that bounces will reset this
+#     fsuipc_type = "i32"
+#     datarefs     = { VhInd = "sim/flightmodel/position/vh_ind", OnGround = "sim/flightmodel/failures/onground_any" }
+#     update_if_expr = "$OnGround 0 =="
+#     expr = "$VhInd 256.0 *"                    # m/s → 256*m/s
+#
+#
+# RPN operators: see README-EXPR.md
 # Variable references: $name  (reads the named dataref)
 #
 # All offsets per XPUIPC Offsets PDF and XPUIPCOffsets.cfg reference.
@@ -216,10 +225,11 @@ scale       = 256.0                    # m/s → 256*m/s
 
 
 [[mapping]]
-offset = 0x030c  # TODO: this is not meant to be updated while 0x0366 On Ground is set
+offset = 0x030c  # Aircraft vertical speed at touchdown, do not update when on ground, note that bounces will reset this
 fsuipc_type = "i32"
-dataref     = "sim/flightmodel/position/vh_ind"
-scale       = 256.0                    # m/s → 256*m/s
+datarefs     = { VhInd = "sim/flightmodel/position/vh_ind", OnGround = "sim/flightmodel/failures/onground_any" }
+update_if_expr = "$OnGround 0 =="
+expr = "$VhInd 256.0 *"                    # m/s → 256*m/s
 
 
 [[mapping]]

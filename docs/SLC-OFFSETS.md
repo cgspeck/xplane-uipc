@@ -88,6 +88,7 @@
 0x0570, 8
 0x7b91, 1
 0x023e, 2
+0x030c, 4
 ```
 
 ### Derived
@@ -96,7 +97,6 @@
 # offset, n_bytes
 0x3367, 1  # various exit doors as a bitmask - note: no documentation about which door corresponds with which bit
 0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left (port), 2=pushing back, tail to swing to right (starboard). Only 3 and 0 supported.
-0x030c, 4 -  Aircraft Touchdown Vertical Speed, needs to be frozen while on ground
 ```
 
 ### Supplied by helper LUA script
