@@ -21,7 +21,7 @@ pub unsafe extern "C" fn menu_handler(_menu_ref: *mut c_void, item_ref: *mut c_v
         }
         MENU_RELOAD => {
             xplane_log("Reload mappings requested");
-            if let Err(e) = crate::load_mappings_and_init() {
+            if let Err(e) = crate::load_and_resolve_mappings() {
                 xplane_log(&format!("Failed to reload mappings: {}", e));
             }
         }
