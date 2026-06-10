@@ -5,13 +5,16 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use std::ffi::{CString, c_void};
 
-use crate::{about_window::about_window_menu_handler, clear_log_file, xplane_log};
+use crate::{
+    about_window::about_window_menu_handler, clear_log_file, find_and_load_config, xplane_log,
+};
 
 const MENU_ABOUT: usize = 0;
-const MENU_RELOAD: usize = 1;
-const MENU_CLEAR_LOG: usize = 2;
-const MENU_START_CAPTURE: usize = 3;
-const MENU_STOP_CAPTURE: usize = 4;
+const MENU_RELOAD_CONFIG: usize = 1;
+const MENU_RELOAD_MAPPINGS: usize = 2;
+const MENU_CLEAR_LOG: usize = 3;
+const MENU_START_CAPTURE: usize = 4;
+const MENU_STOP_CAPTURE: usize = 5;
 
 pub unsafe extern "C" fn menu_handler(_menu_ref: *mut c_void, item_ref: *mut c_void) {
     match item_ref as usize {
@@ -19,9 +22,16 @@ pub unsafe extern "C" fn menu_handler(_menu_ref: *mut c_void, item_ref: *mut c_v
             about_window_menu_handler();
             xplane_log("After menu handler");
         }
-        MENU_RELOAD => {
+        MENU_RELOAD_CONFIG => {
+            xplane_log("Reload config requested");
+            if let Err(e) = find_and_load_config() {
+                tracing::error!("Failed to load config: {}", e);
+                xplane_log(&format!("Failed to load config: {}", e));
+            }
+        }
+        MENU_RELOAD_MAPPINGS => {
             xplane_log("Reload mappings requested");
-            if let Err(e) = crate::load_and_resolve_mappings() {
+            if let Err(e) = crate::find_load_and_resolve_mappings() {
                 xplane_log(&format!("Failed to reload mappings: {}", e));
             }
         }
@@ -62,8 +72,14 @@ pub fn build_menu() {
         );
         XPLMAppendMenuItem(
             menu_id,
+            CString::new("Reload Config").unwrap().as_ptr(),
+            MENU_RELOAD_CONFIG as *mut c_void,
+            0,
+        );
+        XPLMAppendMenuItem(
+            menu_id,
             CString::new("Reload Mappings").unwrap().as_ptr(),
-            MENU_RELOAD as *mut c_void,
+            MENU_RELOAD_MAPPINGS as *mut c_void,
             0,
         );
         XPLMAppendMenuItem(
