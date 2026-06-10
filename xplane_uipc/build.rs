@@ -109,6 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allowlist_var("xpWidgetClass_Caption")
         .allowlist_var("xpProperty_CaptionLit")
         .allowlist_var("xpMessage_CloseButtonPushed")
+        .allowlist_var("XPLM_MSG_PLANE_LOADED")
         .allowlist_var("XPLM_USE_NATIVE_PATHS")
         .allowlist_var("XPLM_USE_NATIVE_WIDGET_WINDOWS")
         .allowlist_var("xplmType_Int")
