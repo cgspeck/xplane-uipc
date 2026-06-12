@@ -2,6 +2,3 @@
 /**/target
 # the distribution folder for the main plugin
 /dist
-# C# test client and test suite
-/**/obj
-/**/bin
