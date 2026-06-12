@@ -25,7 +25,7 @@ jobs:
       run: cargo xtask dist
 
     - name: Archive
-      uses: vimtor/action-zip@v1
+      uses: vimtor/action-zip@v1.3
       with:
         files: dist/
         dest: xplane-uipc.zip
