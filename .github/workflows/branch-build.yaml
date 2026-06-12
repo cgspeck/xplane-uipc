@@ -1,0 +1,28 @@
+name: Branch Build
+
+on:
+  push:
+    tags-ignore: 
+     - '**'
+
+jobs:
+  build:
+    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-Readme.md
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check formatting
+      run: cargo fmt --check
+
+    - name: Run Tests
+      run: cargo test
+
+    - name: Create distribution
+      run: cargo xtask dist
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: xplane-uipc
+        path: dist/
