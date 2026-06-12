@@ -50,7 +50,11 @@ impl EvalEngine {
                     fsuipc_value: val.map(|v| v * scale + offset_add),
                 }
             }
-            MappingSource::Expr { datarefs, expr, update_if_expr: _ } => {
+            MappingSource::Expr {
+                datarefs,
+                expr,
+                update_if_expr: _,
+            } => {
                 let mut vars = HashMap::new();
                 let mut inputs = Vec::with_capacity(datarefs.len());
                 // datarefs: name -> (path, array_index)
@@ -222,7 +226,7 @@ mod tests {
             MappingSource::Expr {
                 datarefs,
                 expr: Expr::parse("$Nav 1 * $Bcn 2 * +").unwrap(),
-                update_if_expr: None
+                update_if_expr: None,
             },
             false,
         )];
@@ -237,7 +241,6 @@ mod tests {
         assert_eq!(results[0].fsuipc_value, Some(3.0));
         assert_eq!(results[0].inputs.len(), 2);
     }
-
 
     #[test]
     fn test_ignores_update_if_expr() {
@@ -278,7 +281,7 @@ mod tests {
             MappingSource::Expr {
                 datarefs,
                 expr: Expr::parse("$Nav 1 * 2 +").unwrap(),
-                update_if_expr: None
+                update_if_expr: None,
             },
             false,
         )];
@@ -369,7 +372,7 @@ mod tests {
                 MappingSource::Expr {
                     datarefs,
                     expr: Expr::parse("$Nav 1 * $Bcn 2 * +").unwrap(),
-                    update_if_expr: None
+                    update_if_expr: None,
                 },
                 false,
             ),

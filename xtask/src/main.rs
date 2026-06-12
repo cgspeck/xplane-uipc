@@ -92,6 +92,12 @@ fn dist_binary() -> Result<(), DynError> {
     eprintln!("copying {} to {}", src.display(), dll_dir.display());
     fs::copy(&src, dll_dir.join("xplane-uipc.xpl"))?;
 
+    let src_expr_calculator = project_root()
+        .join("target")
+        .join("release")
+        .join("expr-calculator.exe");
+
+    fs::copy(&src_expr_calculator, dist_dir().join("expr-calculator.exe"))?;
     let src_license = project_root().join("LICENSE.md");
     fs::copy(&src_license, dist_dir().join("LICENSE.md"))?;
     let src_readme = project_root().join("README.md");
@@ -102,8 +108,13 @@ fn dist_binary() -> Result<(), DynError> {
     fs::copy(&src_config, dist_dir().join("config.toml"))?;
     let expr_readme = project_root().join("uipc-expr").join("README-EXPR.md");
     fs::copy(&expr_readme, dist_dir().join("README-EXPR.md"))?;
-    let lua_datetime_helper = project_root().join("lua").join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua");
-    fs::copy(&lua_datetime_helper, dist_dir().join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua"))?;
+    let lua_datetime_helper = project_root()
+        .join("lua")
+        .join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua");
+    fs::copy(
+        &lua_datetime_helper,
+        dist_dir().join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua"),
+    )?;
     Ok(())
 }
 
