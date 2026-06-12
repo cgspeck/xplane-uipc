@@ -92,6 +92,12 @@ fn dist_binary() -> Result<(), DynError> {
     eprintln!("copying {} to {}", src.display(), dll_dir.display());
     fs::copy(&src, dll_dir.join("xplane-uipc.xpl"))?;
 
+    let src_expr_calculator = project_root()
+        .join("target")
+        .join("release")
+        .join("expr-calculator.exe");
+
+    fs::copy(&src_expr_calculator, dist_dir().join("expr-calculator.exe"))?;
     let src_license = project_root().join("LICENSE.md");
     fs::copy(&src_license, dist_dir().join("LICENSE.md"))?;
     let src_readme = project_root().join("README.md");
