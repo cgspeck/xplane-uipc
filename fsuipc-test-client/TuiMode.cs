@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -14,6 +15,7 @@ public static class TuiMode
     public static async Task<int> Run(string inputPath)
     {
         var (defs, errors) = OffsetParser.Parse(inputPath);
+        string hostname = Dns.GetHostName().Split(".")[0];
 
         if (errors.Count > 0)
         {
@@ -118,48 +120,48 @@ public static class TuiMode
                     break;
 
                 case KeyAction.Reload:
-                {
-                    var (newDefs, newErrors) = OffsetParser.Parse(state.FilePath);
-                    if (newErrors.Count > 0)
                     {
-                        state.LastError = $"Reload errors: {string.Join("; ", newErrors)}";
+                        var (newDefs, newErrors) = OffsetParser.Parse(state.FilePath);
+                        if (newErrors.Count > 0)
+                        {
+                            state.LastError = $"Reload errors: {string.Join("; ", newErrors)}";
+                        }
+                        else if (newDefs.Count == 0)
+                        {
+                            state.LastError = "Reload: no offsets in file";
+                        }
+                        else
+                        {
+                            state.Defs = newDefs;
+                            state.SelectedIndex = 0;
+                            state.IsDirty = false;
+                            Reregister(client, state.Defs);
+                            state.LastError = $"Reloaded {newDefs.Count} offsets from {Path.GetFileName(state.FilePath)}";
+                        }
+                        break;
                     }
-                    else if (newDefs.Count == 0)
-                    {
-                        state.LastError = "Reload: no offsets in file";
-                    }
-                    else
-                    {
-                        state.Defs = newDefs;
-                        state.SelectedIndex = 0;
-                        state.IsDirty = false;
-                        Reregister(client, state.Defs);
-                        state.LastError = $"Reloaded {newDefs.Count} offsets from {Path.GetFileName(state.FilePath)}";
-                    }
-                    break;
-                }
 
                 case KeyAction.Save:
-                {
-                    var snapshot = BatchMode.FormatSnapshot(client.Handles);
-                    var json = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions
                     {
-                        WriteIndented = true,
-                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                    });
-                    var savePath = $"fsuipc-snapshot-{DateTime.Now:yyyyMMdd-HHmmss}.json";
-                    File.WriteAllText(savePath, json);
-                    state.LastError = $"Saved to {savePath}";
-                    break;
-                }
+                        var snapshot = BatchMode.FormatSnapshot(client.Handles);
+                        var json = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                        });
+                        var savePath = $"fsuipc-snapshot-{DateTime.Now:yyyyMMdd-HHmmss}-{hostname}.json";
+                        File.WriteAllText(savePath, json);
+                        state.LastError = $"Saved to {savePath}";
+                        break;
+                    }
 
                 case KeyAction.WriteFile:
-                {
-                    OffsetParser.WriteFile(state.FilePath, state.Defs);
-                    state.IsDirty = false;
-                    state.LastError = $"Written {state.Defs.Count} offsets to {Path.GetFileName(state.FilePath)}";
-                    break;
-                }
+                    {
+                        OffsetParser.WriteFile(state.FilePath, state.Defs);
+                        state.IsDirty = false;
+                        state.LastError = $"Written {state.Defs.Count} offsets to {Path.GetFileName(state.FilePath)}";
+                        break;
+                    }
             }
         }
     }

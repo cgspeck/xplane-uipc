@@ -4,6 +4,8 @@
 
 ### FSUIPC Offsets
 
+If you have MSFS, install FSUIPC7 then use `FSUIPC7\Utils\FSInterrogate2std.exe` tool or `Documents\FSUIPC7\FSUIPC7 Offsets Status.pdf`.
+
 [Project Magenta Downloads page](https://www.projectmagenta.com/downloads/) - specifically [FSUIPC Offsets Quick Reference](https://www.projectmagenta.com/download/8733/)
 
 [All About FSUIPC Page](https://fsuipc.com/about/) - search for "documentation" for [stand-alone download pack](https://fsuipc.com/download/FSUIPC7_Documentation.zip).

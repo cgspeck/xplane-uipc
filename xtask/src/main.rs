@@ -102,6 +102,8 @@ fn dist_binary() -> Result<(), DynError> {
     fs::copy(&src_config, dist_dir().join("config.toml"))?;
     let expr_readme = project_root().join("uipc-expr").join("README-EXPR.md");
     fs::copy(&expr_readme, dist_dir().join("README-EXPR.md"))?;
+    let lua_datetime_helper = project_root().join("lua").join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua");
+    fs::copy(&lua_datetime_helper, dist_dir().join("Xplane_Uipc_Helper_Set_Date_Datarefs.lua"))?;
     Ok(())
 }
 
