@@ -1,20 +1,20 @@
-name: Branch Build
+name: Release Build
 
 on:
   push:
-    branches:
-      - '**'
-    tags-ignore:
-      - '**'
+    tags:
+      - 'v*'
 
 jobs:
   build:
     # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-Readme.md
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v5
-
+    
     - name: Check formatting
       run: cargo fmt --check
 
@@ -24,7 +24,16 @@ jobs:
     - name: Create distribution
       run: cargo xtask dist
 
-    - uses: actions/upload-artifact@v7
+    - name: Archive
+      uses: vimtor/action-zip@v1
       with:
-        name: xplane-uipc
-        path: dist/
+        files: dist/
+        dest: xplane-uipc.zip
+        recursive: true
+
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      with:
+        fail_on_unmatched_files: true
+        files: |
+          xplane-uipc.zip
