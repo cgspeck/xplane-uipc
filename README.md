@@ -53,7 +53,7 @@ Make your changes to `C:\X-Plane 12\Resources\plugins\xplane-uipc\mappings.toml`
 ## Project Structure
 
 | Crate | Type | Purpose |
-|-------|------|---------|
+| ------- | ------ | --------- |
 | `xplane_uipc/` | X-Plane plugin (`cdylib`)| Loads as a plugin into X-Plane, reads `mappings.toml`, evaluates dataref expressions, and writes results to shared memory |
 | `ipc_host/` | Library (`cdylib` + `rlib`) | Windows IPC/shared-memory mechanism; communication layer between plugin and FSUIPC clients |
 | `uipc-expr/` | Library | RPN-style expression parser and evaluator for offset value formulas |
