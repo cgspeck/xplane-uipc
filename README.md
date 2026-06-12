@@ -41,7 +41,7 @@ You can also start/stop capture UIPC messages by clicking  "X-Plane UIPC" ->  "S
 
 See:
 
-* [SLC-OFFSETS.md](docs\SLC-OFFSETS.md)
+* [SLC-OFFSETS.md](docs\OFFSETS.md)
 * [mappings.toml](xplane_uipc\mappings.toml)
 
 ## Extending mappings.toml / adding your own offsets
