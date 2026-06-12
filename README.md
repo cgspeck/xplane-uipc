@@ -129,14 +129,7 @@ See `uipc-debug/README.md` for full keybindings and options.
 
 ### FSUIPC Test Client (`fsuipc-test-client`)
 
-.NET console application (Windows only, requires .NET 10 SDK + FSUIPCClientDLL) that connects to any FSUIPC-compatible host and reads offsets in real time or batch mode.
-
-```shell
-dotnet run --project fsuipc-test-client -- fsuipc-test-client/sample-offsets.txt
-dotnet run --project fsuipc-test-client -- fsuipc-test-client/sample-offsets.txt --batch > output.json
-```
-
-See `fsuipc-test-client/README.md` for input format, keybindings, and build instructions.
+Moved to [a dedicated repository](https://github.com/cgspeck/fsuipc-test-client).
 
 ## License
 
