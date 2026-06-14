@@ -72,7 +72,8 @@ fn main() {
         .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
         .with_edit_mode(edit_mode);
 
-    let prompt = DefaultPrompt::default();
+    let mut prompt = DefaultPrompt::default();
+    prompt.left_prompt = reedline::DefaultPromptSegment::Empty;
     let no_vars = &HashMap::new();
     loop {
         let sig = line_editor.read_line(&prompt);
