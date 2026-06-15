@@ -36,10 +36,17 @@ unsafe fn read_u32_at(ptr: *const u8) -> u32 {
 /// The scan reads up to `offset + 15` so we stop when fewer than 16 bytes
 /// remain at the candidate position.
 unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize) -> Option<usize> {
+    tracing::trace!(
+        "find_next_record: entry, cur_ptr: {:#?}, max_gap: {}, available: {}",
+        cur_ptr,
+        max_gap,
+        available
+    );
     // Need at least 16 bytes from cur_ptr + offset to read the sentinel at +12..+15
     let safe_limit = if available >= 16 {
         max_gap.min(available - 16)
     } else {
+        tracing::trace!("find_next_record: early return none");
         return None;
     };
     for offset in 0..=safe_limit {
@@ -62,9 +69,10 @@ unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize)
                 continue;
             }
         }
-
+        tracing::trace!("find_next_record: returned offset {:#}", offset);
         return Some(offset);
     }
+    tracing::trace!("find_next_record: full scan returned none");
     None
 }
 
