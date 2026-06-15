@@ -189,7 +189,7 @@ expr = "$pilot $copilot | $standby |"
 [[mapping]]
 offset      = 0x0580  # TRUE heading at a whacky scale
 fsuipc_type = "u32"
-dataref     = {Hdg="sim/flightmodel/position/true_psi"}
+datarefs    = {Hdg="sim/flightmodel/position/true_psi"}
 expr = "$Hdg 360 65536 65536 * / /"
 
 [[mapping]]
@@ -534,7 +534,7 @@ expr = "$Lng 360 65536 65536 * 65536 * 65536 * / /"
 [[mapping]]
 offset      = 0x0574 # elevation in metres, whole-part only, if specifcally called
 fsuipc_type = "i32"
-dataref     = { elev = "sim/flightmodel/position/elevation" }
+datarefs     = { elev = "sim/flightmodel/position/elevation" }
 expr = "$elev floor"
 
 [[mapping]]
