@@ -245,14 +245,14 @@ scale       = 625.0
 
 # =============================================================================
 # LIGHTS  (combined bitmask)
-# 0x0D0C  bit 0=Nav, 1=Beacon, 2=Landing, 3=Taxi, 4=Strobes  (u16)  rw
+# 0x0D0C  (u16)  rw
 # =============================================================================
-
+# 1=Nav, 2=Bcn, 4=Land, 8=Taxi, 16=Strobe, 32=Panel, 64=Recognition, 128=Wing, 256=Logo, 512=Cabin (see also $0280, $0281 and $028C)
 [[mapping]]
 offset      = 0x0D0C
 fsuipc_type = "u16"
-datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on" }
-expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * +"
+datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on", Wing = "laminar/B738/toggle_switch/wing_light", Logo = "laminar/B738/toggle_switch/logo_light"}
+expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * + $Wing 128 * + $Logo 256 * +"
 
 [[mapping]]
 offset      = 0x02B4   # Ground velocity
@@ -294,8 +294,13 @@ scale       = 32.174                   # G → ft/s²
 [[mapping]]
 offset      = 0x3068  # ACCELERATION BODY Y (vertical up/down)
 fsuipc_type = "f64"
-dataref     = "sim/flightmodel/forces/g_nrml"
-scale       = 32.174
+# datarefs     = { GNrm="sim/flightmodel/forces/g_nrml" }
+# simplified conversion ACCELERATION BODY Y = (g_nrml - 1) * 32.174
+# more nuanced one would account for bank angle & unusal attitudes
+# more preceis formula
+datarefs = { Bank="sim/flightmodel2/position/true_phi", GNrml="sim/flightmodel/forces/g_nrml", Pitch="sim/flightmodel/position/true_theta" }
+expr = "$GNrml $Pitch PI * 180 / cos $Bank PI * 180 / cos * - 32.174 *"
+# expr = "$GNrml 1 - 32.174 *"
 
 [[mapping]]
 offset      = 0x3070  # ACCELERATION BODY Z (longitudinal, forward/backward)
