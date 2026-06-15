@@ -337,7 +337,7 @@ pub unsafe fn process_mapped_view(
                         }
                         Value::Integer16(v) => {
                             tracing::trace!(
-                                "Writing i64 {} -> offset {:#06x}",
+                                "Writing i16 {} -> offset {:#06x}",
                                 v,
                                 record.dw_offset
                             );
@@ -365,9 +365,11 @@ pub unsafe fn process_mapped_view(
                         }
                         Value::UnsignedInteger16(v) => {
                             tracing::trace!(
-                                "Writing u16 {} -> offset {:#06x}",
+                                "Writing u16 {} -> offset {:#06x} ({:#?}, {} bytes)",
                                 v,
-                                record.dw_offset
+                                record.dw_offset,
+                                record.payload_ptr,
+                                std::mem::size_of::<u16>()
                             );
                             std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
                         }
@@ -463,7 +465,6 @@ pub unsafe fn process_mapped_view(
                     }
                 }
             }
-
             record_errors
         })
     }
