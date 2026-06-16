@@ -12,6 +12,7 @@ Non-goals:
 
 1. supporting in-process access;
 2. supporting WideFS UDP protocol;
+3. full and complete support for FSUIPC protocol e.g. all offsets, write/triggering X-Plane actions
 
 ## X-Plane dependencies
 
