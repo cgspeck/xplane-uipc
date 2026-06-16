@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env, process::exit};
 
 use reedline::{
     ColumnarMenu, DefaultCompleter, DefaultPrompt, Emacs, ExampleHighlighter, KeyCode,
@@ -8,6 +8,23 @@ use reedline::{
 use uipc_expr::Expr;
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let no_vars = &HashMap::new();
+    if args.len() > 1 {
+        let in_expr = args[1..].join(" ");
+        match Expr::parse(&in_expr) {
+            Ok(s) => {
+                let v = s.eval(no_vars);
+                println!("{}", v);
+                exit(0);
+            }
+            Err(_) => {
+                println!("Unable to parse expression");
+                exit(1);
+            }
+        }
+    }
+
     let commands = vec![
         "+".into(),
         "-".into(),
@@ -72,8 +89,8 @@ fn main() {
         .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
         .with_edit_mode(edit_mode);
 
-    let prompt = DefaultPrompt::default();
-    let no_vars = &HashMap::new();
+    let mut prompt = DefaultPrompt::default();
+    prompt.left_prompt = reedline::DefaultPromptSegment::Empty;
     loop {
         let sig = line_editor.read_line(&prompt);
         match sig {

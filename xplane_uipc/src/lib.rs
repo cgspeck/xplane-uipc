@@ -295,7 +295,7 @@ unsafe extern "C" fn flight_loop_callback(
         tracing::info!("resolving datarefs during flight loop callback");
         match find_load_and_resolve_mappings() {
             Ok(_) => tracing::info!("resolved datarefs"),
-            Err(_) => tracing::error!("error loading mappings or resolving datarefs"),
+            Err(e) => tracing::error!("error loading mappings or resolving datarefs: {}", e),
         }
         DATAREF_RESOLUTION_REQUIRED.store(false, Ordering::Relaxed);
     }

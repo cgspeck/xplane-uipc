@@ -64,10 +64,17 @@ fn main() {
     tracing::info!("Press Ctrl+C to stop...");
     let (tx, rx) = std::sync::mpsc::channel::<ipc_host::IpcCommands>();
 
+    let capture_config: ipc_host::CaptureConfig = ipc_host::CaptureConfig {
+        path: Some("./scratch".into()),
+        max: Some(20),
+    };
+
     let join_handle = thread::spawn(|| unsafe {
-        ipc_host::create_ipc_window_and_run(rx, ipc_host::CaptureConfig::none())
+        ipc_host::create_ipc_window_and_run(rx, capture_config)
             .expect("Failed to create IPC window");
     });
+
+    tx.send(ipc_host::IpcCommands::StartCapture).unwrap();
 
     let _ = ctrlc::set_handler(move || {
         tracing::info!("Shutting down...");

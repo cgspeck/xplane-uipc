@@ -1,8 +1,5 @@
 use byteorder::{ByteOrder, LittleEndian};
-use std::collections::HashSet;
 use std::slice;
-
-use std::sync::{LazyLock, Mutex};
 
 use crate::{
     try_send_write,
@@ -12,16 +9,6 @@ use crate::{
 
 const SENTINEL: u32 = 0x5061_756C; // "luaP" LE
 const FSD_SENTINEL: u32 = 0x4453_463A; // ":FSD" LE
-
-static LOGGED_SENTINEL_VALUES: LazyLock<Mutex<HashSet<u32>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
-static FSD_LOGGED_TEXTS: LazyLock<Mutex<HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
-
-pub fn reset_logged_sentinels() {
-    LOGGED_SENTINEL_VALUES.lock().unwrap().clear();
-    FSD_LOGGED_TEXTS.lock().unwrap().clear();
-}
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
     unsafe { LittleEndian::read_u32(slice::from_raw_parts(ptr, 4)) }
@@ -36,10 +23,17 @@ unsafe fn read_u32_at(ptr: *const u8) -> u32 {
 /// The scan reads up to `offset + 15` so we stop when fewer than 16 bytes
 /// remain at the candidate position.
 unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize) -> Option<usize> {
+    tracing::trace!(
+        "find_next_record: entry, cur_ptr: {:#?}, max_gap: {}, available: {}",
+        cur_ptr,
+        max_gap,
+        available
+    );
     // Need at least 16 bytes from cur_ptr + offset to read the sentinel at +12..+15
     let safe_limit = if available >= 16 {
         max_gap.min(available - 16)
     } else {
+        tracing::trace!("find_next_record: early return none");
         return None;
     };
     for offset in 0..=safe_limit {
@@ -62,9 +56,10 @@ unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize)
                 continue;
             }
         }
-
+        tracing::trace!("find_next_record: returned offset {:#}", offset);
         return Some(offset);
     }
+    tracing::trace!("find_next_record: full scan returned none");
     None
 }
 
@@ -162,28 +157,16 @@ where
             let sentinel_offset = cur_ptr.offset_from(mapped_view_ptr) as usize;
 
             if !sentinel_ok {
-                tracing::debug!(
-                    "Bad sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, scanning forward",
+                tracing::trace!(
+                    "Non-luaP sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, value {:#010x}",
                     req_id,
                     dw_offset,
                     n_bytes,
-                    sentinel_offset
+                    sentinel_offset,
+                    sentinel
                 );
-                error_count += 1;
 
-                // ── Once-logging of unrecognised sentinel values ─────────
-                {
-                    let mut logged = LOGGED_SENTINEL_VALUES.lock().unwrap();
-                    if logged.insert(sentinel) {
-                        tracing::warn!(
-                            "Bad sentinel at offset {:#x}: value {:#010x}",
-                            sentinel_offset,
-                            sentinel
-                        );
-                    }
-                }
-
-                // ── Once-logging of ":FSD" trailing text ────────────────
+                // ── Detect ":FSD" trailing text for diagnostics ────────
                 if sentinel == FSD_SENTINEL {
                     let mut text = String::new();
                     for i in 0..255usize {
@@ -193,78 +176,38 @@ where
                         }
                         text.push(c as char);
                     }
-                    if !text.is_empty() && FSD_LOGGED_TEXTS.lock().unwrap().insert(text.clone()) {
-                        tracing::info!(
-                            "Bad sentinel at offset {:#x}: ':FSD' followed by: \"{}\"",
+                    if !text.is_empty() {
+                        tracing::trace!(
+                            "FSD sentinel at offset {:#x} followed by: \"{}\"",
                             sentinel_offset,
                             text
                         );
                     }
                 }
-
-                // ── Phase 1: scan 16 bytes ──────────────────────────────
-                let recovery_next_offset;
-                match find_next_record(
-                    sentinel_before_ptr.add(1),
-                    16,
-                    avail(sentinel_before_ptr.add(1)),
-                ) {
-                    Some(0) => {
-                        recovery_next_offset = Some(sentinel_offset + 1);
-                        cur_ptr = sentinel_before_ptr.add(1);
-                    }
-                    Some(skip) => {
-                        recovery_next_offset = Some(sentinel_offset + 1 + skip);
-                        cur_ptr = sentinel_before_ptr.add(1 + skip);
-                    }
-                    None => {
-                        // ── Phase 2: scan the rest of the buffer ────────
-                        let scan_ptr = sentinel_before_ptr.add(1);
-                        let remaining = avail(scan_ptr).saturating_sub(16);
-                        match find_next_record(scan_ptr, remaining, avail(scan_ptr)) {
-                            Some(0) => {
-                                recovery_next_offset = Some(sentinel_offset + 1);
-                                cur_ptr = sentinel_before_ptr.add(1);
-                            }
-                            Some(skip) => {
-                                recovery_next_offset = Some(sentinel_offset + 1 + skip);
-                                cur_ptr = sentinel_before_ptr.add(1 + skip);
-                            }
-                            None => {
-                                let record = ParsedRecord {
-                                    req_id,
-                                    dw_offset,
-                                    raw_n,
-                                    n_bytes,
-                                    is_write,
-                                    sentinel_ok: false,
-                                    sentinel_offset,
-                                    recovery_next_offset: None,
-                                    payload_ptr: std::ptr::null_mut(),
-                                };
-                                error_count += on_record(record);
-                                break;
-                            }
-                        }
-                    }
-                }
-                let record = ParsedRecord {
-                    req_id,
-                    dw_offset,
-                    raw_n,
-                    n_bytes,
-                    is_write,
-                    sentinel_ok: false,
-                    sentinel_offset,
-                    recovery_next_offset,
-                    payload_ptr: std::ptr::null_mut(),
-                };
-                error_count += on_record(record);
-                continue;
             }
             cur_ptr = cur_ptr.add(4);
 
-            // ── 5. Payload ────────────────────────────────────────────────
+            // ── 5. Field validation ──────────────────────────────────────────
+            let remaining = avail(cur_ptr);
+            if dw_offset > 0xFFFF || n_bytes == 0 || n_bytes > remaining as u32 {
+                tracing::warn!(
+                    "Invalid record: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, reason: {}",
+                    req_id,
+                    dw_offset,
+                    n_bytes,
+                    sentinel_offset,
+                    if dw_offset > 0xFFFF {
+                        "dwOffset > 0xFFFF"
+                    } else if n_bytes == 0 {
+                        "nBytes == 0"
+                    } else {
+                        "nBytes exceeds remaining buffer"
+                    },
+                );
+                break;
+            }
+
+            // ── 6. Payload ────────────────────────────────────────────────
             let payload_ptr = cur_ptr as *mut u8;
 
             let record = ParsedRecord {
@@ -273,14 +216,14 @@ where
                 raw_n,
                 n_bytes,
                 is_write,
-                sentinel_ok: true,
+                sentinel_ok,
                 sentinel_offset,
                 recovery_next_offset: None,
                 payload_ptr,
             };
             error_count += on_record(record);
 
-            // ── 6. Advance past payload ───────────────────────────────────
+            // ── 7. Advance past payload ───────────────────────────────────
             cur_ptr = cur_ptr.add(n_bytes as usize);
         }
 
@@ -337,7 +280,7 @@ pub unsafe fn process_mapped_view(
                         }
                         Value::Integer16(v) => {
                             tracing::trace!(
-                                "Writing i64 {} -> offset {:#06x}",
+                                "Writing i16 {} -> offset {:#06x}",
                                 v,
                                 record.dw_offset
                             );
@@ -365,9 +308,11 @@ pub unsafe fn process_mapped_view(
                         }
                         Value::UnsignedInteger16(v) => {
                             tracing::trace!(
-                                "Writing u16 {} -> offset {:#06x}",
+                                "Writing u16 {} -> offset {:#06x} ({:#?}, {} bytes)",
                                 v,
-                                record.dw_offset
+                                record.dw_offset,
+                                record.payload_ptr,
+                                std::mem::size_of::<u16>()
                             );
                             std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
                         }
@@ -463,7 +408,6 @@ pub unsafe fn process_mapped_view(
                     }
                 }
             }
-
             record_errors
         })
     }
@@ -675,53 +619,24 @@ mod tests {
     }
 
     #[test]
-    fn test_bad_sentinel_with_fsd_and_extended_recovery() {
-        // Buffer layout:
-        //   orphan record #1: reqID=2, offset=0xD6C, nBytes=4
-        //   orphan record #2: reqID=2, offset=0xD70, nBytes=128 (write)
-        //   ":FSDX_GSBOARDING_STATE\0"
-        //   100 bytes of zeros
-        //   valid record: reqID=1, offset=100, nBytes=8, sentinel=luaP
-        let mut data = vec![0u8; 256];
-
-        // Orphan record #1 (12 bytes)
-        data[0..4].copy_from_slice(&2u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&0x0D6Cu32.to_le_bytes()); // offset
-        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes
-
-        // Orphan record #2 (12 bytes)
-        data[12..16].copy_from_slice(&2u32.to_le_bytes()); // reqID
-        data[16..20].copy_from_slice(&0x0D70u32.to_le_bytes()); // offset
-        data[20..24].copy_from_slice(&(128 | 0x8000_0000u32).to_le_bytes()); // nBytes (write)
-
-        // ":FSD" sentinel at offset 24 (sentinel position of orphan #2)
-        data[24] = b':';
-        data[25] = b'F';
-        data[26] = b'S';
-        data[27] = b'D';
-        // Trailing ASCII text
-        let text = b"X_GSBOARDING_STATE";
-        data[28..28 + text.len()].copy_from_slice(text);
-        data[28 + text.len()] = 0; // null terminator
-
-        // Zero padding (from ~53 to 152)
-        // data is already zeroed
-
-        // Valid record starting at offset 153
-        data[153..157].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[157..161].copy_from_slice(&100u32.to_le_bytes()); // offset=100
-        data[161..165].copy_from_slice(&8u32.to_le_bytes()); // nBytes=8
-        data[165] = 0x6C;
-        data[166] = 0x75;
-        data[167] = 0x61;
-        data[168] = 0x50; // luaP
+    fn test_fsd_sentinel_record_is_processed() {
+        // A record with ":FSD" sentinel should be processed normally
+        // (value written to payload, not treated as error).
+        let mut data = vec![0u8; 64];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
+        data[8..12].copy_from_slice(&8u32.to_le_bytes()); // nBytes=8 (read)
+        data[12] = b':';
+        data[13] = b'F';
+        data[14] = b'S';
+        data[15] = b'D'; // ":FSD" sentinel
 
         let mut table = create_test_table();
         table.insert(
-            100,
+            50,
             Entry {
-                value: Value::Integer64(9999),
-                source: 100,
+                value: Value::Integer64(7777),
+                source: 50,
                 destination: 0,
                 writable: false,
             },
@@ -731,34 +646,42 @@ mod tests {
         let error_count =
             unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
 
-        // One bad sentinel from orphan #1; orphan #2 is consumed as part of
-        // orphan #1's header and never parsed independently. Phase 2 recovers
-        // past both orphans + :FSD junk to reach the valid record.
-        assert_eq!(error_count, 1);
-        // The valid record at offset 153 should have been processed
-        let read_val = i64::from_le_bytes(data[169..177].try_into().unwrap());
-        assert_eq!(read_val, 9999);
+        // No errors — record was processed despite FSD sentinel
+        assert_eq!(error_count, 0);
+        // Value was written to payload area (offset 16)
+        let read_val = i64::from_le_bytes(data[16..24].try_into().unwrap());
+        assert_eq!(read_val, 7777);
     }
 
     #[test]
-    fn test_fsd_no_text_after() {
-        // ":FSD" followed immediately by null bytes — no text log expected
+    fn test_non_luap_sentinel_accepted() {
+        // A record with a non-"luaP" sentinel (e.g. a pointer value like
+        // FSInterrogate writes) should be processed without error.
         let mut data = vec![0u8; 64];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes());
-        data[4..8].copy_from_slice(&100u32.to_le_bytes());
-        data[8..12].copy_from_slice(&8u32.to_le_bytes());
-        // ":FSD" as sentinel
-        data[12] = b':';
-        data[13] = b'F';
-        data[14] = b'S';
-        data[15] = b'D';
-        // rest is zeros — no printable text follows
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
+        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes=4 (read)
+        // Non-"luaP" value — like a writeback pointer
+        data[12..16].copy_from_slice(&0x0105FFF8u32.to_le_bytes());
 
-        let table = create_test_table();
+        let mut table = create_test_table();
+        table.insert(
+            50,
+            Entry {
+                value: Value::Integer32(42),
+                source: 50,
+                destination: 0,
+                writable: false,
+            },
+        );
+
         let mut warned_set = WarnedSet::new();
         let error_count =
             unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-        assert_eq!(error_count, 1);
+
+        assert_eq!(error_count, 0);
+        let read_val = i32::from_le_bytes(data[16..20].try_into().unwrap());
+        assert_eq!(read_val, 42);
     }
 
     #[test]
@@ -840,5 +763,58 @@ mod tests {
 
         let payload: Vec<u8> = data[16..21].to_vec();
         assert_eq!(&payload[..], b"hello");
+    }
+
+    #[test]
+    fn test_invalid_dw_offset_rejected() {
+        // dwOffset > 0xFFFF should be rejected (break processing)
+        let mut data = vec![0u8; 64];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x10000u32.to_le_bytes()); // dwOffset = 65536 > 0xFFFF
+        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes = 4
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
+        // Payload should NOT have been written (stays zero)
+        assert_eq!(data[16..20], [0u8; 4]);
+    }
+
+    #[test]
+    fn test_nbytes_zero_rejected() {
+        // nBytes = 0 should be rejected (would cause infinite loop)
+        let mut data = vec![0u8; 64];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
+        data[8..12].copy_from_slice(&0u32.to_le_bytes()); // nBytes = 0
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
+    }
+
+    #[test]
+    fn test_nbytes_exceeds_buffer_rejected() {
+        // nBytes larger than remaining buffer should be rejected
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
+        data[8..12].copy_from_slice(&100u32.to_le_bytes()); // nBytes = 100, only 16 bytes after header
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
     }
 }
