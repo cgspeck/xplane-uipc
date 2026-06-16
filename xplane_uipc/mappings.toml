@@ -87,14 +87,18 @@ size = 24
 # =============================================================================
 # FSUIPC HEADER OFFSETS
 # These identify this as XPUIPC to client software
-# 0x3304 = FSUIPC version (0x50000008 = XPUIPC version 7.x)
+# 0x3304 = FSUIPC "interim version" - u16
+# 0x3308 = FSUIPC  BCD Maj-Minor version - u16
+# 0x3304 is actually written back as a u32 with both registers combined
 # 0x3308 = FS version (0x0B00 = FSX-compatible, 0xFADEFFFF = X-Plane)
 # =============================================================================
 
 [[mapping]]  # FSUIPC interim version Id, 0=none, 1-26 = a-z
 offset      = 0x3304
-fsuipc_type = "u16"
-static_value = 0
+# fsuipc_type = "u16"
+# static_value = 0
+fsuipc_type = "u32"
+static_value = 0x50000008
 
 [[mapping]]  # FSUIPC version, BCD. e.g. 0x1998 = version 1.998
 offset      = 0x3306
@@ -103,20 +107,18 @@ static_value = 0x7507
 
 [[mapping]]  # FS version, 1=FS98, 2=FS2K, 3=CFS2, 4=CFS1, 5=reserved, 6=FS2002, 7=FS2004, 8=FSX, 9=ESP, 10=P3D
 offset      = 0x3308
-fsuipc_type = "u16"
-static_value = 13
-
-[[mapping]]  # is electric airways avaliable
-offset      = 0x3124
-fsuipc_type = "u8"
-static_value = 110
+# this is actually read with 330A, which must be 'FADE', essentually a fixed check-value
+# fsuipc_type = "u16"
+# static_value = 13
+fsuipc_type = "u32"
+static_value = 0xFADEFFFF
 
 [[mapping]]  #  Hot keys: # of slots
 offset      = 0x320c
 fsuipc_type = "u32"
 static_value = 56
 
-[[mapping]]
+[[mapping]]  # Hot buttons: # of slots
 offset = 0x290C
 fsuipc_type = "u32"
 static_value = 56

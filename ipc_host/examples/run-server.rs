@@ -21,18 +21,7 @@ fn main() {
                 0x3304,
                 Entry {
                     // value: Value::UnsignedInteger16(0),
-                    value: Value::UnsignedInteger16(0x5000),
-                    source: 0,
-                    destination: 0,
-                    writable: false,
-                },
-            ),
-            (
-                0x3306,
-                Entry {
-                    // value: Value::UnsignedInteger16(0x7507),
-                    // value: Value::UnsignedInteger16(0x7000),
-                    value: Value::UnsignedInteger16(0x0008),
+                    value: Value::UnsignedInteger32(0x50000008),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -41,7 +30,7 @@ fn main() {
             (
                 0x3308,
                 Entry {
-                    value: Value::UnsignedInteger16(13),
+                    value: Value::UnsignedInteger32(0xFADEFFFF),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -51,7 +40,7 @@ fn main() {
                 0x3124,
                 Entry {
                     // value: Value::UnsignedInteger8(110),
-                    value: Value::UnsignedInteger8(0),
+                    value: Value::UnsignedInteger32(0),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -65,15 +54,6 @@ fn main() {
                     source: 0,
                     destination: 0,
                     writable: false,
-                },
-            ),
-            (
-                0x02CC,
-                Entry {
-                    value: Value::UnsignedInteger32(0),
-                    source: 0,
-                    destination: 0,
-                    writable: true,
                 },
             ),
         ];

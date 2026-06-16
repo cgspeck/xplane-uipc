@@ -179,7 +179,38 @@ unsafe extern "system" fn wnd_proc(
         Vec::new()
     };
 
-    // ── Process the mapped view ───────────────────────────────────────────
+    let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+    if let Some(state) = guard.as_mut() {
+        if state.enabled && state.count < state.max && !raw_bytes.is_empty() {
+            let ts = chrono::Local::now()
+                .format("%Y-%m-%dT%H-%M-%S.%3fZ")
+                .to_string();
+            let mut bin_path = state.path.join(format!("{}.bin", ts));
+            let mut counter = 0u32;
+            while bin_path.exists() {
+                counter += 1;
+                bin_path = state.path.join(format!("{}_{}.bin", ts, counter));
+            }
+            let bytes = raw_bytes.clone();
+            let path = bin_path.clone();
+            let _ = std::thread::spawn(move || {
+                if let Err(e) = std::fs::write(&path, &bytes) {
+                    tracing::warn!("Failed to write capture file {:?}: {}", path, e);
+                }
+            });
+            tracing::info!("Captured view to {:?}", bin_path);
+            state.count += 1;
+            if state.count >= state.max {
+                tracing::warn!(
+                    "Capture guardrail reached ({} files), disabling capture",
+                    state.max
+                );
+                state.enabled = false;
+            }
+        }
+        // ── Process the mapped view ───────────────────────────────────────────
+    }
+
     let table_arc = get_value_table();
     let table = table_arc.read().unwrap();
     tracing::trace!("Aquired table lock");
@@ -187,42 +218,8 @@ unsafe extern "system" fn wnd_proc(
     let error_count =
         unsafe { process_mapped_view(mapped_view_ptr, view_size, &table, &mut *warned_set) };
 
-    // ── Capture if errors detected ────────────────────────────────────────
     if error_count > 0 {
-        let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-        if let Some(state) = guard.as_mut() {
-            if state.enabled && state.count < state.max && !raw_bytes.is_empty() {
-                let ts = chrono::Local::now()
-                    .format("%Y-%m-%dT%H-%M-%S.%3fZ")
-                    .to_string();
-                let mut bin_path = state.path.join(format!("{}.bin", ts));
-                let mut counter = 0u32;
-                while bin_path.exists() {
-                    counter += 1;
-                    bin_path = state.path.join(format!("{}_{}.bin", ts, counter));
-                }
-                let bytes = raw_bytes.clone();
-                let path = bin_path.clone();
-                let _ = std::thread::spawn(move || {
-                    if let Err(e) = std::fs::write(&path, &bytes) {
-                        tracing::warn!("Failed to write capture file {:?}: {}", path, e);
-                    }
-                });
-                tracing::info!(
-                    "Captured view with {} errors to {:?}",
-                    error_count,
-                    bin_path
-                );
-                state.count += 1;
-                if state.count >= state.max {
-                    tracing::warn!(
-                        "Capture guardrail reached ({} files), disabling capture",
-                        state.max
-                    );
-                    state.enabled = false;
-                }
-            }
-        }
+        tracing::error!("process_mapped_view returned {} errors", error_count);
     }
 
     tracing::trace!("Finished processing mapped view, unmapping and closing handle");

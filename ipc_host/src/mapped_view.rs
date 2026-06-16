@@ -187,7 +187,27 @@ where
             }
             cur_ptr = cur_ptr.add(4);
 
-            // ── 5. Payload ────────────────────────────────────────────────
+            // ── 5. Field validation ──────────────────────────────────────────
+            let remaining = avail(cur_ptr);
+            if dw_offset > 0xFFFF || n_bytes == 0 || n_bytes > remaining as u32 {
+                tracing::warn!(
+                    "Invalid record: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, reason: {}",
+                    req_id,
+                    dw_offset,
+                    n_bytes,
+                    sentinel_offset,
+                    if dw_offset > 0xFFFF {
+                        "dwOffset > 0xFFFF"
+                    } else if n_bytes == 0 {
+                        "nBytes == 0"
+                    } else {
+                        "nBytes exceeds remaining buffer"
+                    },
+                );
+                break;
+            }
+
+            // ── 6. Payload ────────────────────────────────────────────────
             let payload_ptr = cur_ptr as *mut u8;
 
             let record = ParsedRecord {
@@ -203,7 +223,7 @@ where
             };
             error_count += on_record(record);
 
-            // ── 6. Advance past payload ───────────────────────────────────
+            // ── 7. Advance past payload ───────────────────────────────────
             cur_ptr = cur_ptr.add(n_bytes as usize);
         }
 
@@ -743,5 +763,58 @@ mod tests {
 
         let payload: Vec<u8> = data[16..21].to_vec();
         assert_eq!(&payload[..], b"hello");
+    }
+
+    #[test]
+    fn test_invalid_dw_offset_rejected() {
+        // dwOffset > 0xFFFF should be rejected (break processing)
+        let mut data = vec![0u8; 64];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x10000u32.to_le_bytes()); // dwOffset = 65536 > 0xFFFF
+        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes = 4
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
+        // Payload should NOT have been written (stays zero)
+        assert_eq!(data[16..20], [0u8; 4]);
+    }
+
+    #[test]
+    fn test_nbytes_zero_rejected() {
+        // nBytes = 0 should be rejected (would cause infinite loop)
+        let mut data = vec![0u8; 64];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
+        data[8..12].copy_from_slice(&0u32.to_le_bytes()); // nBytes = 0
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
+    }
+
+    #[test]
+    fn test_nbytes_exceeds_buffer_rejected() {
+        // nBytes larger than remaining buffer should be rejected
+        let mut data = vec![0u8; 32];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
+        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
+        data[8..12].copy_from_slice(&100u32.to_le_bytes()); // nBytes = 100, only 16 bytes after header
+        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
+
+        let table = create_test_table();
+        let mut warned_set = WarnedSet::new();
+        let error_count =
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+
+        assert_eq!(error_count, 0);
     }
 }
