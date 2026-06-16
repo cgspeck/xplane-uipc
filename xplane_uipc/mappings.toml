@@ -301,13 +301,8 @@ scale       = 32.174                   # G → ft/s²
 [[mapping]]
 offset      = 0x3068  # ACCELERATION BODY Y (vertical up/down)
 fsuipc_type = "f64"
-# datarefs     = { GNrm="sim/flightmodel/forces/g_nrml" }
-# simplified conversion ACCELERATION BODY Y = (g_nrml - 1) * 32.174
-# more nuanced one would account for bank angle & unusal attitudes
-# more preceis formula
 datarefs = { Bank="sim/flightmodel2/position/true_phi", GNrml="sim/flightmodel/forces/g_nrml", Pitch="sim/flightmodel/position/true_theta" }
 expr = "$GNrml $Pitch PI * 180 / cos $Bank PI * 180 / cos * - 32.174 *"
-# expr = "$GNrml 1 - 32.174 *"
 
 [[mapping]]
 offset      = 0x3070  # ACCELERATION BODY Z (longitudinal, forward/backward)
