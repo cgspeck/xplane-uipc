@@ -44,3 +44,22 @@ fn test_fsinterrogate_capture() {
     assert_eq!(records[1].n_bytes, 4);
     assert!(!records[1].is_write);
 }
+
+#[test]
+fn test_8001_dump_does_not_crash() {
+    // This dump contains a request for offset 0x8001, which is in a completely different shape to the
+    // previously seen requests
+    let data = include_bytes!("fixtures/fsinterrogate-offset-8001.bin");
+    let mut records = Vec::new();
+    let errors = unsafe {
+        iterate_records(data.as_ptr(), data.len(), |rec| {
+            records.push(rec);
+            0
+        })
+    };
+    assert_eq!(errors, 0);
+    // The pseudo-record passes validation (reqID=2, offset=0x8001, nBytes=13)
+    // before following bytes break field-validation. At least 0 records
+    // is guaranteed — what matters is that we didn't crash.
+    assert!(records.len() <= 1);
+}
