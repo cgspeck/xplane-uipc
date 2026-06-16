@@ -197,7 +197,7 @@ expr = "$pilot $copilot | $standby |"
 offset      = 0x0580  # TRUE heading at a whacky scale
 fsuipc_type = "u32"
 datarefs    = {Hdg="sim/flightmodel/position/true_psi"}
-expr = "$Hdg 360 65536 65536 * / /"
+expr = "$Hdg 65536 65536 * * 360 \\"
 
 [[mapping]]
 offset      = 0x0BD0  # Spolier handle position, 4800 = armed
