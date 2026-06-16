@@ -91,7 +91,6 @@ size = 24
 # 0x3308 = FS version (0x0B00 = FSX-compatible, 0xFADEFFFF = X-Plane)
 # =============================================================================
 
-# TODO: CHECK AGAINST MSFS
 [[mapping]]  # FSUIPC interim version Id, 0=none, 1-26 = a-z
 offset      = 0x3304
 fsuipc_type = "u16"
@@ -100,25 +99,22 @@ static_value = 0
 [[mapping]]  # FSUIPC version, BCD. e.g. 0x1998 = version 1.998
 offset      = 0x3306
 fsuipc_type = "u16"
-static_value = 0x7570
+static_value = 0x7507
 
-# TODO: CHECK AGAINST MSFS
 [[mapping]]  # FS version, 1=FS98, 2=FS2K, 3=CFS2, 4=CFS1, 5=reserved, 6=FS2002, 7=FS2004, 8=FSX, 9=ESP, 10=P3D
 offset      = 0x3308
 fsuipc_type = "u16"
-static_value = 0xFADEFFFF
+static_value = 13
 
-# TODO: CHECK AGAINST MSFS
 [[mapping]]  # is electric airways avaliable
 offset      = 0x3124
 fsuipc_type = "u8"
-static_value = 0x00000000
+static_value = 110
 
-# TODO: CHECK AGAINST MSFS
 [[mapping]]  #  Hot keys: # of slots
 offset      = 0x320c
 fsuipc_type = "u32"
-static_value = 0x00000000
+static_value = 56
 
 [[mapping]]
 offset = 0x290C

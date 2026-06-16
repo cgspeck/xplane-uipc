@@ -340,7 +340,6 @@ pub unsafe fn create_ipc_window_and_run(
                         (&mut *warned_set_ptr).clear_all();
                     }
                 }
-                crate::mapped_view::reset_logged_sentinels();
             }
             IpcCommands::StartCapture => {
                 tracing::info!("Starting capture...");

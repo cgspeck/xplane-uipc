@@ -20,7 +20,8 @@ fn main() {
             (
                 0x3304,
                 Entry {
-                    value: Value::UnsignedInteger16(26),
+                    // value: Value::UnsignedInteger16(0),
+                    value: Value::UnsignedInteger16(0x5000),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -29,7 +30,9 @@ fn main() {
             (
                 0x3306,
                 Entry {
-                    value: Value::UnsignedInteger16(0x7570),
+                    // value: Value::UnsignedInteger16(0x7507),
+                    // value: Value::UnsignedInteger16(0x7000),
+                    value: Value::UnsignedInteger16(0x0008),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -38,7 +41,7 @@ fn main() {
             (
                 0x3308,
                 Entry {
-                    value: Value::UnsignedInteger16(11),
+                    value: Value::UnsignedInteger16(13),
                     source: 0,
                     destination: 0,
                     writable: false,
@@ -47,6 +50,7 @@ fn main() {
             (
                 0x3124,
                 Entry {
+                    // value: Value::UnsignedInteger8(110),
                     value: Value::UnsignedInteger8(0),
                     source: 0,
                     destination: 0,
@@ -56,10 +60,20 @@ fn main() {
             (
                 0x320c,
                 Entry {
-                    value: Value::UnsignedInteger32(56),
+                    // value: Value::UnsignedInteger32(56),
+                    value: Value::UnsignedInteger32(0),
                     source: 0,
                     destination: 0,
                     writable: false,
+                },
+            ),
+            (
+                0x02CC,
+                Entry {
+                    value: Value::UnsignedInteger32(0),
+                    source: 0,
+                    destination: 0,
+                    writable: true,
                 },
             ),
         ];
