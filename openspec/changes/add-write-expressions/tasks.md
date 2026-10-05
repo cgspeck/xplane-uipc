@@ -53,7 +53,7 @@
 - [x] 6.8 Time offsets `0x0238`–`0x023C`: also write `sim/time/use_system_time = 0`
 - [x] 6.9 `0x2E80`: convert to an expression mapping with `write_exprs = { Av = "$value 0 !=" }`
 - [x] 6.10 Add commented Zibo `write_commands` and state-dataref placeholders (TODO: confirm with DataRefTool) to `0x281C`, `0x3102`, `0x2E80` and `0x0D0C`
-- [ ] 6.11 Docs: `write_commands` in the `mappings.toml` header and `README-EXPR.md`; update the PR description
-- [ ] 6.12 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
+- [x] 6.11 Docs: `write_commands` in the `mappings.toml` header and `README-EXPR.md`; update the PR description
+- [x] 6.12 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
 - [ ] 6.13 Sim check: with "use system time" on, write `0x023B` and `0x023C`. Confirm the time sticks
 - [ ] 6.14 Sim check, Zibo: fill in the placeholders, then write battery, avionics and landing lights with the state matching and not matching. Confirm the command runs only when the state differs, and that a missing command logs one error while the other targets are still written
