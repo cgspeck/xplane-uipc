@@ -11,7 +11,7 @@
 - [ ] 2.2 Skip writes with `dwOffset > 0xFFFF` (debug log, no error), and stop truncating `dw_offset as u16` without checking it first
 - [ ] 2.3 Handle writes to `APP_KEY_OFFSET`: extract printable text up to NUL/`nBytes`, log it at the configured level, no forwarding and no warnings
 - [ ] 2.4 Add `set_key_write_log_level(LevelFilter)` / a static `AtomicU8` in `ipc_host`, plus a helper that emits at a runtime-chosen level
-- [ ] 2.5 In `wnd_proc` (`ipc_host/src/lib.rs`), return `LRESULT(0)` when `process_mapped_view` reports errors and `LRESULT(1)` otherwise; rename the magic numbers to `FS6IPC_MESSAGE_SUCCESS`/`FAILURE`
+- [ ] 2.5 In `wnd_proc` (`ipc_host/src/lib.rs`), return `LRESULT(0)` when `process_mapped_view` reports a malformed view (rejected writes alone don't fail the message) and `LRESULT(1)` otherwise; rename the magic numbers to `FS6IPC_MESSAGE_SUCCESS`/`FAILURE`
 
 ## 3. Configuration
 

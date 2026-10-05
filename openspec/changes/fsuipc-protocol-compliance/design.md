@@ -44,7 +44,7 @@ Example of FSInterrogate's key write (`unhandled-req-issue/…30.097Z.bin`):
 - Accept the `0x8001` key write quietly, with a configurable log level.
 
 **Non-Goals:**
-- Offsets above `0xFFFF`. The FSUIPC offset space is 64 KB: "FSUIPC for Programmers" documents nothing past `0xFFFF`, and its highest area is the AI traffic block at `D000`–`FFFF`. The `dwOffset > 0xFFFF` values seen so far were artefacts of the misparse. A well-framed record with such an offset is still handled defensively: reads are zero-filled, writes are ignored, and it's logged once. It's not treated as malformed.
+- Offsets above `0xFFFF`. The FSUIPC offset space is 64 KB: "FSUIPC for Programmers" documents nothing past `0xFFFF`, and its highest area is the AI traffic block at `D000`–`FFFF`. The `dwOffset > 0xFFFF` values seen so far were artefacts of the misparse. A well-framed record with such an offset is still handled defensively: reads are zero-filled, writes are ignored, and both are logged at debug level. It's not treated as malformed.
 - Validating or enforcing the application key. FSUIPC registration isn't emulated.
 - Writing to `pDest`. It's a pointer in the client's address space.
 - Fixing FSInterrogate's "responding / not responding" alternation directly. This change removes two likely contributors (the misparse and stale bytes on unknown reads). Whatever is left gets investigated afterwards with debug logs.
