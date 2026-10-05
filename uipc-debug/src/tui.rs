@@ -546,11 +546,11 @@ fn ui(f: &mut Frame, app: &mut App) {
         return;
     }
 
-    if let Some(idx) = app.popup_index {
-        if let Some(result) = app.results.get(idx) {
-            render_popup(f, result, f.area());
-            return;
-        }
+    if let Some(idx) = app.popup_index
+        && let Some(result) = app.results.get(idx)
+    {
+        render_popup(f, result, f.area());
+        return;
     }
 
     let area = f.area();
@@ -712,17 +712,17 @@ fn handle_normal_input(app: &mut App) -> bool {
                 });
             }
             KeyCode::Up => {
-                if matches!(app.focus, Focus::Table) && !app.results.is_empty() {
-                    if app.selected > 0 {
-                        app.selected -= 1;
-                    }
+                if matches!(app.focus, Focus::Table) && !app.results.is_empty() && app.selected > 0
+                {
+                    app.selected -= 1;
                 }
             }
             KeyCode::Down => {
-                if matches!(app.focus, Focus::Table) && !app.results.is_empty() {
-                    if app.selected + 1 < app.results.len() {
-                        app.selected += 1;
-                    }
+                if matches!(app.focus, Focus::Table)
+                    && !app.results.is_empty()
+                    && app.selected + 1 < app.results.len()
+                {
+                    app.selected += 1;
                 }
             }
             KeyCode::PageUp => {
@@ -746,13 +746,13 @@ fn handle_normal_input(app: &mut App) -> bool {
                 }
             }
             KeyCode::Enter => {
-                if matches!(app.focus, Focus::Table) {
-                    if matches!(
+                if matches!(app.focus, Focus::Table)
+                    && matches!(
                         app.results.get(app.selected).map(|r| &r.source),
                         Some(MappingSource::Expr { .. })
-                    ) {
-                        app.popup_index = Some(app.selected);
-                    }
+                    )
+                {
+                    app.popup_index = Some(app.selected);
                 }
             }
             KeyCode::Esc => {

@@ -278,12 +278,12 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
 }
 
 pub fn parse_dataref_with_index(s: &str) -> (String, Option<i32>) {
-    if let Some(bracket) = s.rfind('[') {
-        if s.ends_with(']') {
-            let idx_str = &s[bracket + 1..s.len() - 1];
-            if let Ok(idx) = idx_str.parse::<i32>() {
-                return (s[..bracket].to_string(), Some(idx));
-            }
+    if let Some(bracket) = s.rfind('[')
+        && s.ends_with(']')
+    {
+        let idx_str = &s[bracket + 1..s.len() - 1];
+        if let Ok(idx) = idx_str.parse::<i32>() {
+            return (s[..bracket].to_string(), Some(idx));
         }
     }
     (s.to_string(), None)

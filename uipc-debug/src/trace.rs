@@ -79,10 +79,10 @@ where
             buf.push(msg.clone());
         }
 
-        if let Some(ref file) = self.file {
-            if let Ok(mut f) = file.lock() {
-                let _ = writeln!(f, "{}", msg);
-            }
+        if let Some(ref file) = self.file
+            && let Ok(mut f) = file.lock()
+        {
+            let _ = writeln!(f, "{}", msg);
         }
     }
 }

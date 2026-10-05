@@ -65,10 +65,7 @@ fn plugin_version() -> String {
         Some(sha) => sha.get(..7).unwrap_or(sha),
         None => "unknown",
     };
-    let build_date = match option_env!("VERGEN_BUILD_DATE") {
-        Some(date) => date,
-        None => "unknown",
-    };
+    let build_date = option_env!("VERGEN_BUILD_DATE").unwrap_or("unknown");
     let is_dirty = match option_env!("VERGEN_GIT_IS_DIRTY") {
         Some("true") => "dirty",
         Some("false") => "clean",
@@ -99,6 +96,13 @@ pub fn xplane_log(msg: &str) {
     }
 }
 
+/// X-Plane plugin entry point: report the plugin name, signature and description.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. `out_name`,
+/// `out_sig` and `out_desc` must each point to a writable buffer of at least
+/// 256 bytes.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginStart(
@@ -296,10 +300,10 @@ fn parse_config_and_apply(config_path: &str) {
         }
     };
 
-    if let Some(handle) = TRACING_FILTER_HANDLE.get() {
-        if let Err(e) = handle.reload(level) {
-            tracing::warn!("Failed to reload tracing filter: {}", e);
-        }
+    if let Some(handle) = TRACING_FILTER_HANDLE.get()
+        && let Err(e) = handle.reload(level)
+    {
+        tracing::warn!("Failed to reload tracing filter: {}", e);
     }
 
     if let Some(hz) = config.settings.update_rate_hz {
@@ -404,14 +408,20 @@ pub fn find_load_and_resolve_mappings() -> Result<(), String> {
 fn get_system_path() -> String {
     let mut system_path_buf = [0u8; 512];
     unsafe { XPLMGetSystemPath(system_path_buf.as_mut_ptr() as *mut c_char) };
-    let system_path = unsafe {
+
+    unsafe {
         CStr::from_ptr(system_path_buf.as_ptr() as *const c_char)
             .to_string_lossy()
             .into_owned()
-    };
-    system_path
+    }
 }
 
+/// X-Plane plugin entry point: the plugin was enabled.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginEnable() -> c_int {
@@ -481,6 +491,12 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     1
 }
 
+/// X-Plane plugin entry point: the plugin was disabled.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginDisable() {
@@ -513,6 +529,12 @@ pub unsafe extern "C" fn XPluginDisable() {
     }
 }
 
+/// X-Plane plugin entry point: the plugin is being unloaded.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginStop() {
@@ -520,6 +542,12 @@ pub unsafe extern "C" fn XPluginStop() {
     xplane_log("XPluginStop complete");
 }
 
+/// X-Plane plugin entry point: an inter-plugin or sim message arrived.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument(skip_all)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: *mut c_void) {

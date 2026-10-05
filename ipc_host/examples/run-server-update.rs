@@ -3,7 +3,6 @@ use std::thread;
 use std::time::Duration;
 
 use tracing::Level;
-use tracing_subscriber;
 
 use ipc_host::value_table::{
     Entry, Value, create_table_with_entries, get_value_table, set_value_table,
@@ -90,12 +89,11 @@ fn main() {
         heading = (heading + 1) % 360;
 
         let table = get_value_table();
-        if let Ok(mut table) = table.write() {
-            if let Some(entry) = table.entries.get_mut(0x02CC as usize) {
-                if let Some(e) = entry {
-                    e.value = Value::UnsignedInteger32(heading);
-                }
-            }
+        if let Ok(mut table) = table.write()
+            && let Some(entry) = table.entries.get_mut(0x02CC_usize)
+            && let Some(e) = entry
+        {
+            e.value = Value::UnsignedInteger32(heading);
         }
     }
 

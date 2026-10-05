@@ -9,7 +9,6 @@ pub enum WarnCategory {
     ReadNotExist = 0,
     WriteNotExist = 1,
     WriteNotWritable = 2,
-    COUNT = 3,
 }
 
 #[derive(Debug)]

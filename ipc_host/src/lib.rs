@@ -107,13 +107,8 @@ unsafe extern "system" fn wnd_proc(
         .unwrap_or("<Invalid UTF-8 in atom name>");
     tracing::trace!("Received Atom Name: {}", atom_name_str);
     // open the file mapping and read the contents
-    let handle_res = unsafe {
-        OpenFileMappingA(
-            FILE_MAP_WRITE.0,
-            false,
-            PCSTR(atom_name_str.as_ptr() as *const u8),
-        )
-    };
+    let handle_res =
+        unsafe { OpenFileMappingA(FILE_MAP_WRITE.0, false, PCSTR(atom_name_str.as_ptr())) };
     if handle_res.is_err() {
         tracing::trace!(
             "Failed to open file mapping for atom name: {}",
@@ -180,36 +175,38 @@ unsafe extern "system" fn wnd_proc(
     };
 
     let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-    if let Some(state) = guard.as_mut() {
-        if state.enabled && state.count < state.max && !raw_bytes.is_empty() {
-            let ts = chrono::Local::now()
-                .format("%Y-%m-%dT%H-%M-%S.%3fZ")
-                .to_string();
-            let mut bin_path = state.path.join(format!("{}.bin", ts));
-            let mut counter = 0u32;
-            while bin_path.exists() {
-                counter += 1;
-                bin_path = state.path.join(format!("{}_{}.bin", ts, counter));
-            }
-            let bytes = raw_bytes.clone();
-            let path = bin_path.clone();
-            let _ = std::thread::spawn(move || {
-                if let Err(e) = std::fs::write(&path, &bytes) {
-                    tracing::warn!("Failed to write capture file {:?}: {}", path, e);
-                }
-            });
-            tracing::info!("Captured view to {:?}", bin_path);
-            state.count += 1;
-            if state.count >= state.max {
-                tracing::warn!(
-                    "Capture guardrail reached ({} files), disabling capture",
-                    state.max
-                );
-                state.enabled = false;
-            }
+    if let Some(state) = guard.as_mut()
+        && state.enabled
+        && state.count < state.max
+        && !raw_bytes.is_empty()
+    {
+        let ts = chrono::Local::now()
+            .format("%Y-%m-%dT%H-%M-%S.%3fZ")
+            .to_string();
+        let mut bin_path = state.path.join(format!("{}.bin", ts));
+        let mut counter = 0u32;
+        while bin_path.exists() {
+            counter += 1;
+            bin_path = state.path.join(format!("{}_{}.bin", ts, counter));
         }
-        // ── Process the mapped view ───────────────────────────────────────────
+        let bytes = raw_bytes.clone();
+        let path = bin_path.clone();
+        let _ = std::thread::spawn(move || {
+            if let Err(e) = std::fs::write(&path, &bytes) {
+                tracing::warn!("Failed to write capture file {:?}: {}", path, e);
+            }
+        });
+        tracing::info!("Captured view to {:?}", bin_path);
+        state.count += 1;
+        if state.count >= state.max {
+            tracing::warn!(
+                "Capture guardrail reached ({} files), disabling capture",
+                state.max
+            );
+            state.enabled = false;
+        }
     }
+    // ── Process the mapped view ───────────────────────────────────────────
 
     let table_arc = get_value_table();
     let table = table_arc.read().unwrap();
@@ -278,7 +275,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
 
         let unwrapped_hwnd = hwnd?;
 
-        if unwrapped_hwnd.0 == std::ptr::null_mut() {
+        if unwrapped_hwnd.0.is_null() {
             return Err(anyhow::anyhow!("Failed to IPC window"));
         }
 
@@ -292,6 +289,14 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
     }
 }
 
+/// Create the `UIPCMAIN` IPC window and run its message loop until
+/// `IpcCommands::Shutdown` is received.
+///
+/// # Safety
+///
+/// Call this from a dedicated thread, and run only one instance at a time.
+/// The window belongs to the calling thread, and its window procedure uses a
+/// `WarnedSet` that this function frees when the loop exits.
 #[tracing::instrument(skip(config))]
 pub unsafe fn create_ipc_window_and_run(
     rx: Receiver<IpcCommands>,
@@ -346,39 +351,41 @@ pub unsafe fn create_ipc_window_and_run(
     let mut continue_loop = true;
 
     while continue_loop {
-        rx.try_recv().ok().map(|cmd| match cmd {
-            IpcCommands::ResetWarnings => {
-                tracing::info!("Resetting warnings...");
-                unsafe {
-                    let warned_set_ptr =
-                        GetWindowLongPtrW(HWND(hwnd), GWLP_USERDATA) as *mut WarnedSet;
-                    if !warned_set_ptr.is_null() {
-                        (&mut *warned_set_ptr).clear_all();
+        if let Ok(cmd) = rx.try_recv() {
+            match cmd {
+                IpcCommands::ResetWarnings => {
+                    tracing::info!("Resetting warnings...");
+                    unsafe {
+                        let warned_set_ptr =
+                            GetWindowLongPtrW(HWND(hwnd), GWLP_USERDATA) as *mut WarnedSet;
+                        if !warned_set_ptr.is_null() {
+                            (&*warned_set_ptr).clear_all();
+                        }
                     }
                 }
-            }
-            IpcCommands::StartCapture => {
-                tracing::info!("Starting capture...");
-                let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-                if let Some(state) = guard.as_mut() {
-                    state.enabled = true;
+                IpcCommands::StartCapture => {
+                    tracing::info!("Starting capture...");
+                    let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+                    if let Some(state) = guard.as_mut() {
+                        state.enabled = true;
+                    }
+                }
+                IpcCommands::StopCapture => {
+                    tracing::info!("Stopping capture...");
+                    let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+                    if let Some(state) = guard.as_mut() {
+                        state.enabled = false;
+                    }
+                }
+                IpcCommands::Shutdown => {
+                    tracing::info!("Shutting down IPC window...");
+                    unsafe {
+                        DestroyWindow(HWND(hwnd)).ok();
+                    }
+                    continue_loop = false;
                 }
             }
-            IpcCommands::StopCapture => {
-                tracing::info!("Stopping capture...");
-                let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-                if let Some(state) = guard.as_mut() {
-                    state.enabled = false;
-                }
-            }
-            IpcCommands::Shutdown => {
-                tracing::info!("Shutting down IPC window...");
-                unsafe {
-                    DestroyWindow(HWND(hwnd)).ok();
-                }
-                continue_loop = false;
-            }
-        });
+        }
 
         let ret = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
 
