@@ -683,4 +683,36 @@ expr        = \"$A\"
             err
         );
     }
+
+    #[test]
+    fn writable_zero_scale() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+scale       = 0.0
+writable    = true
+",
+        );
+        assert!(err.contains("'scale = 0'"), "{}", err);
+    }
+
+    #[test]
+    fn read_only_zero_scale_loads() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+scale       = 0.0
+offset_add  = 5.0
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty());
+        assert_eq!(config.mappings.len(), 1);
+    }
 }
