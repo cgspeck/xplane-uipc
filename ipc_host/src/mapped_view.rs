@@ -16,12 +16,14 @@
 //! read's payload there after the call, so it means nothing to the server.
 
 use byteorder::{ByteOrder, LittleEndian};
+use std::collections::HashSet;
 use std::fmt;
 use std::slice;
-use std::sync::atomic::{AtomicU8, Ordering};
-use tracing::{Level, level_filters::LevelFilter};
+use tracing::level_filters::LevelFilter;
 
 use crate::{
+    log_at,
+    runtime_level::RuntimeLevel,
     try_send_write,
     value_table::{Table, Value},
     warning::{WarnCategory, WarnedSet},
@@ -39,35 +41,37 @@ pub const F64IPC_READSTATEDATA_ID: u32 = 4;
 /// forwarded to the flight loop.
 pub const APP_KEY_OFFSET: u16 = 0x8001;
 
-/// Levels selectable for key-write logging, indexed by `KEY_WRITE_LOG_LEVEL`.
-const KEY_WRITE_LEVELS: [LevelFilter; 6] = [
-    LevelFilter::OFF,
-    LevelFilter::ERROR,
-    LevelFilter::WARN,
-    LevelFilter::INFO,
-    LevelFilter::DEBUG,
-    LevelFilter::TRACE,
-];
+/// Offset clients write the parameter for the next macro or Lua request to.
+pub const LUA_PARAM_OFFSET: u16 = 0x0D6C;
 
-/// Index into `KEY_WRITE_LEVELS`; defaults to INFO.
-static KEY_WRITE_LOG_LEVEL: AtomicU8 = AtomicU8::new(3);
+/// Offset clients write a macro or Lua request to, for FSUIPC to run. We can't
+/// run them, so requests are logged, never forwarded.
+pub const LUA_REQUEST_OFFSET: u16 = 0x0D70;
+
+/// Size of the request text area at `LUA_REQUEST_OFFSET`.
+const LUA_REQUEST_LEN: usize = 40;
+
+/// Level application key writes to `APP_KEY_OFFSET` are logged at.
+static KEY_WRITE_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
 
 /// Set the level application key writes to `APP_KEY_OFFSET` are logged at.
 /// `LevelFilter::OFF` silences them.
 pub fn set_key_write_log_level(level: LevelFilter) {
-    let index = KEY_WRITE_LEVELS
-        .iter()
-        .position(|l| *l == level)
-        .unwrap_or(3);
-    KEY_WRITE_LOG_LEVEL.store(index as u8, Ordering::Relaxed);
+    KEY_WRITE_LOG_LEVEL.set(level);
 }
 
-pub fn key_write_log_level() -> LevelFilter {
-    KEY_WRITE_LEVELS[KEY_WRITE_LOG_LEVEL.load(Ordering::Relaxed) as usize]
+/// Level macro and Lua requests written to `LUA_REQUEST_OFFSET` are logged at.
+static LUA_REQUEST_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
+
+/// Set the level macro and Lua requests written to `LUA_REQUEST_OFFSET` are
+/// logged at. `LevelFilter::OFF` silences them.
+pub fn set_lua_request_log_level(level: LevelFilter) {
+    LUA_REQUEST_LOG_LEVEL.set(level);
 }
 
-/// The key text: bytes up to the first NUL, with anything unprintable escaped.
-fn key_text(payload: &[u8]) -> String {
+/// Text written by a client: bytes up to the first NUL, with anything
+/// unprintable escaped.
+fn client_text(payload: &[u8]) -> String {
     let end = payload
         .iter()
         .position(|&b| b == 0)
@@ -76,17 +80,53 @@ fn key_text(payload: &[u8]) -> String {
 }
 
 fn log_key_write(payload: &[u8]) {
-    let Some(level) = key_write_log_level().into_level() else {
-        return;
+    log_at!(
+        KEY_WRITE_LOG_LEVEL,
+        "Application key write: \"{}\"",
+        client_text(payload)
+    );
+}
+
+/// The parameter written to `LUA_PARAM_OFFSET`: up to 4 bytes, little-endian,
+/// zero-extended.
+fn lua_param(payload: &[u8]) -> u32 {
+    let mut bytes = [0u8; 4];
+    let len = payload.len().min(bytes.len());
+    bytes[..len].copy_from_slice(&payload[..len]);
+    u32::from_le_bytes(bytes)
+}
+
+/// The request text written to `LUA_REQUEST_OFFSET`, limited to its 40 bytes.
+fn lua_request_text(payload: &[u8]) -> String {
+    client_text(&payload[..payload.len().min(LUA_REQUEST_LEN)])
+}
+
+/// Log a request at `LUA_REQUEST_LOG_LEVEL` the first time its text and
+/// parameter are seen, so clients that repeat it every poll don't flood the
+/// log. Repeats are logged at trace.
+fn log_lua_request(payload: &[u8], state: &mut IpcState) {
+    let text = lua_request_text(payload);
+    let first = state
+        .logged_lua_requests
+        .insert((text.clone(), state.lua_param));
+    let param = match state.lua_param {
+        Some(p) => format!("param {}", p),
+        None => "no param".to_string(),
     };
-    let text = key_text(payload);
-    match level {
-        Level::ERROR => tracing::error!("Application key write: \"{}\"", text),
-        Level::WARN => tracing::warn!("Application key write: \"{}\"", text),
-        Level::INFO => tracing::info!("Application key write: \"{}\"", text),
-        Level::DEBUG => tracing::debug!("Application key write: \"{}\"", text),
-        _ => tracing::trace!("Application key write: \"{}\"", text),
+    if !first {
+        tracing::trace!(
+            "Lua/macro request \"{}\" ({}) repeated, already logged",
+            text,
+            param
+        );
+        return;
     }
+    log_at!(
+        LUA_REQUEST_LOG_LEVEL,
+        "Lua/macro request \"{}\" ({}), not supported",
+        text,
+        param
+    );
 }
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
@@ -271,6 +311,42 @@ pub struct ProcessOutcome {
     pub rejected_writes: usize,
 }
 
+/// State the IPC window keeps between client messages. Owned by the window and
+/// used only on the IPC thread.
+pub struct IpcState {
+    /// Offsets already warned about, so each warning is logged once.
+    pub(crate) warned: WarnedSet,
+    /// Last parameter written to `LUA_PARAM_OFFSET`, if any. Kept after use,
+    /// as FSUIPC reuses it for later requests.
+    pub(crate) lua_param: Option<u32>,
+    /// Lua/macro requests (text and parameter) already logged, so each is
+    /// logged once.
+    pub(crate) logged_lua_requests: HashSet<(String, Option<u32>)>,
+}
+
+impl IpcState {
+    pub fn new() -> Self {
+        Self {
+            warned: WarnedSet::new(),
+            lua_param: None,
+            logged_lua_requests: HashSet::new(),
+        }
+    }
+
+    /// Forget which offsets have been warned about and which Lua/macro
+    /// requests have been logged. The Lua parameter is kept.
+    pub fn reset_warnings(&mut self) {
+        self.warned.clear_all();
+        self.logged_lua_requests.clear();
+    }
+}
+
+impl Default for IpcState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Answer the read and write requests in a client's mapped view.
 ///
 /// # Safety
@@ -282,7 +358,7 @@ pub unsafe fn process_mapped_view(
     mapped_view_ptr: *const u8,
     view_size: usize,
     table: &Table,
-    warned_set: &mut WarnedSet,
+    state: &mut IpcState,
 ) -> ProcessOutcome {
     let mut rejected_writes = 0;
     // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid and writable
@@ -291,11 +367,11 @@ pub unsafe fn process_mapped_view(
             // SAFETY: iterate_records only yields payloads that lie within the view
             let payload = slice::from_raw_parts_mut(record.payload_ptr, record.n_bytes as usize);
             if record.kind.is_write() {
-                if !apply_write(&record, payload, table, warned_set) {
+                if !apply_write(&record, payload, table, state) {
                     rejected_writes += 1;
                 }
             } else {
-                answer_read(&record, payload, table, warned_set);
+                answer_read(&record, payload, table, &state.warned);
             }
         })
     };
@@ -364,12 +440,7 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
 }
 
 /// Forward a write request to the flight loop. Returns false if it was rejected.
-fn apply_write(
-    record: &ParsedRecord,
-    payload: &[u8],
-    table: &Table,
-    warned_set: &WarnedSet,
-) -> bool {
+fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut IpcState) -> bool {
     let Ok(offset) = u16::try_from(record.dw_offset) else {
         tracing::debug!(
             "Ignoring write to out-of-range offset {:#x}",
@@ -382,10 +453,24 @@ fn apply_write(
         offset,
         record.n_bytes
     );
-    if offset == APP_KEY_OFFSET {
-        log_key_write(payload);
-        return true;
+    match offset {
+        APP_KEY_OFFSET => {
+            log_key_write(payload);
+            return true;
+        }
+        LUA_PARAM_OFFSET => {
+            let param = lua_param(payload);
+            tracing::debug!("Lua/macro parameter set to {}", param);
+            state.lua_param = Some(param);
+            return true;
+        }
+        LUA_REQUEST_OFFSET => {
+            log_lua_request(payload, state);
+            return true;
+        }
+        _ => {}
     }
+    let warned_set = &state.warned;
     let entry = table.get(offset).filter(|_| table.is_writable(offset));
     let Some(entry) = entry else {
         if table.is_active(offset)
@@ -482,15 +567,12 @@ mod tests {
         }
 
         fn process(&mut self, table: &Table) -> ProcessOutcome {
-            let mut warned_set = WarnedSet::new();
-            unsafe {
-                process_mapped_view(
-                    self.data.as_mut_ptr(),
-                    self.data.len(),
-                    table,
-                    &mut warned_set,
-                )
-            }
+            self.process_with(table, &mut IpcState::new())
+        }
+
+        /// Process with state that persists across calls, like the IPC window's.
+        fn process_with(&mut self, table: &Table, state: &mut IpcState) -> ProcessOutcome {
+            unsafe { process_mapped_view(self.data.as_mut_ptr(), self.data.len(), table, state) }
         }
     }
 
@@ -584,23 +666,156 @@ mod tests {
         assert!(outcome.malformed.is_none());
         assert_eq!(outcome.rejected_writes, 0);
         assert!(rx.try_recv().is_err());
-    }
 
-    #[test]
-    fn test_key_text() {
-        assert_eq!(key_text(b"6PETEXPDRVW3\0"), "6PETEXPDRVW3");
-        assert_eq!(key_text(b"ABC\0junk"), "ABC");
-        assert_eq!(key_text(b"NO-NUL"), "NO-NUL");
-        assert_eq!(key_text(b"A\x01B\0"), "A\\x01B");
-    }
-
-    #[test]
-    fn test_key_write_log_level_round_trips() {
-        for level in KEY_WRITE_LEVELS {
-            set_key_write_log_level(level);
-            assert_eq!(key_write_log_level(), level);
+        // Lua/macro parameter and request: accepted, not forwarded, even if mapped.
+        for offset in [LUA_PARAM_OFFSET, LUA_REQUEST_OFFSET] {
+            table.insert(
+                offset,
+                Entry {
+                    value: Value::UnsignedInteger32(0),
+                    source: 0,
+                    destination: 0,
+                    writable: true,
+                },
+            );
         }
-        set_key_write_log_level(LevelFilter::INFO);
+        let outcome = View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .end()
+            .process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(outcome.rejected_writes, 0);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_lua_param_from_short_and_full_writes() {
+        for (payload, expected) in [
+            (&[3u8][..], 3),
+            (&[0x34, 0x12][..], 0x1234),
+            (&[0x78, 0x56, 0x34, 0x12][..], 0x1234_5678),
+            (&[1, 0, 0, 0, 0xFF][..], 1),
+        ] {
+            let mut state = IpcState::new();
+            View::default()
+                .write(LUA_PARAM_OFFSET as u32, payload)
+                .end()
+                .process_with(&Table::new(), &mut state);
+            assert_eq!(state.lua_param, Some(expected), "payload {:02x?}", payload);
+        }
+    }
+
+    #[test]
+    fn test_lua_param_persists_across_messages() {
+        let mut state = IpcState::new();
+        let table = Table::new();
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &5u32.to_le_bytes())
+            .end()
+            .process_with(&table, &mut state);
+        for request in [&b"LuaToggle slc_doors\0"[..], b"LuaSet slc_doors\0"] {
+            View::default()
+                .write(LUA_REQUEST_OFFSET as u32, request)
+                .end()
+                .process_with(&table, &mut state);
+            assert_eq!(state.lua_param, Some(5));
+        }
+    }
+
+    #[test]
+    fn test_lua_request_logged_once_per_text_and_param() {
+        let mut state = IpcState::new();
+        let table = Table::new();
+        let request = |state: &mut IpcState, text: &[u8]| {
+            View::default()
+                .write(LUA_REQUEST_OFFSET as u32, text)
+                .end()
+                .process_with(&table, state);
+        };
+        request(&mut state, b"LuaSet slc_doors\0");
+        request(&mut state, b"LuaSet slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 1);
+        assert!(
+            state
+                .logged_lua_requests
+                .contains(&("LuaSet slc_doors".to_string(), None))
+        );
+
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .end()
+            .process_with(&table, &mut state);
+        request(&mut state, b"LuaSet slc_doors\0");
+        request(&mut state, b"LuaSet slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 2);
+        assert!(
+            state
+                .logged_lua_requests
+                .contains(&("LuaSet slc_doors".to_string(), Some(3)))
+        );
+
+        request(&mut state, b"LuaKill slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 3);
+    }
+
+    #[test]
+    fn test_reset_warnings_clears_lua_requests_keeps_param() {
+        let mut state = IpcState::new();
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &5u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .end()
+            .process_with(&Table::new(), &mut state);
+        assert_eq!(state.logged_lua_requests.len(), 1);
+        state.reset_warnings();
+        assert!(state.logged_lua_requests.is_empty());
+        assert_eq!(state.lua_param, Some(5));
+    }
+
+    #[test]
+    fn test_lua_request_text_cut_at_nul_and_40_bytes() {
+        assert_eq!(
+            lua_request_text(b"LuaKill slc_doors\0junk"),
+            "LuaKill slc_doors"
+        );
+        let long = [b'x'; 48];
+        assert_eq!(lua_request_text(&long), "x".repeat(40));
+    }
+
+    #[test]
+    fn test_lua_offsets_not_warned_and_read_as_zero() {
+        let mut state = IpcState::new();
+        let mut view = View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .read32(LUA_PARAM_OFFSET as u32, 4)
+            .read32(LUA_REQUEST_OFFSET as u32, 40)
+            .end();
+        view.process_with(&Table::new(), &mut state);
+        // check_and_set returns true when the offset hadn't been warned about yet.
+        for offset in [LUA_PARAM_OFFSET, LUA_REQUEST_OFFSET] {
+            assert!(
+                state
+                    .warned
+                    .check_and_set(offset, WarnCategory::WriteNotExist)
+            );
+            assert!(
+                state
+                    .warned
+                    .check_and_set(offset, WarnCategory::WriteNotWritable)
+            );
+        }
+        assert_eq!(view.payload_at(2, 4), &[0; 4]);
+        assert_eq!(view.payload_at(3, 40), &[0; 40]);
+    }
+
+    #[test]
+    fn test_client_text() {
+        assert_eq!(client_text(b"6PETEXPDRVW3\0"), "6PETEXPDRVW3");
+        assert_eq!(client_text(b"ABC\0junk"), "ABC");
+        assert_eq!(client_text(b"NO-NUL"), "NO-NUL");
+        assert_eq!(client_text(b"A\x01B\0"), "A\\x01B");
     }
 
     #[test]

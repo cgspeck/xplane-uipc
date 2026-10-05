@@ -1,6 +1,11 @@
 [settings]
 update_rate_hz = 20
 log_level = "info"
-# Level for logging application key writes to offset 0x8001 (e.g. from
-# FSInterrogate): off, error, warn, info, debug or trace.
-key_write_log_level = "info"
+
+# Levels for messages that have their own setting: off, error, warn, info,
+# debug or trace. log_level above still applies on top.
+[log_levels]
+# Application key writes to offset 0x8001 (e.g. from FSInterrogate).
+key_write = "info"
+# Macro and Lua requests written to 0x0D6C / 0x0D70, which the plugin can't run.
+lua_request = "info"

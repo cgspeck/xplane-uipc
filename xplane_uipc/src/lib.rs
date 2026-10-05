@@ -259,13 +259,34 @@ pub fn clear_log_file() {
 #[derive(serde::Deserialize)]
 struct Config {
     settings: Settings,
+    #[serde(default)]
+    log_levels: LogLevels,
 }
 
 #[derive(serde::Deserialize)]
 struct Settings {
     update_rate_hz: Option<u8>,
     log_level: Option<String>,
+    /// Deprecated: use `[log_levels] key_write`.
     key_write_log_level: Option<String>,
+}
+
+/// Levels for messages that have their own setting.
+#[derive(serde::Deserialize, Default)]
+struct LogLevels {
+    key_write: Option<String>,
+    lua_request: Option<String>,
+}
+
+/// The key-write level setting: `[log_levels] key_write`, falling back to the
+/// deprecated `[settings] key_write_log_level`. Warns when both are set.
+fn key_write_setting<'a>(new: Option<&'a str>, deprecated: Option<&'a str>) -> Option<&'a str> {
+    if new.is_some() && deprecated.is_some() {
+        tracing::warn!(
+            "config.toml sets both [log_levels] key_write and the deprecated [settings] key_write_log_level; using [log_levels] key_write"
+        );
+    }
+    new.or(deprecated)
 }
 
 /// Parse a log level setting: missing means INFO, and an invalid value warns
@@ -296,6 +317,7 @@ fn parse_config_and_apply(config_path: &str) {
                 let _ = handle.reload(LevelFilter::INFO);
             }
             ipc_host::set_key_write_log_level(LevelFilter::INFO);
+            ipc_host::set_lua_request_log_level(LevelFilter::INFO);
             return;
         }
     };
@@ -309,8 +331,15 @@ fn parse_config_and_apply(config_path: &str) {
     }
 
     ipc_host::set_key_write_log_level(parse_level_setting(
-        "key_write_log_level",
-        config.settings.key_write_log_level.as_deref(),
+        "key_write",
+        key_write_setting(
+            config.log_levels.key_write.as_deref(),
+            config.settings.key_write_log_level.as_deref(),
+        ),
+    ));
+    ipc_host::set_lua_request_log_level(parse_level_setting(
+        "lua_request",
+        config.log_levels.lua_request.as_deref(),
     ));
 
     if let Some(hz) = config.settings.update_rate_hz {
@@ -582,5 +611,43 @@ mod tests {
     fn level_setting_defaults_to_info() {
         assert_eq!(parse_level_setting("x", None), LevelFilter::INFO);
         assert_eq!(parse_level_setting("x", Some("loud")), LevelFilter::INFO);
+    }
+
+    #[test]
+    fn log_levels_table_is_parsed() {
+        let config: Config = toml::from_str(
+            "[settings]\nlog_level = \"info\"\n[log_levels]\nkey_write = \"off\"\nlua_request = \"debug\"\n",
+        )
+        .unwrap();
+        assert_eq!(config.log_levels.key_write.as_deref(), Some("off"));
+        assert_eq!(config.log_levels.lua_request.as_deref(), Some("debug"));
+    }
+
+    #[test]
+    fn config_without_log_levels_still_parses() {
+        let config: Config = toml::from_str("[settings]\nkey_write_log_level = \"off\"\n").unwrap();
+        assert!(config.log_levels.key_write.is_none());
+        assert!(config.log_levels.lua_request.is_none());
+        assert_eq!(config.settings.key_write_log_level.as_deref(), Some("off"));
+    }
+
+    #[test]
+    fn shipped_config_parses_with_log_levels() {
+        let config: Config = toml::from_str(include_str!("../config.toml")).unwrap();
+        assert_eq!(config.log_levels.key_write.as_deref(), Some("info"));
+        assert_eq!(config.log_levels.lua_request.as_deref(), Some("info"));
+        assert!(config.settings.key_write_log_level.is_none());
+    }
+
+    #[test]
+    fn deprecated_key_write_setting_used_when_new_one_missing() {
+        assert_eq!(key_write_setting(None, Some("off")), Some("off"));
+        assert_eq!(key_write_setting(None, None), None);
+    }
+
+    #[test]
+    fn new_key_write_setting_wins_over_deprecated_one() {
+        assert_eq!(key_write_setting(Some("info"), Some("off")), Some("info"));
+        assert_eq!(key_write_setting(Some("debug"), None), Some("debug"));
     }
 }
