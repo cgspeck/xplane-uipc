@@ -252,6 +252,9 @@ pub unsafe fn process_mapped_view(
 }
 
 fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_set: &WarnedSet) {
+    // Like FSUIPC, always answer with bytes: whatever we don't serve reads as
+    // zero rather than whatever the client last left in its buffer.
+    payload.fill(0);
     let Ok(offset) = u16::try_from(record.dw_offset) else {
         tracing::debug!(
             "Ignoring read from out-of-range offset {:#x}",
@@ -285,7 +288,6 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
             );
             let len = bytes.len().min(payload.len());
             payload[..len].copy_from_slice(&bytes[..len]);
-            payload[len..].fill(0);
         }
         value => {
             // Never write past the request's payload: a narrower read
