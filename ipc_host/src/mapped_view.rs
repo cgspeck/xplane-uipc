@@ -95,8 +95,13 @@ fn lua_param(payload: &[u8]) -> u32 {
     u32::from_le_bytes(bytes)
 }
 
+/// The request text written to `LUA_REQUEST_OFFSET`, limited to its 40 bytes.
+fn lua_request_text(payload: &[u8]) -> String {
+    client_text(&payload[..payload.len().min(LUA_REQUEST_LEN)])
+}
+
 fn log_lua_request(payload: &[u8], param: Option<u32>) {
-    let text = client_text(&payload[..payload.len().min(LUA_REQUEST_LEN)]);
+    let text = lua_request_text(payload);
     let param = match param {
         Some(p) => format!("param {}", p),
         None => "no param".to_string(),
