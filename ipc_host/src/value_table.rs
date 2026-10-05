@@ -141,6 +141,31 @@ impl Table {
         self.writable.clear();
     }
 
+    /// Start an update cycle: returns the previous cycle's active offsets and
+    /// clears the bookkeeping. Pass the result to `end_update`.
+    pub fn begin_update(&mut self) -> Vec<u16> {
+        let previous = self.active.clone();
+        self.clear_active_and_writable();
+        previous
+    }
+
+    /// Finish an update cycle: drop entries that were active last cycle but were
+    /// neither inserted nor kept this cycle, so stale values are not served.
+    pub fn end_update(&mut self, previous: Vec<u16>) {
+        for i in previous {
+            if !self.active_mask[i as usize] {
+                self.entries[i as usize] = None;
+            }
+        }
+    }
+
+    /// Re-activate an existing entry without changing its value. No-op if absent.
+    pub fn keep(&mut self, index: u16) {
+        if let Some(entry) = self.entries[index as usize].take() {
+            self.insert(index, entry);
+        }
+    }
+
     pub fn is_active(&self, index: u16) -> bool {
         self.active_mask[index as usize]
     }
