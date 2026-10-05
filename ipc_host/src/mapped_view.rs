@@ -645,6 +645,98 @@ mod tests {
         assert!(outcome.malformed.is_none());
         assert_eq!(outcome.rejected_writes, 0);
         assert!(rx.try_recv().is_err());
+
+        // Lua/macro parameter and request: accepted, not forwarded, even if mapped.
+        for offset in [LUA_PARAM_OFFSET, LUA_REQUEST_OFFSET] {
+            table.insert(
+                offset,
+                Entry {
+                    value: Value::UnsignedInteger32(0),
+                    source: 0,
+                    destination: 0,
+                    writable: true,
+                },
+            );
+        }
+        let outcome = View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .end()
+            .process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(outcome.rejected_writes, 0);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_lua_param_from_short_and_full_writes() {
+        for (payload, expected) in [
+            (&[3u8][..], 3),
+            (&[0x34, 0x12][..], 0x1234),
+            (&[0x78, 0x56, 0x34, 0x12][..], 0x1234_5678),
+            (&[1, 0, 0, 0, 0xFF][..], 1),
+        ] {
+            let mut state = IpcState::new();
+            View::default()
+                .write(LUA_PARAM_OFFSET as u32, payload)
+                .end()
+                .process_with(&Table::new(), &mut state);
+            assert_eq!(state.lua_param, Some(expected), "payload {:02x?}", payload);
+        }
+    }
+
+    #[test]
+    fn test_lua_param_persists_across_messages() {
+        let mut state = IpcState::new();
+        let table = Table::new();
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &5u32.to_le_bytes())
+            .end()
+            .process_with(&table, &mut state);
+        for request in [&b"LuaToggle slc_doors\0"[..], b"LuaSet slc_doors\0"] {
+            View::default()
+                .write(LUA_REQUEST_OFFSET as u32, request)
+                .end()
+                .process_with(&table, &mut state);
+            assert_eq!(state.lua_param, Some(5));
+        }
+    }
+
+    #[test]
+    fn test_lua_request_text_cut_at_nul_and_40_bytes() {
+        assert_eq!(
+            lua_request_text(b"LuaKill slc_doors\0junk"),
+            "LuaKill slc_doors"
+        );
+        let long = [b'x'; 48];
+        assert_eq!(lua_request_text(&long), "x".repeat(40));
+    }
+
+    #[test]
+    fn test_lua_offsets_not_warned_and_read_as_zero() {
+        let mut state = IpcState::new();
+        let mut view = View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .read32(LUA_PARAM_OFFSET as u32, 4)
+            .read32(LUA_REQUEST_OFFSET as u32, 40)
+            .end();
+        view.process_with(&Table::new(), &mut state);
+        // check_and_set returns true when the offset hadn't been warned about yet.
+        for offset in [LUA_PARAM_OFFSET, LUA_REQUEST_OFFSET] {
+            assert!(
+                state
+                    .warned
+                    .check_and_set(offset, WarnCategory::WriteNotExist)
+            );
+            assert!(
+                state
+                    .warned
+                    .check_and_set(offset, WarnCategory::WriteNotWritable)
+            );
+        }
+        assert_eq!(view.payload_at(2, 4), &[0; 4]);
+        assert_eq!(view.payload_at(3, 40), &[0; 40]);
     }
 
     #[test]
