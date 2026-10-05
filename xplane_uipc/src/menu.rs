@@ -3,15 +3,9 @@
 #![allow(non_snake_case)]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-use std::{
-    ffi::{CString, c_void},
-    sync::atomic::Ordering,
-};
+use std::ffi::{CString, c_void};
 
-use crate::{
-    DATAREF_RESOLUTION_REQUIRED, about_window::about_window_menu_handler, clear_log_file,
-    xplane_log,
-};
+use crate::{about_window::about_window_menu_handler, clear_log_file, xplane_log};
 
 const MENU_ABOUT: usize = 0;
 const MENU_RELOAD_CONFIG: usize = 1;
@@ -28,10 +22,16 @@ pub unsafe extern "C" fn menu_handler(_menu_ref: *mut c_void, item_ref: *mut c_v
         }
         MENU_RELOAD_CONFIG => {
             xplane_log("Reload config requested");
-            DATAREF_RESOLUTION_REQUIRED.store(true, Ordering::Release);
+            if let Err(e) = crate::find_and_load_config() {
+                xplane_log(&format!("Failed to reload config: {}", e));
+            }
         }
         MENU_RELOAD_MAPPINGS => {
             xplane_log("Reload mappings requested");
+            // Per the configurable-log-level spec, a mapping reload also re-reads config.toml.
+            if let Err(e) = crate::find_and_load_config() {
+                xplane_log(&format!("Failed to reload config: {}", e));
+            }
             if let Err(e) = crate::find_load_and_resolve_mappings() {
                 xplane_log(&format!("Failed to reload mappings: {}", e));
             }

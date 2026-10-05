@@ -16,20 +16,28 @@ use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
 pub use uipc_mapping::{DatarefMapping, MappingSource};
 
-fn f64_to_value(value: f64, ty: FsuipcType) -> Value {
-    match ty {
-        FsuipcType::U8 => Value::UnsignedInteger8(value as u8),
-        FsuipcType::I8 => Value::Integer8(value as i8),
-        FsuipcType::U16 => Value::UnsignedInteger16(value as u16),
-        FsuipcType::I16 => Value::Integer16(value as i16),
-        FsuipcType::U32 => Value::UnsignedInteger32(value as u32),
-        FsuipcType::I32 => Value::Integer32(value as i32),
-        FsuipcType::U64 => Value::UnsignedInteger64(value as u64),
-        FsuipcType::I64 => Value::Integer64(value as i64),
-        FsuipcType::F32 => Value::Float32(value as f32),
-        FsuipcType::F64 => Value::Float64(value),
-        FsuipcType::String => Value::String(vec![0]),
+/// Bound a raw string read to `max_len` bytes, always ending in a NUL.
+/// Bytes after the first NUL are dropped; an empty read becomes an empty string.
+fn terminate_string(mut buf: Vec<u8>, max_len: usize) -> Vec<u8> {
+    if max_len == 0 {
+        return Vec::new();
     }
+    if let Some(nul) = buf.iter().position(|&b| b == 0) {
+        buf.truncate(nul);
+    }
+    buf.truncate(max_len - 1);
+    buf.push(0);
+    buf
+}
+
+/// Outcome of evaluating a mapping for one update cycle.
+pub enum Reading {
+    /// Serve this value.
+    Value(Value),
+    /// Keep serving the previous value (`update_if_expr` was false).
+    Retain,
+    /// No value available; stop serving the offset.
+    Missing,
 }
 
 // ─── Resolved dataref handle ──────────────────────────────────────────────────
@@ -54,7 +62,7 @@ impl ResolvedRef {
         }
     }
 
-    /// Read the scalar value from this dataref (returns None if invalid).
+    /// Read a NUL-terminated string of at most `max_len` bytes (None if the handle is invalid).
     pub fn read_bytes(&self, max_len: usize) -> Option<Vec<u8>> {
         if self.handle.is_null() {
             return None;
@@ -68,14 +76,8 @@ impl ResolvedRef {
                 max_len as i32,
             )
         };
-        if bytes_read == 0 {
-            return None;
-        }
-        buf.truncate(bytes_read as usize);
-        if buf.last() != Some(&0) {
-            buf.push(0);
-        }
-        Some(buf)
+        buf.truncate(bytes_read.clamp(0, max_len as i32) as usize);
+        Some(terminate_string(buf, max_len))
     }
 
     pub fn read(&self) -> Option<f64> {
@@ -87,17 +89,18 @@ impl ResolvedRef {
 
         if let Some(array_index) = self.array_index {
             memo = match ty {
+                // Get*v returns the number of elements copied; 0 means the index is out of range.
                 _ if (ty & xplmType_IntArray) != 0 => unsafe {
                     let mut v: i32 = 0;
-                    XPLMGetDatavi(self.handle, &mut v, array_index, 1);
+                    let n = XPLMGetDatavi(self.handle, &mut v, array_index, 1);
                     tracing::trace!("retrieve array index: {}, i32 value: {}", array_index, v);
-                    Some(v as f64)
+                    (n == 1).then_some(v as f64)
                 },
                 _ if (ty & xplmType_FloatArray) != 0 => unsafe {
                     let mut v: f32 = 0.0;
-                    XPLMGetDatavf(self.handle, &mut v, array_index, 1);
+                    let n = XPLMGetDatavf(self.handle, &mut v, array_index, 1);
                     tracing::trace!("retrieve array index: {}, f32 value: {}", array_index, v);
-                    Some(v as f64)
+                    (n == 1).then_some(v as f64)
                 },
                 _ => None,
             };
@@ -123,7 +126,15 @@ impl ResolvedRef {
             return;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
-        if ty & xplmType_Double != 0 {
+        if let Some(array_index) = self.array_index {
+            if ty & xplmType_IntArray != 0 {
+                let mut v = xplane_value.round() as i32;
+                unsafe { XPLMSetDatavi(self.handle, &mut v, array_index, 1) };
+            } else if ty & xplmType_FloatArray != 0 {
+                let mut v = xplane_value as f32;
+                unsafe { XPLMSetDatavf(self.handle, &mut v, array_index, 1) };
+            }
+        } else if ty & xplmType_Double != 0 {
             unsafe {
                 XPLMSetDatad(self.handle, xplane_value);
             }
@@ -133,7 +144,7 @@ impl ResolvedRef {
             }
         } else if ty & xplmType_Int != 0 {
             unsafe {
-                XPLMSetDatai(self.handle, xplane_value as i32);
+                XPLMSetDatai(self.handle, xplane_value.round() as i32);
             }
         }
     }
@@ -211,10 +222,28 @@ impl ResolvedMapping {
         }
     }
 
-    /// Evaluate the mapping and return the FSUIPC value, or None if any required
-    /// dataref is missing.
-    pub fn read_xplane(&self) -> Option<f64> {
-        match &self.source {
+    /// Evaluate the mapping for this update cycle.
+    ///
+    /// Simple mappings are `Missing` when their dataref is unavailable. In
+    /// expressions, an unavailable dataref evaluates as 0.0 (documented in
+    /// README-EXPR.md; mappings rely on it to mix aircraft-specific datarefs).
+    /// A false `update_if_expr` yields `Retain`.
+    pub fn read_xplane_value(&self) -> Reading {
+        if self.fsuipc_type == FsuipcType::String {
+            let bytes = match &self.source {
+                ResolvedSource::Simple { dr, .. } => dr.read_bytes(self.size),
+                ResolvedSource::StaticStr { static_str } => {
+                    Some(terminate_string(static_str.as_bytes().to_vec(), self.size))
+                }
+                _ => None,
+            };
+            return match bytes {
+                Some(b) => Reading::Value(Value::String(b)),
+                None => Reading::Missing,
+            };
+        }
+
+        let value = match &self.source {
             ResolvedSource::Simple {
                 dr,
                 scale,
@@ -229,46 +258,26 @@ impl ResolvedMapping {
                 for (name, dr) in refs {
                     vars.insert(name.clone(), dr.read().unwrap_or(0.0));
                 }
-
-                match update_if_expr {
-                    Some(c) => {
-                        if c.eval(&vars) > 0.0 {
-                            Some(expr.eval(&vars))
-                        } else {
-                            None
-                        }
-                    }
-                    None => Some(expr.eval(&vars)),
+                if update_if_expr
+                    .as_ref()
+                    .is_some_and(|c| c.eval(&vars) <= 0.0)
+                {
+                    return Reading::Retain;
                 }
+                Some(expr.eval(&vars))
             }
             ResolvedSource::Static { static_value } => *static_value,
             ResolvedSource::StaticStr { .. } => None,
+        };
+        match value.and_then(|v| Value::from_f64(v, self.fsuipc_type)) {
+            Some(v) => Reading::Value(v),
+            None => Reading::Missing,
         }
     }
 
     /// Write a value back to X-Plane (simple mappings only; expr write-back
     /// requires knowledge of which dataref to write and the inverse expression,
     /// which is not yet supported).
-    pub fn read_xplane_value(&self) -> Option<Value> {
-        match self.fsuipc_type {
-            FsuipcType::String => {
-                let bytes = match &self.source {
-                    ResolvedSource::Simple { dr, .. } => dr.read_bytes(self.size)?,
-                    ResolvedSource::StaticStr { static_str } => {
-                        let mut b = static_str.as_bytes().to_vec();
-                        b.push(0);
-                        b
-                    }
-                    _ => return None,
-                };
-                Some(Value::String(bytes))
-            }
-            _ => self
-                .read_xplane()
-                .map(|v| f64_to_value(v, self.fsuipc_type)),
-        }
-    }
-
     pub fn write_xplane(&self, fsuipc_value: f64) {
         if !self.writable {
             return;
@@ -299,10 +308,10 @@ impl PluginState {
     pub fn update(&mut self) {
         let table: Arc<RwLock<Table>> = get_value_table();
         if let Ok(mut table) = table.write() {
-            table.clear_active_and_writable();
+            let previous = table.begin_update();
             for m in &self.mappings {
-                if let Some(value) = m.read_xplane_value() {
-                    table.insert(
+                match m.read_xplane_value() {
+                    Reading::Value(value) => table.insert(
                         m.offset,
                         ipc_host::value_table::Entry {
                             value,
@@ -310,9 +319,13 @@ impl PluginState {
                             destination: 0,
                             writable: m.writable,
                         },
-                    );
+                    ),
+                    Reading::Retain => table.keep(m.offset),
+                    Reading::Missing => {}
                 }
             }
+            // Offsets that produced no value this cycle stop being served.
+            table.end_update(previous);
         }
     }
 
@@ -325,5 +338,29 @@ impl PluginState {
             }
         }
         tracing::warn!("No writable mapping found for offset {:#06x}", offset);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::terminate_string;
+
+    #[test]
+    fn terminate_string_fills_size_exactly() {
+        assert_eq!(
+            terminate_string(b"ABCDEFGH".to_vec(), 8),
+            b"ABCDEFG\0".to_vec()
+        );
+    }
+
+    #[test]
+    fn terminate_string_keeps_existing_nul() {
+        assert_eq!(terminate_string(b"AB\0junk".to_vec(), 8), b"AB\0".to_vec());
+    }
+
+    #[test]
+    fn terminate_string_empty_read_is_empty_string() {
+        assert_eq!(terminate_string(Vec::new(), 8), vec![0]);
+        assert_eq!(terminate_string(b"x".to_vec(), 0), Vec::<u8>::new());
     }
 }

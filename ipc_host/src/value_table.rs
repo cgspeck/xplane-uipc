@@ -1,3 +1,5 @@
+use uipc_mapping::FsuipcType;
+
 #[derive(Clone, Debug)]
 pub enum Value {
     UnsignedInteger8(u8),
@@ -14,6 +16,74 @@ pub enum Value {
     String(Vec<u8>),
 }
 
+impl Value {
+    /// Convert a mapping's f64 result to the declared FSUIPC type.
+    ///
+    /// Integers round to nearest (half away from zero); types up to 32 bits wrap
+    /// two's complement when out of range, matching FSUIPC's raw-memory semantics.
+    /// Returns `None` for non-finite input and for `String`.
+    pub fn from_f64(value: f64, ty: FsuipcType) -> Option<Value> {
+        if !value.is_finite() {
+            return None;
+        }
+        let r = value.round();
+        let wrapped = r as i64;
+        Some(match ty {
+            FsuipcType::U8 => Value::UnsignedInteger8(wrapped as u8),
+            FsuipcType::I8 => Value::Integer8(wrapped as i8),
+            FsuipcType::U16 => Value::UnsignedInteger16(wrapped as u16),
+            FsuipcType::I16 => Value::Integer16(wrapped as i16),
+            FsuipcType::U32 => Value::UnsignedInteger32(wrapped as u32),
+            FsuipcType::I32 => Value::Integer32(wrapped as i32),
+            FsuipcType::U64 if r < 0.0 => Value::UnsignedInteger64(wrapped as u64),
+            FsuipcType::U64 => Value::UnsignedInteger64(r as u64),
+            FsuipcType::I64 => Value::Integer64(wrapped),
+            FsuipcType::F32 => Value::Float32(value as f32),
+            FsuipcType::F64 => Value::Float64(value),
+            FsuipcType::String => return None,
+        })
+    }
+
+    /// Little-endian encoding of the value as it appears in FSUIPC memory.
+    pub fn to_le_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::UnsignedInteger8(v) => v.to_le_bytes().to_vec(),
+            Value::Integer8(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger16(v) => v.to_le_bytes().to_vec(),
+            Value::Integer16(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger32(v) => v.to_le_bytes().to_vec(),
+            Value::Integer32(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger64(v) => v.to_le_bytes().to_vec(),
+            Value::Integer64(v) => v.to_le_bytes().to_vec(),
+            Value::Float32(v) => v.to_le_bytes().to_vec(),
+            Value::Float64(v) => v.to_le_bytes().to_vec(),
+            Value::Bool(v) => vec![*v as u8],
+            Value::String(bytes) => bytes.clone(),
+        }
+    }
+
+    /// Decode a client write payload using this value's type. The payload must
+    /// be exactly the type's width. Strings and bools are not writable.
+    pub fn decode_le(&self, bytes: &[u8]) -> Option<f64> {
+        fn arr<const N: usize>(b: &[u8]) -> Option<[u8; N]> {
+            b.try_into().ok()
+        }
+        Some(match self {
+            Value::UnsignedInteger8(_) => u8::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer8(_) => i8::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger16(_) => u16::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer16(_) => i16::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger32(_) => u32::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer32(_) => i32::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger64(_) => u64::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer64(_) => i64::from_le_bytes(arr(bytes)?) as f64,
+            Value::Float32(_) => f32::from_le_bytes(arr(bytes)?) as f64,
+            Value::Float64(_) => f64::from_le_bytes(arr(bytes)?),
+            Value::Bool(_) | Value::String(_) => return None,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Entry {
     pub value: Value,
@@ -25,8 +95,13 @@ pub struct Entry {
 #[derive(Debug)]
 pub struct Table {
     pub entries: Box<[Option<Entry>; 65536]>,
+    /// Offsets inserted since the last `clear_active_and_writable()`, in insertion order.
     pub active: Vec<u16>,
+    /// Writable offsets inserted since the last `clear_active_and_writable()`.
     pub writable: Vec<u16>,
+    // O(1) membership flags mirroring `active` / `writable`.
+    active_mask: Box<[bool]>,
+    writable_mask: Box<[bool]>,
 }
 
 impl Table {
@@ -37,24 +112,66 @@ impl Table {
             entries,
             active: Vec::new(),
             writable: Vec::new(),
+            active_mask: vec![false; 65536].into_boxed_slice(),
+            writable_mask: vec![false; 65536].into_boxed_slice(),
         }
     }
 
     pub fn insert(&mut self, index: u16, entry: Entry) {
-        let is_new = self.entries[index as usize].is_none();
-        if is_new {
+        let i = index as usize;
+        if !self.active_mask[i] {
+            self.active_mask[i] = true;
             self.active.push(index);
         }
-        let writable = entry.writable;
-        self.entries[index as usize] = Some(entry);
-        if writable && is_new {
+        if entry.writable && !self.writable_mask[i] {
+            self.writable_mask[i] = true;
             self.writable.push(index);
         }
+        self.entries[i] = Some(entry);
     }
 
     pub fn clear_active_and_writable(&mut self) {
+        for &i in &self.active {
+            self.active_mask[i as usize] = false;
+        }
+        for &i in &self.writable {
+            self.writable_mask[i as usize] = false;
+        }
         self.active.clear();
         self.writable.clear();
+    }
+
+    /// Start an update cycle: returns the previous cycle's active offsets and
+    /// clears the bookkeeping. Pass the result to `end_update`.
+    pub fn begin_update(&mut self) -> Vec<u16> {
+        let previous = self.active.clone();
+        self.clear_active_and_writable();
+        previous
+    }
+
+    /// Finish an update cycle: drop entries that were active last cycle but were
+    /// neither inserted nor kept this cycle, so stale values are not served.
+    pub fn end_update(&mut self, previous: Vec<u16>) {
+        for i in previous {
+            if !self.active_mask[i as usize] {
+                self.entries[i as usize] = None;
+            }
+        }
+    }
+
+    /// Re-activate an existing entry without changing its value. No-op if absent.
+    pub fn keep(&mut self, index: u16) {
+        if let Some(entry) = self.entries[index as usize].take() {
+            self.insert(index, entry);
+        }
+    }
+
+    pub fn is_active(&self, index: u16) -> bool {
+        self.active_mask[index as usize]
+    }
+
+    pub fn is_writable(&self, index: u16) -> bool {
+        self.writable_mask[index as usize]
     }
 
     pub fn get(&self, index: u16) -> Option<&Entry> {
@@ -142,6 +259,175 @@ mod tests {
         );
         assert_eq!(table.active.len(), 2);
         assert_eq!(table.writable.len(), 1);
+    }
+
+    /// Regression: re-inserting the same offsets after a clear must repopulate
+    /// `active`/`writable`. Previously only empty slots were tracked, so every
+    /// update cycle after the first left both vectors empty and all writes failed.
+    #[test]
+    fn test_reinsert_same_offsets_after_clear() {
+        let mut table = Table::new();
+        for _ in 0..3 {
+            table.clear_active_and_writable();
+            table.insert(
+                10,
+                Entry {
+                    value: Value::UnsignedInteger32(1),
+                    source: 0,
+                    destination: 0,
+                    writable: true,
+                },
+            );
+            table.insert(20, entry(Value::UnsignedInteger32(2)));
+            table.insert(20, entry(Value::UnsignedInteger32(3)));
+            assert_eq!(table.active, vec![10, 20]);
+            assert_eq!(table.writable, vec![10]);
+            assert!(table.is_writable(10));
+            assert!(!table.is_writable(20));
+            assert!(table.is_active(20));
+        }
+        table.clear_active_and_writable();
+        assert!(!table.is_active(10));
+        assert!(!table.is_writable(10));
+    }
+
+    #[test]
+    fn test_end_update_expires_entries_not_reinserted() {
+        let mut table = Table::new();
+        let prev = table.begin_update();
+        table.insert(10, entry(Value::UnsignedInteger32(1)));
+        table.insert(20, entry(Value::UnsignedInteger32(2)));
+        table.end_update(prev);
+
+        let prev = table.begin_update();
+        table.insert(10, entry(Value::UnsignedInteger32(3)));
+        table.end_update(prev);
+
+        assert!(table.get(10).is_some());
+        assert!(table.get(20).is_none(), "stale offset must not be served");
+        assert_eq!(table.active, vec![10]);
+    }
+
+    #[test]
+    fn test_keep_retains_value_and_writable() {
+        let mut table = Table::new();
+        let prev = table.begin_update();
+        table.insert(
+            10,
+            Entry {
+                value: Value::Integer32(-7),
+                source: 0,
+                destination: 0,
+                writable: true,
+            },
+        );
+        table.end_update(prev);
+
+        let prev = table.begin_update();
+        table.keep(10);
+        table.keep(99); // absent: no-op
+        table.end_update(prev);
+
+        assert!(matches!(table.get(10).unwrap().value, Value::Integer32(-7)));
+        assert!(table.is_active(10));
+        assert!(table.is_writable(10));
+        assert!(table.get(99).is_none());
+        assert!(!table.is_active(99));
+    }
+
+    #[test]
+    fn test_from_f64_rounds_instead_of_truncating() {
+        assert!(matches!(
+            Value::from_f64(1023.9999, FsuipcType::I32),
+            Some(Value::Integer32(1024))
+        ));
+        assert!(matches!(
+            Value::from_f64(-2.5, FsuipcType::I16),
+            Some(Value::Integer16(-3))
+        ));
+        assert!(matches!(
+            Value::from_f64(0.4999, FsuipcType::U8),
+            Some(Value::UnsignedInteger8(0))
+        ));
+    }
+
+    #[test]
+    fn test_from_f64_wraps_out_of_range() {
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U16),
+            Some(Value::UnsignedInteger16(0xFFFF))
+        ));
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U32),
+            Some(Value::UnsignedInteger32(u32::MAX))
+        ));
+        assert!(matches!(
+            Value::from_f64(256.0, FsuipcType::U8),
+            Some(Value::UnsignedInteger8(0))
+        ));
+        assert!(matches!(
+            Value::from_f64(40000.0, FsuipcType::I16),
+            Some(Value::Integer16(-25536))
+        ));
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U64),
+            Some(Value::UnsignedInteger64(u64::MAX))
+        ));
+        assert!(matches!(
+            Value::from_f64(1.8e19, FsuipcType::U64),
+            Some(Value::UnsignedInteger64(18_000_000_000_000_000_000))
+        ));
+    }
+
+    #[test]
+    fn test_from_f64_rejects_non_finite_and_string() {
+        assert!(Value::from_f64(f64::NAN, FsuipcType::I32).is_none());
+        assert!(Value::from_f64(f64::INFINITY, FsuipcType::F64).is_none());
+        assert!(Value::from_f64(1.0, FsuipcType::String).is_none());
+    }
+
+    #[test]
+    fn test_from_f64_floats_unrounded() {
+        assert!(matches!(
+            Value::from_f64(1.25, FsuipcType::F32),
+            Some(Value::Float32(v)) if v == 1.25
+        ));
+        assert!(matches!(
+            Value::from_f64(1.25, FsuipcType::F64),
+            Some(Value::Float64(v)) if v == 1.25
+        ));
+    }
+
+    #[test]
+    fn test_decode_le_uses_type() {
+        let v = Value::Integer16(0);
+        assert_eq!(v.decode_le(&[0xFF, 0xFF]), Some(-1.0));
+        let v = Value::UnsignedInteger16(0);
+        assert_eq!(v.decode_le(&[0xFF, 0xFF]), Some(65535.0));
+        let v = Value::Float32(0.0);
+        assert_eq!(v.decode_le(&1.5f32.to_le_bytes()), Some(1.5));
+        let v = Value::Integer64(0);
+        assert_eq!(v.decode_le(&(-5i64).to_le_bytes()), Some(-5.0));
+        let v = Value::Integer32(0);
+        assert_eq!(v.decode_le(&(-100_000i32).to_le_bytes()), Some(-100_000.0));
+    }
+
+    #[test]
+    fn test_decode_le_rejects_wrong_size_and_unwritable() {
+        assert_eq!(Value::UnsignedInteger32(0).decode_le(&[1, 2]), None);
+        assert_eq!(Value::Float64(0.0).decode_le(&[0; 4]), None);
+        assert_eq!(Value::String(vec![0]).decode_le(&[0]), None);
+        assert_eq!(Value::Bool(false).decode_le(&[1]), None);
+    }
+
+    #[test]
+    fn test_to_le_bytes() {
+        assert_eq!(
+            Value::UnsignedInteger32(0x12345678).to_le_bytes(),
+            vec![0x78, 0x56, 0x34, 0x12]
+        );
+        assert_eq!(Value::Integer16(-1).to_le_bytes(), vec![0xFF, 0xFF]);
+        assert_eq!(Value::Bool(true).to_le_bytes(), vec![1]);
     }
 
     fn entry(value: Value) -> Entry {

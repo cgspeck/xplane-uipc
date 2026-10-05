@@ -276,8 +276,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
             Some(warned_set_ptr as *mut _), // Pass the warned_set pointer as the lpParam to the window, so we can access it in the wnd_proc
         );
 
-        // if hwnd.0 == 0 {
-        let unwrapped_hwnd = hwnd.unwrap();
+        let unwrapped_hwnd = hwnd?;
 
         if unwrapped_hwnd.0 == std::ptr::null_mut() {
             return Err(anyhow::anyhow!("Failed to IPC window"));
@@ -299,26 +298,46 @@ pub unsafe fn create_ipc_window_and_run(
     config: capture::CaptureConfig,
 ) -> anyhow::Result<()> {
     tracing::info!("Creating IPC window...");
+    // ── Initialize capture state ───────────────────────────────────────────
+    // Capture is a diagnostic aid: if its directory can't be created, disable
+    // capture rather than refusing to serve IPC clients.
+    if let Some(ref path) = config.path {
+        let dir_ok = path.exists() || {
+            tracing::info!("Creating capture directory: {:?}", path);
+            match std::fs::create_dir_all(path) {
+                Ok(()) => true,
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to create capture directory {:?}: {}; capture disabled",
+                        path,
+                        e
+                    );
+                    false
+                }
+            }
+        };
+        if dir_ok {
+            let max = config.max.unwrap_or(usize::MAX);
+            let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+            *guard = Some(capture::CaptureState {
+                enabled: false,
+                path: path.clone(),
+                count: 0,
+                max,
+            });
+        }
+    }
+
     let warned_set = Box::new(WarnedSet::new());
     let warned_set_ptr = Box::into_raw(warned_set);
 
-    // ── Initialize capture state ───────────────────────────────────────────
-    if let Some(ref path) = config.path {
-        if !path.exists() {
-            tracing::info!("Creating capture directory: {:?}", path);
-            std::fs::create_dir_all(path)?;
+    let hwnd = match create_ipc_window(warned_set_ptr) {
+        Ok(hwnd) => hwnd,
+        Err(e) => {
+            unsafe { drop(Box::from_raw(warned_set_ptr)) };
+            return Err(e);
         }
-        let max = config.max.unwrap_or(usize::MAX);
-        let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-        *guard = Some(capture::CaptureState {
-            enabled: false,
-            path: path.clone(),
-            count: 0,
-            max,
-        });
-    }
-
-    let hwnd = create_ipc_window(warned_set_ptr)?;
+    };
     tracing::trace!("HWND created: {:?}", hwnd);
 
     let hwnd = hwnd.0;
