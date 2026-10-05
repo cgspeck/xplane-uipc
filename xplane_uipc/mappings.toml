@@ -36,6 +36,35 @@
 #     update_if_expr = "$OnGround 0 =="
 #     expr = "$VhInd 256.0 *"                    # m/s → 256*m/s
 #
+# Writes
+#
+#   A client can only write an offset whose mapping has writable = true.
+#
+#   Simple mappings reverse the linear transform: dataref = (value - offset_add) / scale.
+#   A writable simple mapping can't have scale = 0.
+#
+#   Expression mappings need write_exprs: one RPN expression per dataref to write,
+#   keyed by a name from datarefs. $value is the number the client wrote (in FSUIPC
+#   units) and every datarefs name holds that dataref's current value, e.g.:
+#
+#     [[mapping]]
+#     offset      = 0x023B  # Zulu hour
+#     fsuipc_type = "u8"
+#     datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec" }
+#     expr        = "$H"
+#     writable    = true
+#     write_exprs = { Z = "$value 3600 * $Z 3600 % +" }   # new hour, same minutes and seconds
+#
+#   Every write expression is evaluated before anything is written. If any result is
+#   not a finite number, nothing is written. A write expression can only use $value and
+#   names from datarefs, and a datarefs entry can't be called "value".
+#
+#   These are load errors (logged, and the mapping is skipped):
+#     - writable = true on an expression mapping without write_exprs
+#     - write_exprs without expr, or without writable = true
+#     - writable = true with scale = 0
+#     - both dataref and expr on one mapping
+#
 #
 # RPN operators: see README-EXPR.md
 # Variable references: $name  (reads the named dataref)

@@ -109,6 +109,42 @@ All trig functions operate in radians.
 
 Example: `$enable 42 0 ?` — returns 42 when `$enable` is non-zero, 0 otherwise.
 
+## Write expressions
+
+In `mappings.toml`, an expression mapping with `writable = true` turns a client's write into dataref writes through `write_exprs`. That's one expression per dataref to write, keyed by a name from the mapping's `datarefs`. The evaluator is the same as for reads, with two kinds of variable:
+
+- `$value` is the number the client wrote, in FSUIPC units (the same number a read would give).
+- Every name in `datarefs` holds that dataref's current value. Unavailable datarefs read as `0.0`.
+
+Lights (`0x0D0C`): one write sets a switch per bit.
+
+```toml
+datarefs    = { Nav = "sim/cockpit2/switches/navigation_lights_on", Bcn = "sim/cockpit2/switches/beacon_on" }
+expr        = "$Nav 1 * $Bcn 2 * +"
+writable    = true
+write_exprs = { Nav = "$value 1 & 0 !=", Bcn = "$value 2 & 0 !=" }
+```
+
+Writing `2` sets `navigation_lights_on` to `0` and `beacon_on` to `1`.
+
+Zulu hour (`0x023B`): the hour dataref is read-only, so the write merges the new hour into `sim/time/zulu_time_sec` and keeps the minutes and seconds.
+
+```toml
+datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec" }
+expr        = "$H"
+writable    = true
+write_exprs = { Z = "$value 3600 * $Z 3600 % +" }
+```
+
+With `zulu_time_sec` at `45296.5` (12:34:56.5), writing `1` sets it to `5696.5` (01:34:56.5).
+
+Rules:
+
+- **All or nothing.** Every write expression is evaluated against the same snapshot of the datarefs before anything is written. If any result isn't a finite number, nothing is written and a warning is logged. So `{ A = "$B", B = "$A" }` swaps the two values.
+- **Sorted order.** Targets are written in sorted key order. Integer datarefs are rounded, and `dataref[N]` targets write element `N`.
+- **Checked at load.** Unlike read expressions, where an unknown variable is quietly `0.0`, a write expression that uses a name other than `value` or a `datarefs` name is a load error. So is a target that isn't a `datarefs` name, an empty `write_exprs`, a `datarefs` entry called `value`, and `writable = true` without `write_exprs`.
+- **Unavailable datarefs.** A target whose dataref is unavailable is skipped, and the others are still written. The first skip after loading mappings logs a warning, and later ones log at debug.
+
 ## API
 
 - `Expr::parse(src)` — Parse a string into an `Expr`.
