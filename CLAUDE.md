@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Shared agent rules (verification, commits, openspec) live in AGENTS.md:
+
+@AGENTS.md
+
 ## Build & Test
 
 See the README for full setup instructions and prerequisites. Summary:
@@ -11,9 +15,10 @@ See the README for full setup instructions and prerequisites. Summary:
 make              # fmt + clippy + cross-check + test — the main dev loop
 make test         # tests only (portable crates: uipc-expr, uipc-mapping, etc.)
 make check        # type-check Windows crates via --target x86_64-pc-windows-msvc
-make clippy       # lint everything (portable natively, Windows via cross-compilation)
+make clippy       # lint all targets, warnings as errors (portable natively, Windows via cross-compilation)
 
 # Windows (full build + deploy)
+cargo clippy --workspace --all-targets -- -D warnings   # same lint gate as CI
 cargo xtask dist          # release build → dist/xplane-uipc/
 cargo xtask deploy        # dist + copy to X-Plane plugins dir
 cargo test                # all tests including ipc_host
