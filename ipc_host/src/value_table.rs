@@ -292,6 +292,50 @@ mod tests {
     }
 
     #[test]
+    fn test_end_update_expires_entries_not_reinserted() {
+        let mut table = Table::new();
+        let prev = table.begin_update();
+        table.insert(10, entry(Value::UnsignedInteger32(1)));
+        table.insert(20, entry(Value::UnsignedInteger32(2)));
+        table.end_update(prev);
+
+        let prev = table.begin_update();
+        table.insert(10, entry(Value::UnsignedInteger32(3)));
+        table.end_update(prev);
+
+        assert!(table.get(10).is_some());
+        assert!(table.get(20).is_none(), "stale offset must not be served");
+        assert_eq!(table.active, vec![10]);
+    }
+
+    #[test]
+    fn test_keep_retains_value_and_writable() {
+        let mut table = Table::new();
+        let prev = table.begin_update();
+        table.insert(
+            10,
+            Entry {
+                value: Value::Integer32(-7),
+                source: 0,
+                destination: 0,
+                writable: true,
+            },
+        );
+        table.end_update(prev);
+
+        let prev = table.begin_update();
+        table.keep(10);
+        table.keep(99); // absent: no-op
+        table.end_update(prev);
+
+        assert!(matches!(table.get(10).unwrap().value, Value::Integer32(-7)));
+        assert!(table.is_active(10));
+        assert!(table.is_writable(10));
+        assert!(table.get(99).is_none());
+        assert!(!table.is_active(99));
+    }
+
+    #[test]
     fn test_from_f64_rounds_instead_of_truncating() {
         assert!(matches!(
             Value::from_f64(1023.9999, FsuipcType::I32),
