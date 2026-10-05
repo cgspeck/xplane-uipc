@@ -31,4 +31,4 @@
 ## 6. Verification
 
 - [x] 6.1 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
-- [ ] 6.2 Sim check: run the client that wrote `0x0D6C`/`0x0D70` and record the logged request text in `mappings reconciliation/` for the follow-up decision
+- [x] 6.2 Sim check: run the client that wrote `0x0D6C`/`0x0D70` and record the logged request text in `mappings reconciliation/` for the follow-up decision
