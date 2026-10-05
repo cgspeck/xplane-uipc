@@ -81,6 +81,9 @@ pub enum MappingSource {
         /// write there. Sorted so writes go out in a repeatable order; empty
         /// for read-only mappings.
         write_exprs: BTreeMap<String, Expr>,
+        /// Command path → expression for how many times to run it. Sorted;
+        /// empty for read-only mappings.
+        write_commands: BTreeMap<String, Expr>,
     },
 }
 
@@ -116,6 +119,7 @@ struct RawMapping {
     expr: Option<String>,
     update_if_expr: Option<String>,
     write_exprs: Option<HashMap<String, String>>,
+    write_commands: Option<HashMap<String, String>>,
 
     #[serde(default = "default_writable")]
     writable: bool,
@@ -202,21 +206,24 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
             ));
             continue;
         }
-        if r.write_exprs.is_some() {
-            if r.expr.is_none() {
-                load_errors.push(format!(
-                    "offset 0x{:04X}: 'write_exprs' requires 'expr'",
-                    r.offset
-                ));
-                continue;
+        let present_tables = [
+            (WriteTable::Exprs, r.write_exprs.is_some()),
+            (WriteTable::Commands, r.write_commands.is_some()),
+        ];
+        let table_error = present_tables.iter().find_map(|&(table, present)| {
+            if !present {
+                None
+            } else if r.expr.is_none() {
+                Some(format!("'{}' requires 'expr'", table.name()))
+            } else if !r.writable {
+                Some(format!("'{}' requires 'writable = true'", table.name()))
+            } else {
+                None
             }
-            if !r.writable {
-                load_errors.push(format!(
-                    "offset 0x{:04X}: 'write_exprs' requires 'writable = true'",
-                    r.offset
-                ));
-                continue;
-            }
+        });
+        if let Some(e) = table_error {
+            load_errors.push(format!("offset 0x{:04X}: {}", r.offset, e));
+            continue;
         }
 
         let source = if let Some(expr_src) = r.expr {
@@ -252,22 +259,25 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 None => None,
             };
 
-            let write_exprs = match (r.write_exprs, r.writable) {
-                (Some(raw), _) => match parse_write_exprs(raw, &datarefs) {
-                    Ok(w) => w,
-                    Err(e) => {
-                        load_errors.push(format!("offset 0x{:04X}: {}", r.offset, e));
-                        continue;
-                    }
+            if r.writable && r.write_exprs.is_none() && r.write_commands.is_none() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: a writable expression mapping needs 'write_exprs' or 'write_commands'",
+                    r.offset
+                ));
+                continue;
+            }
+            let parsed = parse_write_table(WriteTable::Exprs, r.write_exprs, &datarefs).and_then(
+                |write_exprs| {
+                    parse_write_table(WriteTable::Commands, r.write_commands, &datarefs)
+                        .map(|write_commands| (write_exprs, write_commands))
                 },
-                (None, true) => {
-                    load_errors.push(format!(
-                        "offset 0x{:04X}: a writable expression mapping needs 'write_exprs'",
-                        r.offset
-                    ));
+            );
+            let (write_exprs, write_commands) = match parsed {
+                Ok(tables) => tables,
+                Err(e) => {
+                    load_errors.push(format!("offset 0x{:04X}: {}", r.offset, e));
                     continue;
                 }
-                (None, false) => BTreeMap::new(),
             };
 
             MappingSource::Expr {
@@ -275,6 +285,7 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 expr,
                 update_if_expr,
                 write_exprs,
+                write_commands,
             }
         } else if let Some(dr) = r.dataref {
             // The read is the constant `offset_add`, so a write can't be reversed.
@@ -333,45 +344,77 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
     })
 }
 
-/// Parse and check a mapping's `write_exprs` against its `datarefs`.
+/// The two write tables of an expression mapping.
+#[derive(Clone, Copy)]
+enum WriteTable {
+    /// `write_exprs`: datarefs name → value to write.
+    Exprs,
+    /// `write_commands`: command path → how many times to run it.
+    Commands,
+}
+
+impl WriteTable {
+    fn name(self) -> &'static str {
+        match self {
+            WriteTable::Exprs => "write_exprs",
+            WriteTable::Commands => "write_commands",
+        }
+    }
+}
+
+/// Parse and check one of a mapping's write tables against its `datarefs`.
+/// An absent table is empty.
 ///
 /// Unlike read expressions, where an unknown variable quietly reads as 0.0,
-/// a typo here would write zero to a real dataref, so it's an error.
-fn parse_write_exprs(
-    raw: HashMap<String, String>,
+/// a typo here would write zero to a real dataref or run the wrong command,
+/// so it's an error.
+fn parse_write_table(
+    table: WriteTable,
+    raw: Option<HashMap<String, String>>,
     datarefs: &HashMap<String, (String, Option<i32>)>,
 ) -> Result<BTreeMap<String, Expr>, String> {
+    let name = table.name();
+    let Some(raw) = raw else {
+        return Ok(BTreeMap::new());
+    };
     if raw.is_empty() {
-        return Err("'write_exprs' is empty".into());
+        return Err(format!("'{}' is empty", name));
     }
     if datarefs.contains_key("value") {
-        return Err(
-            "'datarefs' can't have an entry named 'value' when 'write_exprs' is present".into(),
-        );
+        return Err(format!(
+            "'datarefs' can't have an entry named 'value' when '{}' is present",
+            name
+        ));
     }
-    let mut write_exprs = BTreeMap::new();
-    for (target, src) in raw.into_iter().collect::<BTreeMap<_, _>>() {
-        if !datarefs.contains_key(&target) {
-            return Err(format!(
-                "write_exprs target '{}' is not a name in 'datarefs'",
-                target
-            ));
+    let mut parsed = BTreeMap::new();
+    for (key, src) in raw.into_iter().collect::<BTreeMap<_, _>>() {
+        match table {
+            WriteTable::Exprs if !datarefs.contains_key(&key) => {
+                return Err(format!(
+                    "{} target '{}' is not a name in 'datarefs'",
+                    name, key
+                ));
+            }
+            WriteTable::Commands if !key.contains('/') => {
+                return Err(format!("{} key '{}' is not a command path", name, key));
+            }
+            _ => {}
         }
-        let expr = Expr::parse(&src)
-            .map_err(|e| format!("write_exprs '{}' parse error: {}", target, e))?;
+        let expr =
+            Expr::parse(&src).map_err(|e| format!("{} '{}' parse error: {}", name, key, e))?;
         if let Some(var) = expr
             .vars()
             .into_iter()
             .find(|v| v != "value" && !datarefs.contains_key(v))
         {
             return Err(format!(
-                "write_exprs '{}' uses unknown variable '${}'",
-                target, var
+                "{} '{}' uses unknown variable '${}'",
+                name, key, var
             ));
         }
-        write_exprs.insert(target, expr);
+        parsed.insert(key, expr);
     }
-    Ok(write_exprs)
+    Ok(parsed)
 }
 
 pub fn parse_dataref_with_index(s: &str) -> (String, Option<i32>) {
@@ -847,7 +890,11 @@ expr        = \"$X\"
 writable    = true
 ",
         );
-        assert!(err.contains("needs 'write_exprs'"), "{}", err);
+        assert!(
+            err.contains("needs 'write_exprs' or 'write_commands'"),
+            "{}",
+            err
+        );
     }
 
     #[test]
@@ -988,6 +1035,144 @@ expr        = \"$A\"
             "{}",
             err
         );
+    }
+
+    #[test]
+    fn write_commands_only() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x281C
+fsuipc_type = \"u32\"
+datarefs    = { Bat = \"sim/test/bat\" }
+expr        = \"$Bat\"
+writable    = true
+write_commands = { \"addon/battery_toggle\" = \"$value 0 != $Bat 0 != !=\" }
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty(), "{:?}", config.load_errors);
+        match &config.mappings[0].source {
+            MappingSource::Expr {
+                write_exprs,
+                write_commands,
+                ..
+            } => {
+                assert!(write_exprs.is_empty());
+                let paths: Vec<&str> = write_commands.keys().map(String::as_str).collect();
+                assert_eq!(paths, vec!["addon/battery_toggle"]);
+            }
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn write_exprs_and_write_commands() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x0D0C
+fsuipc_type = \"u16\"
+datarefs    = { Land = \"sim/test/land\", ZLand = \"addon/land_pos\" }
+expr        = \"$Land\"
+writable    = true
+write_exprs = { Land = \"$value 4 & 0 !=\" }
+write_commands = { \"addon/land_toggle\" = \"$value 4 & 0 != $ZLand 0 != !=\" }
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty(), "{:?}", config.load_errors);
+        match &config.mappings[0].source {
+            MappingSource::Expr {
+                write_exprs,
+                write_commands,
+                ..
+            } => {
+                assert_eq!(write_exprs.len(), 1);
+                assert_eq!(write_commands.len(), 1);
+            }
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn write_commands_key_not_a_path() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = { Toggle = \"1\" }
+",
+        );
+        assert!(err.contains("'Toggle' is not a command path"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_unknown_variable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = { \"addon/toggle\" = \"$valu\" }
+",
+        );
+        assert!(err.contains("write_commands"), "{}", err);
+        assert!(err.contains("valu"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_empty() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = {}
+",
+        );
+        assert!(err.contains("'write_commands' is empty"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_not_writable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+write_commands = { \"addon/toggle\" = \"1\" }
+",
+        );
+        assert!(
+            err.contains("'write_commands' requires 'writable = true'"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn write_commands_without_expr() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+writable    = true
+write_commands = { \"addon/toggle\" = \"1\" }
+",
+        );
+        assert!(err.contains("'write_commands' requires 'expr'"), "{}", err);
     }
 
     #[test]

@@ -229,6 +229,7 @@ impl ResolvedMapping {
                 expr,
                 update_if_expr,
                 write_exprs,
+                ..
             } => {
                 let refs: HashMap<String, ResolvedRef> = datarefs
                     .into_iter()
