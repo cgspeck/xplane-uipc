@@ -82,14 +82,19 @@ offset	writable_mapping	dataref	status	xp_type	xp_writable	units	description
 0x0BE8	yes	sim/cockpit/switches/gear_handle_status	ok	int	y	boolean	Gear handle is up or down?
 0x0238	yes	sim/cockpit2/clock_timer/local_time_hours	ok	int	n	hours	Local time, hours, at the user's current location
 0x0238	yes	sim/time/zulu_time_sec	ok	float	y	seconds	Zulu time (seconds since midnight)
+0x0238	yes	sim/time/use_system_time	ok	int	y	boolean	Use system date and time for local time
 0x0239	yes	sim/cockpit2/clock_timer/local_time_minutes	ok	int	n	minutes	Local time, minutes, at the user's current location
 0x0239	yes	sim/time/zulu_time_sec	ok	float	y	seconds	Zulu time (seconds since midnight)
+0x0239	yes	sim/time/use_system_time	ok	int	y	boolean	Use system date and time for local time
 0x023A	yes	sim/cockpit2/clock_timer/local_time_seconds	ok	int	n	seconds	Local time, seconds, at the user's current location
 0x023A	yes	sim/time/zulu_time_sec	ok	float	y	seconds	Zulu time (seconds since midnight)
+0x023A	yes	sim/time/use_system_time	ok	int	y	boolean	Use system date and time for local time
 0x023B	yes	sim/cockpit2/clock_timer/zulu_time_hours	ok	int	n	hours	Zulu time, hours
 0x023B	yes	sim/time/zulu_time_sec	ok	float	y	seconds	Zulu time (seconds since midnight)
+0x023B	yes	sim/time/use_system_time	ok	int	y	boolean	Use system date and time for local time
 0x023C	yes	sim/cockpit2/clock_timer/zulu_time_minutes	ok	int	n	minutes	Zulu time, minutes
 0x023C	yes	sim/time/zulu_time_sec	ok	float	y	seconds	Zulu time (seconds since midnight)
+0x023C	yes	sim/time/use_system_time	ok	int	y	boolean	Use system date and time for local time
 0x0246	no	xplane-uipc-helper/time/offset_minutes_negated	third-party				
 0x115e	no	sim/graphics/scenery/sun_pitch_degrees	ok	float	n	degrees	Sun pitch from flat in OGL coordinates
 0x115e	no	sim/cockpit2/clock_timer/local_time_hours	ok	int	n	hours	Local time, hours, at the user's current location

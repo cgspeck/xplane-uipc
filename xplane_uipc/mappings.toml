@@ -509,45 +509,47 @@ dataref     = "sim/cockpit/switches/gear_handle_status"
 scale       = 16383.0
 writable    = true
 
+# Time writes also turn off "use system time" (UseSys = 0); while it is on,
+# X-Plane resets the clock to the system time and the write reverts.
 [[mapping]]
 offset      = 0x0238  # Local hour; local_time_sec is read-only, so a write shifts Zulu time
 fsuipc_type = "u8"
-datarefs    = { LH = "sim/cockpit2/clock_timer/local_time_hours", Z = "sim/time/zulu_time_sec" }
+datarefs    = { LH = "sim/cockpit2/clock_timer/local_time_hours", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
 expr        = "$LH"
 writable    = true
-write_exprs = { Z = "$Z $value $LH - 3600 * + 86400 + 86400 %" }
+write_exprs = { Z = "$Z $value $LH - 3600 * + 86400 + 86400 %", UseSys = "0" }
 
 [[mapping]]
 offset      = 0x0239  # Local minute; a write shifts Zulu time
 fsuipc_type = "u8"
-datarefs    = { LM = "sim/cockpit2/clock_timer/local_time_minutes", Z = "sim/time/zulu_time_sec" }
+datarefs    = { LM = "sim/cockpit2/clock_timer/local_time_minutes", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
 expr        = "$LM"
 writable    = true
-write_exprs = { Z = "$Z $value $LM - 60 * + 86400 + 86400 %" }
+write_exprs = { Z = "$Z $value $LM - 60 * + 86400 + 86400 %", UseSys = "0" }
 
 [[mapping]]
 offset      = 0x023A  # Second
 fsuipc_type = "u8"
-datarefs    = { S = "sim/cockpit2/clock_timer/local_time_seconds", Z = "sim/time/zulu_time_sec" }
+datarefs    = { S = "sim/cockpit2/clock_timer/local_time_seconds", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
 expr        = "$S"
 writable    = true
-write_exprs = { Z = "$Z $Z 60 % - $value +" }
+write_exprs = { Z = "$Z $Z 60 % - $value +", UseSys = "0" }
 
 [[mapping]]
 offset      = 0x023B  # Zulu hour
 fsuipc_type = "u8"
-datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec" }
+datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
 expr        = "$H"
 writable    = true
-write_exprs = { Z = "$value 3600 * $Z 3600 % +" }
+write_exprs = { Z = "$value 3600 * $Z 3600 % +", UseSys = "0" }
 
 [[mapping]]
 offset      = 0x023C  # Zulu minute
 fsuipc_type = "u8"
-datarefs    = { M = "sim/cockpit2/clock_timer/zulu_time_minutes", Z = "sim/time/zulu_time_sec" }
+datarefs    = { M = "sim/cockpit2/clock_timer/zulu_time_minutes", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
 expr        = "$M"
 writable    = true
-write_exprs = { Z = "$Z $Z 3600 % - $value 60 * + $Z 60 % +" }
+write_exprs = { Z = "$Z $Z 3600 % - $value 60 * + $Z 60 % +", UseSys = "0" }
 
 # 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
 [[mapping]]
