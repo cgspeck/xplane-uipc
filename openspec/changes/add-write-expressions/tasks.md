@@ -33,7 +33,7 @@
 
 - [x] 4.1 Document `write_exprs` (variables, all-or-nothing, validation) in the `mappings.toml` header comments
 - [x] 4.2 Add a "Write expressions" section to `uipc-expr/README-EXPR.md` with the lights and Zulu-hour examples
-- [ ] 4.3 Document the new load errors (`writable` expression mapping needs `write_exprs`, no writable `scale = 0`, no `dataref` together with `expr`) in the `mappings.toml` header, and list them as breaking in the release notes
+- [x] 4.3 Document the new load errors (`writable` expression mapping needs `write_exprs`, no writable `scale = 0`, no `dataref` together with `expr`) in the `mappings.toml` header, and list them as breaking in the release notes
 
 ## 5. Verification
 
