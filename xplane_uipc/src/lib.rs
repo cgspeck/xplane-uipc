@@ -303,6 +303,10 @@ fn parse_config_and_apply(config_path: &str) {
     }
 
     if let Some(hz) = config.settings.update_rate_hz {
+        if hz == 0 {
+            tracing::warn!("Invalid update_rate_hz 0 in config.toml, keeping current rate");
+            return;
+        }
         tracing::info!("Setting flight update rate to {} hz", hz);
         let v = 1.0 / (hz as f32);
         FLIGHT_LOOP_INTERVAL.store(v, Ordering::Relaxed)
