@@ -386,6 +386,14 @@ mod tests {
             v.payload(&vec![0xAA; n_bytes as usize])
         }
 
+        /// A 64-bit read; the client's payload buffer starts out as `0xAA`s.
+        fn read64(self, offset: u32, n_bytes: u32) -> Self {
+            let mut v = self.header(F64IPC_READSTATEDATA_ID, offset, n_bytes);
+            v.data
+                .extend_from_slice(&0x0000_7FF6_1234_5678u64.to_le_bytes());
+            v.payload(&vec![0xAA; n_bytes as usize])
+        }
+
         fn write(self, offset: u32, bytes: &[u8]) -> Self {
             self.header(FS6IPC_WRITESTATEDATA_ID, offset, bytes.len() as u32)
                 .payload(bytes)
@@ -609,5 +617,108 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn test_read64_framing() {
+        let table = table_with(&[(0x0238, Value::UnsignedInteger16(0x1234), false)]);
+        let mut view = View::default().read64(0x0238, 2).read32(0x0238, 2).end();
+        let (records, result) = view.records();
+        assert_eq!(result, Ok(()));
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].kind, RecordKind::Read64);
+        assert_eq!(records[0].p_dest, 0x0000_7FF6_1234_5678);
+        assert_eq!(view.payloads[0], 20);
+        assert_eq!(records[1].header_offset, 22);
+
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 2), &[0x34, 0x12]);
+        assert_eq!(view.payload_at(1, 2), &[0x34, 0x12]);
+    }
+
+    #[test]
+    fn test_mixed_read_write_stream() {
+        let view = View::default()
+            .read32(0x3304, 4)
+            .write(0x0BC0, &[1, 0])
+            .read32(0x3308, 4)
+            .end();
+        let (records, result) = view.records();
+        assert_eq!(result, Ok(()));
+        let summary: Vec<_> = records
+            .iter()
+            .map(|r| (r.kind, r.dw_offset, r.n_bytes))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                (RecordKind::Read32, 0x3304, 4),
+                (RecordKind::Write, 0x0BC0, 2),
+                (RecordKind::Read32, 0x3308, 4),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_unknown_id_stops_after_earlier_records() {
+        let table = table_with(&[(100, Value::Integer32(42), false)]);
+        let mut view = View::default()
+            .read32(100, 4)
+            .header(7, 100, 4)
+            .payload(&[0; 4])
+            .end();
+        let outcome = view.process(&table);
+        assert_eq!(
+            outcome.malformed,
+            Some(Malformed {
+                at: 20,
+                reason: MalformedReason::UnknownId(7)
+            })
+        );
+        // The read before the bad record was still answered.
+        assert_eq!(view.payload_at(0, 4), &42i32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_header_overrun() {
+        let mut view = View::default().read32(100, 0);
+        view.data
+            .extend_from_slice(&FS6IPC_READSTATEDATA_ID.to_le_bytes());
+        view.data.extend_from_slice(&[0; 8]); // 12 of the 16 header bytes
+        let (records, result) = view.records();
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            result,
+            Err(Malformed {
+                at: 16,
+                reason: MalformedReason::HeaderOverrun(RecordKind::Read32)
+            })
+        );
+    }
+
+    #[test]
+    fn test_missing_terminator() {
+        let view = View::default().read32(100, 4);
+        let (records, result) = view.records();
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            result,
+            Err(Malformed {
+                at: 20,
+                reason: MalformedReason::MissingTerminator
+            })
+        );
+    }
+
+    #[test]
+    fn test_out_of_range_read_is_not_malformed() {
+        let mut view = View::default()
+            .read32(0x1_0000, 4)
+            .read32(0x1_0004, 4)
+            .end();
+        let outcome = view.process(&Table::new());
+        assert!(outcome.malformed.is_none());
+        let (records, _) = view.records();
+        assert_eq!(records.len(), 2);
     }
 }

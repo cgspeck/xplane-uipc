@@ -51,3 +51,14 @@ fn test_fsinterrogate_app_key_write() {
     assert_eq!(key.payload_ptr as *const u8, data[0x0C..].as_ptr());
     assert_eq!(&data[0x0C..0x19], b"6PETEXPDRVW3\0");
 }
+
+#[test]
+fn test_fsinterrogate_activity_counter_poll() {
+    // FSInterrogate polls the 0x337E activity counter every few seconds.
+    let (records, result) = parse(include_bytes!("fixtures/fsinterrogate-337e-read.bin"));
+    assert_eq!(result, Ok(()));
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].kind, RecordKind::Read32);
+    assert_eq!(records[0].dw_offset, 0x337E);
+    assert_eq!(records[0].n_bytes, 2);
+}
