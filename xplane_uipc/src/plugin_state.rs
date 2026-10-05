@@ -16,6 +16,20 @@ use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
 pub use uipc_mapping::{DatarefMapping, MappingSource};
 
+/// Bound a raw string read to `max_len` bytes, always ending in a NUL.
+/// Bytes after the first NUL are dropped; an empty read becomes an empty string.
+fn terminate_string(mut buf: Vec<u8>, max_len: usize) -> Vec<u8> {
+    if max_len == 0 {
+        return Vec::new();
+    }
+    if let Some(nul) = buf.iter().position(|&b| b == 0) {
+        buf.truncate(nul);
+    }
+    buf.truncate(max_len - 1);
+    buf.push(0);
+    buf
+}
+
 /// Outcome of evaluating a mapping for one update cycle.
 pub enum Reading {
     /// Serve this value.
@@ -48,7 +62,7 @@ impl ResolvedRef {
         }
     }
 
-    /// Read the scalar value from this dataref (returns None if invalid).
+    /// Read a NUL-terminated string of at most `max_len` bytes (None if the handle is invalid).
     pub fn read_bytes(&self, max_len: usize) -> Option<Vec<u8>> {
         if self.handle.is_null() {
             return None;
@@ -62,14 +76,8 @@ impl ResolvedRef {
                 max_len as i32,
             )
         };
-        if bytes_read == 0 {
-            return None;
-        }
-        buf.truncate(bytes_read as usize);
-        if buf.last() != Some(&0) {
-            buf.push(0);
-        }
-        Some(buf)
+        buf.truncate(bytes_read.clamp(0, max_len as i32) as usize);
+        Some(terminate_string(buf, max_len))
     }
 
     pub fn read(&self) -> Option<f64> {
@@ -225,9 +233,7 @@ impl ResolvedMapping {
             let bytes = match &self.source {
                 ResolvedSource::Simple { dr, .. } => dr.read_bytes(self.size),
                 ResolvedSource::StaticStr { static_str } => {
-                    let mut b = static_str.as_bytes().to_vec();
-                    b.push(0);
-                    Some(b)
+                    Some(terminate_string(static_str.as_bytes().to_vec(), self.size))
                 }
                 _ => None,
             };
