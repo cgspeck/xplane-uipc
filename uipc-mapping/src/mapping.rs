@@ -190,6 +190,14 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
             }
         }
 
+        if r.dataref.is_some() && r.expr.is_some() {
+            load_errors.push(format!(
+                "offset 0x{:04X}: cannot have both 'dataref' and 'expr'",
+                r.offset
+            ));
+            continue;
+        }
+
         let source = if let Some(expr_src) = r.expr {
             let expr = match Expr::parse(&expr_src) {
                 Ok(e) => e,
