@@ -16,6 +16,7 @@
 //! read's payload there after the call, so it means nothing to the server.
 
 use byteorder::{ByteOrder, LittleEndian};
+use std::collections::HashSet;
 use std::fmt;
 use std::slice;
 use tracing::level_filters::LevelFilter;
@@ -100,12 +101,26 @@ fn lua_request_text(payload: &[u8]) -> String {
     client_text(&payload[..payload.len().min(LUA_REQUEST_LEN)])
 }
 
-fn log_lua_request(payload: &[u8], param: Option<u32>) {
+/// Log a request at `LUA_REQUEST_LOG_LEVEL` the first time its text and
+/// parameter are seen, so clients that repeat it every poll don't flood the
+/// log. Repeats are logged at trace.
+fn log_lua_request(payload: &[u8], state: &mut IpcState) {
     let text = lua_request_text(payload);
-    let param = match param {
+    let first = state
+        .logged_lua_requests
+        .insert((text.clone(), state.lua_param));
+    let param = match state.lua_param {
         Some(p) => format!("param {}", p),
         None => "no param".to_string(),
     };
+    if !first {
+        tracing::trace!(
+            "Lua/macro request \"{}\" ({}) repeated, already logged",
+            text,
+            param
+        );
+        return;
+    }
     log_at!(
         LUA_REQUEST_LOG_LEVEL,
         "Lua/macro request \"{}\" ({}), not supported",
@@ -304,6 +319,9 @@ pub struct IpcState {
     /// Last parameter written to `LUA_PARAM_OFFSET`, if any. Kept after use,
     /// as FSUIPC reuses it for later requests.
     pub(crate) lua_param: Option<u32>,
+    /// Lua/macro requests (text and parameter) already logged, so each is
+    /// logged once.
+    pub(crate) logged_lua_requests: HashSet<(String, Option<u32>)>,
 }
 
 impl IpcState {
@@ -311,12 +329,15 @@ impl IpcState {
         Self {
             warned: WarnedSet::new(),
             lua_param: None,
+            logged_lua_requests: HashSet::new(),
         }
     }
 
-    /// Forget which offsets have been warned about. Other state is kept.
-    pub fn reset_warnings(&self) {
+    /// Forget which offsets have been warned about and which Lua/macro
+    /// requests have been logged. The Lua parameter is kept.
+    pub fn reset_warnings(&mut self) {
         self.warned.clear_all();
+        self.logged_lua_requests.clear();
     }
 }
 
@@ -444,7 +465,7 @@ fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut
             return true;
         }
         LUA_REQUEST_OFFSET => {
-            log_lua_request(payload, state.lua_param);
+            log_lua_request(payload, state);
             return true;
         }
         _ => {}
