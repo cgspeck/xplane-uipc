@@ -1,3 +1,5 @@
+use uipc_mapping::FsuipcType;
+
 #[derive(Clone, Debug)]
 pub enum Value {
     UnsignedInteger8(u8),
@@ -12,6 +14,74 @@ pub enum Value {
     Float64(f64),
     Bool(bool),
     String(Vec<u8>),
+}
+
+impl Value {
+    /// Convert a mapping's f64 result to the declared FSUIPC type.
+    ///
+    /// Integers round to nearest (half away from zero); types up to 32 bits wrap
+    /// two's complement when out of range, matching FSUIPC's raw-memory semantics.
+    /// Returns `None` for non-finite input and for `String`.
+    pub fn from_f64(value: f64, ty: FsuipcType) -> Option<Value> {
+        if !value.is_finite() {
+            return None;
+        }
+        let r = value.round();
+        let wrapped = r as i64;
+        Some(match ty {
+            FsuipcType::U8 => Value::UnsignedInteger8(wrapped as u8),
+            FsuipcType::I8 => Value::Integer8(wrapped as i8),
+            FsuipcType::U16 => Value::UnsignedInteger16(wrapped as u16),
+            FsuipcType::I16 => Value::Integer16(wrapped as i16),
+            FsuipcType::U32 => Value::UnsignedInteger32(wrapped as u32),
+            FsuipcType::I32 => Value::Integer32(wrapped as i32),
+            FsuipcType::U64 if r < 0.0 => Value::UnsignedInteger64(wrapped as u64),
+            FsuipcType::U64 => Value::UnsignedInteger64(r as u64),
+            FsuipcType::I64 => Value::Integer64(wrapped),
+            FsuipcType::F32 => Value::Float32(value as f32),
+            FsuipcType::F64 => Value::Float64(value),
+            FsuipcType::String => return None,
+        })
+    }
+
+    /// Little-endian encoding of the value as it appears in FSUIPC memory.
+    pub fn to_le_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::UnsignedInteger8(v) => v.to_le_bytes().to_vec(),
+            Value::Integer8(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger16(v) => v.to_le_bytes().to_vec(),
+            Value::Integer16(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger32(v) => v.to_le_bytes().to_vec(),
+            Value::Integer32(v) => v.to_le_bytes().to_vec(),
+            Value::UnsignedInteger64(v) => v.to_le_bytes().to_vec(),
+            Value::Integer64(v) => v.to_le_bytes().to_vec(),
+            Value::Float32(v) => v.to_le_bytes().to_vec(),
+            Value::Float64(v) => v.to_le_bytes().to_vec(),
+            Value::Bool(v) => vec![*v as u8],
+            Value::String(bytes) => bytes.clone(),
+        }
+    }
+
+    /// Decode a client write payload using this value's type. The payload must
+    /// be exactly the type's width. Strings and bools are not writable.
+    pub fn decode_le(&self, bytes: &[u8]) -> Option<f64> {
+        fn arr<const N: usize>(b: &[u8]) -> Option<[u8; N]> {
+            b.try_into().ok()
+        }
+        Some(match self {
+            Value::UnsignedInteger8(_) => u8::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer8(_) => i8::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger16(_) => u16::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer16(_) => i16::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger32(_) => u32::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer32(_) => i32::from_le_bytes(arr(bytes)?) as f64,
+            Value::UnsignedInteger64(_) => u64::from_le_bytes(arr(bytes)?) as f64,
+            Value::Integer64(_) => i64::from_le_bytes(arr(bytes)?) as f64,
+            Value::Float32(_) => f32::from_le_bytes(arr(bytes)?) as f64,
+            Value::Float64(_) => f64::from_le_bytes(arr(bytes)?),
+            Value::Bool(_) | Value::String(_) => return None,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]

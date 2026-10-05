@@ -1116,6 +1116,7 @@ dependencies = [
  "ctrlc",
  "tracing",
  "tracing-subscriber",
+ "uipc-mapping",
  "windows 0.62.2",
 ]
 
