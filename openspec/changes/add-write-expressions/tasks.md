@@ -12,9 +12,9 @@
 
 - [ ] 2.1 Carry the parsed write expressions into `ResolvedSource::Expr`
 - [ ] 2.2 In `ResolvedMapping::write_xplane`, for `Expr` with write expressions: read all refs once (unavailable → `0.0`), add `value`, evaluate every write expression, return with a warning if any result isn't finite, otherwise write each target in key order through `ResolvedRef::write`, skipping unavailable targets with a warning
-- [ ] 2.3 Factor the evaluate step into a pure function (variables in, ordered `(name, value)` results or an error out) so it can be unit tested without X-Plane
+- [x] 2.3 Factor the evaluate step into a pure function (variables in, ordered `(name, value)` results or an error out) so it can be unit tested without X-Plane
 - [ ] 2.4 Extend the load-time writability check to warn for each write target X-Plane reports as read-only. Remove the "only single-dataref mappings can be written" warning, which is now a load error (1.3)
-- [ ] 2.5 Unit tests for the pure evaluate step: fan-out, current-value use, snapshot semantics (`A = $B`, `B = $A`), non-finite result blocks everything
+- [x] 2.5 Unit tests for the pure evaluate step: fan-out, current-value use, snapshot semantics (`A = $B`, `B = $A`), non-finite result blocks everything
 - [ ] 2.6 Make `ResolvedRef::write` return whether it wrote: `false` for a null handle or a dataref type it can't write
 - [ ] 2.7 Make `write_xplane` return whether any dataref was written. Add a once-per-load "unavailable dataref" flag to `ResolvedMapping`: the first skip logs a warning naming the offset and the dataref, and later skips log at debug. This covers both single-dataref writes and write-expression targets
 - [ ] 2.8 In `write_offset`, log "Wrote value…" only when `write_xplane` returns `true`
