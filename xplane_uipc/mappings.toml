@@ -244,6 +244,11 @@ datarefs    = { Av = "sim/cockpit2/switches/avionics_power_on" }
 expr        = "$Av"
 writable    = true
 write_exprs = { Av = "$value 0 !=" }
+# TODO Zibo 738: the avionics datarefs are overridden every frame, so writes revert
+# and only commands work. Find the paths with DataRefTool, then add
+#   ZAv = "<Zibo avionics switch state dataref>"   to datarefs, and
+#   write_commands = { "<Zibo avionics toggle command>" = "$value 0 != $ZAv 0 != !=" }
+# The toggle runs once, only when the requested state differs from $ZAv.
 
 [[mapping]]
 offset      = 0x281C  # Battery master on, problematic, because generic always seems to be on
@@ -252,6 +257,11 @@ datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "s
 expr = "$Zibo738 $Generic |"
 writable    = true
 write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
+# TODO Zibo 738: the battery datarefs are overridden every frame, so writes revert
+# and only commands work. Find the paths with DataRefTool, then add
+#   ZBat = "<Zibo battery switch state dataref>"   to datarefs, and
+#   write_commands = { "<Zibo battery toggle command>" = "$value 0 != $ZBat 0 != !=" }
+# The toggle runs once, only when the requested state differs from $ZBat.
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
@@ -260,6 +270,11 @@ datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "s
 expr = "$Zibo738 $Generic |"
 writable    = true
 write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
+# TODO Zibo 738: the battery datarefs are overridden every frame, so writes revert
+# and only commands work. Find the paths with DataRefTool, then add
+#   ZBat = "<Zibo battery switch state dataref>"   to datarefs, and
+#   write_commands = { "<Zibo battery toggle command>" = "$value 0 != $ZBat 0 != !=" }
+# The toggle runs once, only when the requested state differs from $ZBat.
 
 [[mapping]]
 offset      = 0x0366  # SIM ON GROUND
@@ -299,6 +314,13 @@ datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim
 expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * + $Wing 128 * + $Logo 256 * +"
 writable    = true
 write_exprs = { Nav = "$value 1 & 0 !=", Bcn = "$value 2 & 0 !=", Land = "$value 4 & 0 !=", Taxi = "$value 8 & 0 !=", Strb = "$value 16 & 0 !=" }
+# TODO Zibo 738: the landing light datarefs are overridden every frame, so writes revert
+# and only commands work. Find the paths with DataRefTool, then add
+#   ZLand = "<Zibo landing light switch state dataref>"   to datarefs, and
+#   write_commands = { "<Zibo landing light toggle command>" = "$value 4 & 0 != $ZLand 0 != !=" }
+# The toggle runs once, only when the requested state differs from $ZLand.
+# With separate on and off commands, give each its own entry instead:
+#   "<on command>" = "$value 4 & 0 != $ZLand 0 == &", "<off command>" = "$value 4 & 0 == $ZLand 0 != &"
 
 [[mapping]]
 offset      = 0x02B4   # Ground velocity
