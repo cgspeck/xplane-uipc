@@ -83,6 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allowlist_function("XPLMGetPrefsPath")
         .allowlist_function("XPLMFindDataRef")
         .allowlist_function("XPLMGetDataRefTypes")
+        .allowlist_function("XPLMCanWriteDataRef")
         .allowlist_function("XPLMGetDatad")
         .allowlist_function("XPLMGetDataf")
         .allowlist_function("XPLMGetDatai")
