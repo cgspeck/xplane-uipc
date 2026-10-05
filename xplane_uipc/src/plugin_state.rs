@@ -771,6 +771,22 @@ mod tests {
     }
 
     #[test]
+    fn each_missing_target_errors_once() {
+        use tracing_subscriber::layer::SubscriberExt;
+
+        let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let subscriber = tracing_subscriber::registry().with(CountErrors(errors.clone()));
+        let mut mapping = touchdown_vs_mapping();
+        tracing::subscriber::with_default(subscriber, || {
+            for _ in 0..2 {
+                mapping.report_missing("command 'addon/land_toggle'".into());
+                mapping.report_missing("dataref 'addon/land_pos'".into());
+            }
+        });
+        assert_eq!(errors.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    #[test]
     fn missing_is_not_served() {
         let mapping = touchdown_vs_mapping();
         let mut table = Table::new();
