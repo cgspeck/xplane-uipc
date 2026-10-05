@@ -96,6 +96,13 @@ pub fn xplane_log(msg: &str) {
     }
 }
 
+/// X-Plane plugin entry point: report the plugin name, signature and description.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. `out_name`,
+/// `out_sig` and `out_desc` must each point to a writable buffer of at least
+/// 256 bytes.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginStart(
@@ -409,6 +416,12 @@ fn get_system_path() -> String {
     }
 }
 
+/// X-Plane plugin entry point: the plugin was enabled.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginEnable() -> c_int {
@@ -478,6 +491,12 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     1
 }
 
+/// X-Plane plugin entry point: the plugin was disabled.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginDisable() {
@@ -510,6 +529,12 @@ pub unsafe extern "C" fn XPluginDisable() {
     }
 }
 
+/// X-Plane plugin entry point: the plugin is being unloaded.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginStop() {
@@ -517,6 +542,12 @@ pub unsafe extern "C" fn XPluginStop() {
     xplane_log("XPluginStop complete");
 }
 
+/// X-Plane plugin entry point: an inter-plugin or sim message arrived.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread, as the plugin SDK requires. Do not
+/// call it directly.
 #[tracing::instrument(skip_all)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: *mut c_void) {

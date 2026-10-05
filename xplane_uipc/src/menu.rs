@@ -14,6 +14,12 @@ const MENU_CLEAR_LOG: usize = 3;
 const MENU_START_CAPTURE: usize = 4;
 const MENU_STOP_CAPTURE: usize = 5;
 
+/// Handles clicks on the plugin menu items.
+///
+/// # Safety
+///
+/// Called by X-Plane on its main thread as the menu callback. Do not call it
+/// directly.
 pub unsafe extern "C" fn menu_handler(_menu_ref: *mut c_void, item_ref: *mut c_void) {
     match item_ref as usize {
         MENU_ABOUT => {
