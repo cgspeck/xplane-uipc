@@ -337,3 +337,27 @@ impl PluginState {
         tracing::warn!("No writable mapping found for offset {:#06x}", offset);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::terminate_string;
+
+    #[test]
+    fn terminate_string_fills_size_exactly() {
+        assert_eq!(
+            terminate_string(b"ABCDEFGH".to_vec(), 8),
+            b"ABCDEFG\0".to_vec()
+        );
+    }
+
+    #[test]
+    fn terminate_string_keeps_existing_nul() {
+        assert_eq!(terminate_string(b"AB\0junk".to_vec(), 8), b"AB\0".to_vec());
+    }
+
+    #[test]
+    fn terminate_string_empty_read_is_empty_string() {
+        assert_eq!(terminate_string(Vec::new(), 8), vec![0]);
+        assert_eq!(terminate_string(b"x".to_vec(), 0), Vec::<u8>::new());
+    }
+}
