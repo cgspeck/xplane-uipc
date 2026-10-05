@@ -7,7 +7,7 @@ mod bindings {
 }
 use bindings::*;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::CString;
 use std::sync::{Arc, RwLock};
 
@@ -208,9 +208,10 @@ pub struct ResolvedMapping {
     pub size: usize,
     pub source: ResolvedSource,
     pub writable: bool,
-    /// Set once a write has skipped an unavailable dataref, so later skips log
-    /// at debug instead of flooding the log. Reset by reloading mappings.
-    unavailable_warned: bool,
+    /// Write targets already reported as missing, so a repeated skip logs at
+    /// debug instead of flooding the log. Mappings are rebuilt when they're
+    /// resolved again, which clears it.
+    reported_missing: HashSet<String>,
 }
 
 impl ResolvedMapping {
@@ -299,7 +300,7 @@ impl ResolvedMapping {
             size: mapping.size,
             source,
             writable: mapping.writable,
-            unavailable_warned: false,
+            reported_missing: HashSet::new(),
         }
     }
 
@@ -434,28 +435,28 @@ impl ResolvedMapping {
             ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. } => {}
         }
         for target in skipped {
-            self.report_unavailable(&target);
+            self.report_missing(target);
         }
         written
     }
 
-    /// Log a write target skipped because it's unavailable: a warning the
-    /// first time for this mapping since mappings were loaded, debug after.
+    /// Log a write target skipped because it's unavailable: an error the first
+    /// time for that target since mappings were resolved, debug after.
     /// `target` describes it, e.g. "dataref 'sim/a'".
-    fn report_unavailable(&mut self, target: &str) {
-        if self.unavailable_warned {
+    fn report_missing(&mut self, target: String) {
+        if self.reported_missing.contains(&target) {
             tracing::debug!(
                 "Offset {:#06x}: {} is unavailable; skipped",
                 self.offset,
                 target
             );
         } else {
-            tracing::warn!(
-                "Offset {:#06x}: {} is unavailable; skipped (further skips for this offset are logged at debug level)",
+            tracing::error!(
+                "Offset {:#06x}: {} is unavailable; skipped, other targets are still written (repeats are logged at debug level)",
                 self.offset,
                 target
             );
-            self.unavailable_warned = true;
+            self.reported_missing.insert(target);
         }
     }
 }
@@ -703,7 +704,7 @@ mod tests {
             size: 4,
             source: ResolvedSource::Static { static_value: None },
             writable: false,
-            unavailable_warned: false,
+            reported_missing: HashSet::new(),
         }
     }
 
@@ -739,34 +740,34 @@ mod tests {
         ));
     }
 
-    /// Counts warning events, to check what a test logs.
-    struct CountWarnings(Arc<std::sync::atomic::AtomicUsize>);
+    /// Counts error events, to check what a test logs.
+    struct CountErrors(Arc<std::sync::atomic::AtomicUsize>);
 
-    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for CountWarnings {
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for CountErrors {
         fn on_event(
             &self,
             event: &tracing::Event<'_>,
             _ctx: tracing_subscriber::layer::Context<'_, S>,
         ) {
-            if *event.metadata().level() == tracing::Level::WARN {
+            if *event.metadata().level() == tracing::Level::ERROR {
                 self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
         }
     }
 
     #[test]
-    fn unavailable_dataref_warns_once_per_load() {
+    fn unavailable_target_errors_once_per_load() {
         use tracing_subscriber::layer::SubscriberExt;
 
-        let warnings = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let subscriber = tracing_subscriber::registry().with(CountWarnings(warnings.clone()));
+        let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let subscriber = tracing_subscriber::registry().with(CountErrors(errors.clone()));
         let mut mapping = touchdown_vs_mapping();
         tracing::subscriber::with_default(subscriber, || {
             for _ in 0..3 {
-                mapping.report_unavailable("addon/missing");
+                mapping.report_missing("dataref 'addon/missing'".into());
             }
         });
-        assert_eq!(warnings.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(errors.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[test]
