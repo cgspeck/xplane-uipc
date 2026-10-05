@@ -10,12 +10,12 @@ Sources:
 Generated files:
 
 | File | Made by | Contents |
-|---|---|---|
+| --- | --- | --- |
 | `fsuipc-guide-offsets.csv` | `parse_guide.py` | Offset, size and description from the guide |
 | `mappings-vs-guide.tsv` | `reconcile.py` | Each mapping's size against the guide |
 | `datarefs-check.tsv` | `check_datarefs.py` | Each dataref a mapping uses, checked against `DataRefs.txt` |
 
-To regenerate everything (Python 3.8+ and `pdftotext` on PATH), run from this folder:
+To regenerate everything, run these from this folder. They need Python 3.11 or newer (`.python-version` pins 3.14) and `pdftotext` on the PATH. Git for Windows provides `pdftotext`, but only inside Git Bash.
 
 ```bash
 py parse_guide.py "../FSUIPC SDK/FSUIPC for Programmers.pdf" > fsuipc-guide-offsets.csv
@@ -28,7 +28,7 @@ py check_datarefs.py DataRefs.txt ../xplane_uipc/mappings.toml > datarefs-check.
 The mappings use 105 datarefs:
 
 | Result | Count |
-|---|---|
+| --- | --- |
 | Exists in X-Plane, writability matches | 86 |
 | Not in `DataRefs.txt` | 17 |
 | **Read-only, but the mapping is `writable`** | 2 |
@@ -51,7 +51,7 @@ The mappings use 105 datarefs:
 ## 2. mappings.toml against the guide
 
 | Result | Count |
-|---|---|
+| --- | --- |
 | Size matches the guide | 72 |
 | Size differs | 2 |
 | Inside a larger documented field | 3 |
@@ -60,7 +60,7 @@ The mappings use 105 datarefs:
 **Size differs**
 
 | Offset | Mapping | Guide | Suggestion |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `0x3308` | `u32` static `0xFADEFFFF` | 2 bytes, FS version | Intentional. The SDK reads 4 bytes here and checks `0xFADE` in the high word (`0x330A`). Keep it. |
 | `0x3102` | `u16` (battery expr) | **1 byte**, "read for state, write to control" | Change to `u8`. Reads work either way, but if this is made writable, a 1-byte client write would fail the size check (the same problem as FSInterrogate and 0x028C). |
 
@@ -79,7 +79,7 @@ The mappings use 105 datarefs:
 The log comes from a build with zero-fill, so all of these already read as zeros. Mapping them stops the warnings and gives the client real values where we have them.
 
 | Offset | Bytes | Guide says | Suggestion |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `0x3124` | 1 | FS2002 only: "electric always available" flag | Static `0` (u8). |
 | `0x0C18` | 2 | International units: 0=US, 1=Metric+feet, 2=Metric+metres | Static `0` (u16). `DataRefs.txt` has no matching unit setting. |
 | `0x0272`, `0x0273` | 2, 2 | Not in the guide | Unknown. Reading 2 bytes at two neighbouring offsets is odd, and could be two 1-byte fields read sloppily. Check a newer offsets document before mapping. Zero-fill already answers `0`. |

@@ -8,9 +8,17 @@ Needs `pdftotext` (poppler or xpdf) on PATH. Reads two tables: the main
 Output columns: offset, size, description, source ("main" or "panels-token").
 """
 
+import io
 import re
 import subprocess
 import sys
+from typing import TypedDict
+
+
+class GuideRow(TypedDict):
+    off: str  # hex digits, e.g. "028C"
+    size: str | int  # bytes, or text such as "Varies"; "?" for an unknown token type
+    desc: str
 
 # A row's status column ("Ok Ok") can share a line with the start of the next row.
 MERGED_ROW = re.compile(r"^(.*?\b(?:Ok|No|Yes))\s+([0-9A-F]{4}\s+(?:\d+|Varies)\s+.*)$", re.ASCII)
@@ -31,11 +39,11 @@ TOKEN_TYPE_SIZES = {
 }
 
 
-def pdf_lines(pdf_path):
+def pdf_lines(pdf_path: str) -> list[str]:
     text = subprocess.run(
         ["pdftotext", "-raw", pdf_path, "-"], check=True, capture_output=True
     ).stdout.decode("utf-8", errors="surrogateescape")
-    lines = []
+    lines: list[str] = []
     for line in text.split("\n"):
         line = line.replace("\r", "").replace("\f", "")
         merged = MERGED_ROW.match(line)
@@ -43,9 +51,9 @@ def pdf_lines(pdf_path):
     return lines
 
 
-def parse_main(lines, start, end):
-    rows = []
-    current = None
+def parse_main(lines: list[str], start: int, end: int) -> list[GuideRow]:
+    rows: list[GuideRow] = []
+    current: GuideRow | None = None
     last = -1
     for line in lines[start + 1 : end]:
         if line.startswith("Body Frame Of Reference"):  # prose after the table
@@ -68,14 +76,14 @@ def parse_main(lines, start, end):
     return rows
 
 
-def parse_tokens(lines, start):
-    rows = []
+def parse_tokens(lines: list[str], start: int) -> list[GuideRow]:
+    rows: list[GuideRow] = []
     for line in lines[start + 1 :]:
         m = TOKEN_ROW.match(line)
         if not m:
             continue
         off, name, _token_id, type_name, _status = m.groups()
-        size = TOKEN_TYPE_SIZES.get(type_name.upper())
+        size: int | str | None = TOKEN_TYPE_SIZES.get(type_name.upper())
         if size is None:
             bits = re.search(r"(8|16|32|64)$", type_name)
             size = int(bits[1]) // 8 if bits else "?"
@@ -83,7 +91,7 @@ def parse_tokens(lines, start):
     return rows
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     lines = pdf_lines(sys.argv[1])
@@ -92,7 +100,8 @@ def main():
     main_rows = parse_main(lines, main_start, token_start)
     token_rows = parse_tokens(lines, token_start)
 
-    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
+    if isinstance(sys.stdout, io.TextIOWrapper):  # LF, UTF-8 output on Windows too
+        sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
     print("offset,size,description,source")
     for row in main_rows:
         print(f'0x{row["off"]},{row["size"]},"{row["desc"]}",main')

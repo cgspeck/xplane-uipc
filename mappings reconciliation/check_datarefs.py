@@ -8,15 +8,24 @@ Status per dataref: "ok", "NOT FOUND" (a sim/ dataref X-Plane doesn't have),
 "READ-ONLY BUT WRITABLE MAPPING".
 """
 
+import io
 import re
 import sys
+from typing import TypedDict
 
 from mapping_blocks import mapping_blocks
 
 
-def load_datarefs(path):
+class DatarefInfo(TypedDict):
+    type: str  # e.g. "int", "float[8]", "byte[]"
+    writable: str  # "y" or "n"
+    units: str
+    desc: str
+
+
+def load_datarefs(path: str) -> dict[str, DatarefInfo]:
     """DataRefs.txt rows: name, type, writable (y/n), units, description."""
-    datarefs = {}
+    datarefs: dict[str, DatarefInfo] = {}
     with open(path, encoding="utf-8", errors="surrogateescape") as f:
         next(f)  # version line
         for line in f:
@@ -29,8 +38,8 @@ def load_datarefs(path):
     return datarefs
 
 
-def referenced_datarefs(block):
-    refs = []
+def referenced_datarefs(block: str) -> list[str]:
+    refs: list[str] = []
     if m := re.search(r'^\s*dataref\s*=\s*"([^"]+)"', block, re.M):
         refs.append(m[1])
     if m := re.search(r"^\s*datarefs\s*=\s*\{([^}]*)\}", block, re.M):
@@ -38,12 +47,13 @@ def referenced_datarefs(block):
     return refs
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     datarefs = load_datarefs(sys.argv[1])
 
-    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
+    if isinstance(sys.stdout, io.TextIOWrapper):  # LF, UTF-8 output on Windows too
+        sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
     print("offset\twritable_mapping\tdataref\tstatus\txp_type\txp_writable\tunits\tdescription")
     for offset_text, block in mapping_blocks(sys.argv[2]):
         writable = "yes" if re.search(r"^\s*writable\s*=\s*true", block, re.M) else "no"

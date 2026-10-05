@@ -6,9 +6,10 @@ partly valid while being edited.
 """
 
 import re
+from collections.abc import Iterator
 
 
-def mapping_blocks(toml_path):
+def mapping_blocks(toml_path: str) -> Iterator[tuple[str, str]]:
     """Yield (offset text as written, e.g. "0x028C", block text) for each [[mapping]]."""
     with open(toml_path, encoding="utf-8", errors="surrogateescape") as f:
         text = f.read().replace("\r", "")

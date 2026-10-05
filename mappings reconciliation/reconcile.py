@@ -7,17 +7,26 @@ Status per mapping: "ok", "SIZE DIFFERS", "INSIDE FIELD" (the offset falls
 inside a larger documented field) or "NOT IN GUIDE".
 """
 
+import io
 import re
 import sys
+from typing import NotRequired, TypedDict
 
 from mapping_blocks import mapping_blocks
+
+
+class GuideEntry(TypedDict):
+    size: str  # bytes as text, "Varies" etc., or "-" for an enclosing field
+    desc: str
+    inside: NotRequired[bool]  # set when the offset lies inside a larger field
+
 
 TYPE_WIDTHS = {"i8": 1, "u8": 1, "i16": 2, "u16": 2, "i32": 4, "u32": 4, "f32": 4, "i64": 8, "u64": 8, "f64": 8}
 GUIDE_ROW = re.compile(r'^0x([0-9A-F]+),([^,]*),"(.*)",(\S+)$')
 
 
-def load_guide(csv_path):
-    guide = {}
+def load_guide(csv_path: str) -> dict[int, GuideEntry]:
+    guide: dict[int, GuideEntry] = {}
     with open(csv_path, encoding="utf-8", errors="surrogateescape") as f:
         next(f)
         for line in f:
@@ -28,7 +37,7 @@ def load_guide(csv_path):
     return guide
 
 
-def enclosing_field(guide, offset):
+def enclosing_field(guide: dict[int, GuideEntry], offset: int) -> GuideEntry | None:
     """The guide entry for the nearest lower offset, if its size covers `offset`."""
     lower = [base for base in guide if base < offset]
     if not lower:
@@ -40,7 +49,7 @@ def enclosing_field(guide, offset):
     return None
 
 
-def describe_source(block):
+def describe_source(block: str) -> str:
     if m := re.search(r'^\s*dataref\s*=\s*"([^"]+)"', block, re.M):
         source = m[1]
     elif re.search(r"^\s*expr", block, re.M):
@@ -54,12 +63,13 @@ def describe_source(block):
     return source
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     guide = load_guide(sys.argv[1])
 
-    sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
+    if isinstance(sys.stdout, io.TextIOWrapper):  # LF, UTF-8 output on Windows too
+        sys.stdout.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
     print("offset\ttype\twidth\tdoc_size\tstatus\tsource\tdoc_description")
     for offset_text, block in mapping_blocks(sys.argv[2]):
         offset = int(offset_text, 16)
