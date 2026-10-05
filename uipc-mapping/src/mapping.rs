@@ -237,6 +237,14 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 update_if_expr,
             }
         } else if let Some(dr) = r.dataref {
+            // The read is the constant `offset_add`, so a write can't be reversed.
+            if r.writable && r.scale == 0.0 {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: a writable mapping can't have 'scale = 0'",
+                    r.offset
+                ));
+                continue;
+            }
             let (path, idx) = parse_dataref_with_index(&dr);
             MappingSource::Simple {
                 dataref_path: path,
