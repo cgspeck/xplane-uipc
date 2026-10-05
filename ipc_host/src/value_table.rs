@@ -166,6 +166,36 @@ mod tests {
         assert_eq!(table.writable.len(), 1);
     }
 
+    /// Regression: re-inserting the same offsets after a clear must repopulate
+    /// `active`/`writable`. Previously only empty slots were tracked, so every
+    /// update cycle after the first left both vectors empty and all writes failed.
+    #[test]
+    fn test_reinsert_same_offsets_after_clear() {
+        let mut table = Table::new();
+        for _ in 0..3 {
+            table.clear_active_and_writable();
+            table.insert(
+                10,
+                Entry {
+                    value: Value::UnsignedInteger32(1),
+                    source: 0,
+                    destination: 0,
+                    writable: true,
+                },
+            );
+            table.insert(20, entry(Value::UnsignedInteger32(2)));
+            table.insert(20, entry(Value::UnsignedInteger32(3)));
+            assert_eq!(table.active, vec![10, 20]);
+            assert_eq!(table.writable, vec![10]);
+            assert!(table.is_writable(10));
+            assert!(!table.is_writable(20));
+            assert!(table.is_active(20));
+        }
+        table.clear_active_and_writable();
+        assert!(!table.is_active(10));
+        assert!(!table.is_writable(10));
+    }
+
     fn entry(value: Value) -> Entry {
         Entry {
             value,
