@@ -34,22 +34,16 @@ The system SHALL expose two new `IpcCommands` variants to enable and disable cap
 
 The system SHALL capture a mapped view's raw bytes only when all of the following are true:
 1. Capture is enabled (`StartCapture` was sent)
-2. `process_mapped_view` returned `error_count > 0`
-3. `capture_file_count < max_captures` (if a limit is configured)
-4. The view is not zero bytes
+2. `capture_file_count < max_captures` (if a limit is configured)
+3. The view is not zero bytes
 
-Capture SHALL NOT be triggered by:
-- Read from offset not in table (logged only)
-- Write to non-writable offset (logged only)
-
-#### Scenario: Capture triggers on bad sentinel
-- **WHEN** a mapped view contains a record with a bad sentinel
+#### Scenario: Capture of a malformed view
+- **WHEN** a mapped view contains a record with an unknown `dwId`
 - **AND** capture is enabled
 - **THEN** the raw bytes of the entire mapped view SHALL be written to a `.bin` file
 
-#### Scenario: Capture triggers on unsupported write size
-- **WHEN** a mapped view contains a write record with size other than 1, 2, 4, or 8
-- **AND** capture is enabled
+#### Scenario: Capture of a well-formed view
+- **WHEN** capture is enabled and a well-formed view arrives
 - **THEN** the raw bytes of the entire mapped view SHALL be written to a `.bin` file
 
 ### Requirement: Capture file format
@@ -74,20 +68,6 @@ If the capture path does not exist, the system SHALL create it (recursively) at 
 - **THEN** the system SHALL create it with `create_dir_all`
 - **AND** log an info-level message
 
-### Requirement: Resilient parsing
-
-`process_mapped_view` SHALL NOT abort on bad sentinel. Instead it SHALL:
-1. Increment error count
-2. Log a debug message with the partial record header (reqID, dwOffset, nBytes)
-3. Scan forward using `find_next_record` for the next valid record header
-4. Continue processing from the next valid record
-5. Return total error count
-
-#### Scenario: Resilient parsing continues past corruption
-- **WHEN** a mapped view has 5 records and record #3 has a bad sentinel
-- **THEN** the system SHALL log the gap, skip to record #4, and continue processing
-- **AND** return `error_count >= 1`
-
 ### Requirement: View size via VirtualQuery
 
 The system SHALL use `VirtualQuery` on the mapped view address to determine its size for capture.
@@ -99,8 +79,8 @@ The system SHALL use `VirtualQuery` on the mapped view address to determine its 
 
 ### Requirement: Resilient parsing context logging
 
-When a bad sentinel is encountered, the system SHALL log the reqID, dwOffset, and nBytes of the corrupt record so the operator can identify which record failed.
+When a view is malformed, the system SHALL log the byte offset where parsing stopped, the reason, and whatever header fields could be read (`dwId`, `dwOffset`, `nBytes`), so the operator can identify the failing record.
 
-#### Scenario: Corrupt record header logged
-- **WHEN** a bad sentinel is found
-- **THEN** a debug log SHALL include: `reqID={val}, dwOffset={val}, nBytes={val}`
+#### Scenario: Malformed record logged
+- **WHEN** parsing stops on an unknown `dwId`
+- **THEN** a warning SHALL include the byte offset and `dwId={val}`

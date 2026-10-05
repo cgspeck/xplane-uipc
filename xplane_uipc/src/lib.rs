@@ -265,6 +265,21 @@ struct Config {
 struct Settings {
     update_rate_hz: Option<u8>,
     log_level: Option<String>,
+    key_write_log_level: Option<String>,
+}
+
+/// Parse a log level setting: missing means INFO, and an invalid value warns
+/// and falls back to INFO.
+fn parse_level_setting(name: &str, value: Option<&str>) -> LevelFilter {
+    let value = value.unwrap_or("info");
+    value.parse().unwrap_or_else(|_| {
+        tracing::warn!(
+            "Invalid {} '{}' in config.toml. Falling back to INFO.",
+            name,
+            value
+        );
+        LevelFilter::INFO
+    })
 }
 
 fn parse_config_and_apply(config_path: &str) {
@@ -280,31 +295,23 @@ fn parse_config_and_apply(config_path: &str) {
             if let Some(handle) = TRACING_FILTER_HANDLE.get() {
                 let _ = handle.reload(LevelFilter::INFO);
             }
+            ipc_host::set_key_write_log_level(LevelFilter::INFO);
             return;
         }
     };
 
-    let level_str = config
-        .settings
-        .log_level
-        .unwrap_or_else(|| "info".to_string());
-
-    let level: LevelFilter = match level_str.parse() {
-        Ok(l) => l,
-        Err(_) => {
-            tracing::warn!(
-                "Invalid log_level '{}' in config.toml. Falling back to INFO.",
-                level_str
-            );
-            LevelFilter::INFO
-        }
-    };
+    let level = parse_level_setting("log_level", config.settings.log_level.as_deref());
 
     if let Some(handle) = TRACING_FILTER_HANDLE.get()
         && let Err(e) = handle.reload(level)
     {
         tracing::warn!("Failed to reload tracing filter: {}", e);
     }
+
+    ipc_host::set_key_write_log_level(parse_level_setting(
+        "key_write_log_level",
+        config.settings.key_write_log_level.as_deref(),
+    ));
 
     if let Some(hz) = config.settings.update_rate_hz {
         if hz == 0 {
@@ -557,5 +564,23 @@ pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: 
             tracing::info!("User aircraft changed, setting DATAREF_RESOLUTION_REQUIRED flag");
             DATAREF_RESOLUTION_REQUIRED.store(true, Ordering::Release);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn level_setting_parses_valid_values() {
+        assert_eq!(parse_level_setting("x", Some("off")), LevelFilter::OFF);
+        assert_eq!(parse_level_setting("x", Some("debug")), LevelFilter::DEBUG);
+        assert_eq!(parse_level_setting("x", Some("WARN")), LevelFilter::WARN);
+    }
+
+    #[test]
+    fn level_setting_defaults_to_info() {
+        assert_eq!(parse_level_setting("x", None), LevelFilter::INFO);
+        assert_eq!(parse_level_setting("x", Some("loud")), LevelFilter::INFO);
     }
 }

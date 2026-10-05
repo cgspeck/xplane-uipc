@@ -42,7 +42,7 @@ This is an X-Plane plugin that emulates FSUIPC's shared-memory interface so that
 
 3. **Flight loop** (20 Hz): `flight_loop_callback` in `lib.rs` calls `PluginState::update()`, which reads each resolved mapping via X-Plane SDK, converts the value to the appropriate FSUIPC type, and writes it into a global `Table` (the value table).
 
-4. **IPC thread** (`ipc_host`): A hidden Win32 window (`UIPCMAIN`) receives `WM_COPYDATA`-style messages from FSUIPC clients. The window proc opens the client's shared file mapping, iterates over FSUIPC request records (sentinel-delimited binary protocol), reads values from the value table for read requests, and sends write requests back to the flight loop thread via an mpsc channel.
+4. **IPC thread** (`ipc_host`): A hidden Win32 window (`UIPCMAIN`) receives `WM_COPYDATA`-style messages from FSUIPC clients. The window proc opens the client's shared file mapping, iterates over FSUIPC request records (framed by `dwId`, see below), reads values from the value table for read requests, and sends write requests back to the flight loop thread via an mpsc channel.
 
 ### Key boundary: value table
 
@@ -57,7 +57,17 @@ The `Table` in `ipc_host/value_table.rs` is the central shared state. It's a 655
 
 ### FSUIPC binary protocol
 
-The mapped view contains sequential records: `[reqID:u32][dwOffset:u32][nBytes:u32][sentinel:u32="luaP"][payload:nBytes]`. A zero `reqID` with no subsequent sentinel terminates the stream. Write requests have bit 31 set in `nBytes`. Bad sentinels trigger recovery scanning.
+The format follows the FSUIPC SDK client libraries (`IPCuser.c`, 32-bit; `FSUIPCuser64.c`, 64-bit). The mapped view holds records back to back, each a header followed by `nBytes` of payload. The first DWORD, `dwId`, gives the layout:
+
+| dwId | Kind | Header | Payload at |
+|---|---|---|---|
+| 1 | Read32 | `[dwId][dwOffset][nBytes][pDest:4]` | +16 |
+| 4 | Read64 | `[dwId][dwOffset][nBytes][pDest:8]` (packed) | +20 |
+| 2 | Write | `[dwId][dwOffset][nBytes]` | +12 |
+| 0 | End of stream | | |
+
+`pDest` is the client's own destination pointer and means nothing to the server. SLC's `"luaP"` there is just the .NET client library's "Paul". Reads are answered in place, and anything the table can't fill is zeroed. A write to `0x8001` is an application key registration: it's logged at `key_write_log_level` and never forwarded. Parsing stops at an unknown `dwId`, an overrun or a missing terminator, and `wnd_proc` then returns `FS6IPC_MESSAGE_FAILURE` (0) instead of `FS6IPC_MESSAGE_SUCCESS` (1). The offset space is 64 KB; offsets above `0xFFFF` are ignored.
+
 
 ### Thread model
 

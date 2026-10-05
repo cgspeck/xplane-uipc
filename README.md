@@ -36,6 +36,8 @@ Logs are in:
 
 You can modify the trace logging level in `C:\X-Plane 12\Resources\plugins\xplane-uipc\config.toml`. Setting it to `debug` or `trace` will generate a large `uipc.log` file very quickly.
 
+Some clients, such as FSInterrogate, register an application key by writing it to offset `0x8001` when they connect. The plugin accepts these writes and logs the key at the level set by `key_write_log_level` in the same file (`info` by default; `off` silences it). `log_level` still applies on top, so a `debug` key-write level only shows up when `log_level` is `debug` or `trace`.
+
 You can also start/stop capture UIPC messages by clicking  "X-Plane UIPC" ->  "Start Capture" / "Stop Capture". Binary dumps of the shared memory IPC messages will be written to `C:\X-Plane 12\Resources\plugins\xplane-uipc\capture`.
 
 ## List of supported Offsets

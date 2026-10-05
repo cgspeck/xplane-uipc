@@ -25,6 +25,11 @@ use crate::mapped_view::process_mapped_view;
 use crate::value_table::get_value_table;
 use crate::warning::WarnedSet;
 pub use capture::CaptureConfig;
+pub use mapped_view::set_key_write_log_level;
+
+/// Message results the FSUIPC SDK client checks after `SendMessageTimeout`.
+const FS6IPC_MESSAGE_SUCCESS: LRESULT = LRESULT(1);
+const FS6IPC_MESSAGE_FAILURE: LRESULT = LRESULT(0);
 
 pub enum IpcCommands {
     ResetWarnings,
@@ -90,7 +95,7 @@ unsafe extern "system" fn wnd_proc(
     );
     if warned_set.is_null() {
         tracing::error!("warned_set pointer is null, this should not happen");
-        return LRESULT(0);
+        return FS6IPC_MESSAGE_FAILURE;
     }
     // msg.wparam points to a GlobalAddAtomA, the text of which contains the name of a mapped file
     // We can use GlobalGetAtomNameA to retrieve the name, then OpenFileMappingA and MapViewOfFile to read the contents of the mapped file.
@@ -101,7 +106,7 @@ unsafe extern "system" fn wnd_proc(
     let name_len = unsafe { GlobalGetAtomNameA(atom_id, &mut atom_name) };
     if name_len == 0 {
         tracing::trace!("Failed to get atom name for ID: {}", atom_id);
-        return LRESULT(1);
+        return FS6IPC_MESSAGE_SUCCESS;
     }
     let atom_name_str = std::str::from_utf8(&atom_name[..name_len as usize])
         .unwrap_or("<Invalid UTF-8 in atom name>");
@@ -114,7 +119,7 @@ unsafe extern "system" fn wnd_proc(
             "Failed to open file mapping for atom name: {}",
             atom_name_str
         );
-        return LRESULT(1);
+        return FS6IPC_MESSAGE_SUCCESS;
     }
     let handle = handle_res.unwrap();
     if handle.is_invalid() {
@@ -122,7 +127,7 @@ unsafe extern "system" fn wnd_proc(
             "Failed to open file mapping for atom name: {}",
             atom_name_str
         );
-        return LRESULT(1);
+        return FS6IPC_MESSAGE_SUCCESS;
     }
     tracing::trace!(
         "Successfully opened file mapping for atom name: {}",
@@ -140,7 +145,7 @@ unsafe extern "system" fn wnd_proc(
         unsafe {
             let _ = CloseHandle(handle);
         }
-        return LRESULT(0);
+        return FS6IPC_MESSAGE_FAILURE;
     }
     tracing::trace!(
         "Successfully mapped view of file for atom name: {}",
@@ -212,11 +217,11 @@ unsafe extern "system" fn wnd_proc(
     let table = table_arc.read().unwrap();
     tracing::trace!("Aquired table lock");
     tracing::trace!("Calling process_mapped_view");
-    let error_count =
+    let outcome =
         unsafe { process_mapped_view(mapped_view_ptr, view_size, &table, &mut *warned_set) };
 
-    if error_count > 0 {
-        tracing::error!("process_mapped_view returned {} errors", error_count);
+    if outcome.rejected_writes > 0 {
+        tracing::error!("Rejected {} write request(s)", outcome.rejected_writes);
     }
 
     tracing::trace!("Finished processing mapped view, unmapping and closing handle");
@@ -225,7 +230,13 @@ unsafe extern "system" fn wnd_proc(
         let _ = CloseHandle(handle);
     }
 
-    LRESULT(1)
+    // A malformed view tells the client its data was bad (FSUIPC_ERR_DATA),
+    // so it doesn't copy out reads we may not have answered.
+    if outcome.malformed.is_some() {
+        FS6IPC_MESSAGE_FAILURE
+    } else {
+        FS6IPC_MESSAGE_SUCCESS
+    }
 }
 
 #[tracing::instrument(skip(warned_set_ptr))]

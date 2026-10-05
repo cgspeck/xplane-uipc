@@ -188,11 +188,25 @@ impl ResolvedMapping {
                 array_index,
                 scale,
                 offset_add,
-            } => ResolvedSource::Simple {
-                dr: ResolvedRef::resolve(&dataref_path, array_index),
-                scale,
-                offset_add,
-            },
+            } => {
+                let dr = ResolvedRef::resolve(&dataref_path, array_index);
+                // X-Plane silently ignores writes to read-only datarefs.
+                if mapping.writable
+                    && !dr.handle.is_null()
+                    && unsafe { XPLMCanWriteDataRef(dr.handle) } == 0
+                {
+                    tracing::warn!(
+                        "Offset {:#06x} is marked writable but dataref '{}' is read-only; writes to it will have no effect",
+                        mapping.offset,
+                        dataref_path
+                    );
+                }
+                ResolvedSource::Simple {
+                    dr,
+                    scale,
+                    offset_add,
+                }
+            }
             MappingSource::Expr {
                 datarefs,
                 expr,
@@ -213,6 +227,12 @@ impl ResolvedMapping {
             },
             MappingSource::StaticStr { static_str } => ResolvedSource::StaticStr { static_str },
         };
+        if mapping.writable && !matches!(source, ResolvedSource::Simple { .. }) {
+            tracing::warn!(
+                "Offset {:#06x} is marked writable but only single-dataref mappings can be written; writes to it will have no effect",
+                mapping.offset
+            );
+        }
         Self {
             offset: mapping.offset,
             fsuipc_type: mapping.fsuipc_type,

@@ -1,16 +1,4 @@
-## ADDED Requirements
-
-### Requirement: CLI reads capture files
-
-The capture-inspect tool SHALL accept a list of `.bin` file paths as command-line arguments and display parsed contents.
-
-#### Scenario: Inspect single file
-- **WHEN** invoked as `capture-inspect foo.bin`
-- **THEN** the tool SHALL parse and display the records in `foo.bin`
-
-#### Scenario: Inspect multiple files
-- **WHEN** invoked as `capture-inspect foo.bin bar.bin`
-- **THEN** the tool SHALL parse and display records in each file, separated by file headers
+## MODIFIED Requirements
 
 ### Requirement: Record-level display
 
@@ -51,3 +39,10 @@ The tool SHALL exit with a non-zero status if any capture file was malformed.
 - **THEN** the tool SHALL exit with code 1
 - **WHEN** all files parse to a terminator
 - **THEN** the tool SHALL exit with code 0
+
+## REMOVED Requirements
+
+### Requirement: Gap display after bad sentinel
+
+**Reason**: The protocol has no sentinel. Records are framed by `dwId`, and malformed data stops parsing instead of being scanned past.
+**Migration**: Malformed data is shown by the `── MALFORMED: … ──` line.
