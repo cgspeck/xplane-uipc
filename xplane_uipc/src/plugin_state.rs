@@ -124,7 +124,15 @@ impl ResolvedRef {
             return;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
-        if ty & xplmType_Double != 0 {
+        if let Some(array_index) = self.array_index {
+            if ty & xplmType_IntArray != 0 {
+                let mut v = xplane_value as i32;
+                unsafe { XPLMSetDatavi(self.handle, &mut v, array_index, 1) };
+            } else if ty & xplmType_FloatArray != 0 {
+                let mut v = xplane_value as f32;
+                unsafe { XPLMSetDatavf(self.handle, &mut v, array_index, 1) };
+            }
+        } else if ty & xplmType_Double != 0 {
             unsafe {
                 XPLMSetDatad(self.handle, xplane_value);
             }

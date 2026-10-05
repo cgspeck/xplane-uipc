@@ -91,6 +91,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allowlist_function("XPLMSetDatad")
         .allowlist_function("XPLMSetDataf")
         .allowlist_function("XPLMSetDatai")
+        .allowlist_function("XPLMSetDatavf")
+        .allowlist_function("XPLMSetDatavi")
         .allowlist_function("XPLMGetDatab")
         .allowlist_function("XPLMRegisterFlightLoopCallback")
         .allowlist_function("XPLMUnregisterFlightLoopCallback")
