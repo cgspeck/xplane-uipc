@@ -65,10 +65,7 @@ fn plugin_version() -> String {
         Some(sha) => sha.get(..7).unwrap_or(sha),
         None => "unknown",
     };
-    let build_date = match option_env!("VERGEN_BUILD_DATE") {
-        Some(date) => date,
-        None => "unknown",
-    };
+    let build_date = option_env!("VERGEN_BUILD_DATE").unwrap_or("unknown");
     let is_dirty = match option_env!("VERGEN_GIT_IS_DIRTY") {
         Some("true") => "dirty",
         Some("false") => "clean",
@@ -296,10 +293,10 @@ fn parse_config_and_apply(config_path: &str) {
         }
     };
 
-    if let Some(handle) = TRACING_FILTER_HANDLE.get() {
-        if let Err(e) = handle.reload(level) {
-            tracing::warn!("Failed to reload tracing filter: {}", e);
-        }
+    if let Some(handle) = TRACING_FILTER_HANDLE.get()
+        && let Err(e) = handle.reload(level)
+    {
+        tracing::warn!("Failed to reload tracing filter: {}", e);
     }
 
     if let Some(hz) = config.settings.update_rate_hz {
@@ -404,12 +401,12 @@ pub fn find_load_and_resolve_mappings() -> Result<(), String> {
 fn get_system_path() -> String {
     let mut system_path_buf = [0u8; 512];
     unsafe { XPLMGetSystemPath(system_path_buf.as_mut_ptr() as *mut c_char) };
-    let system_path = unsafe {
+
+    unsafe {
         CStr::from_ptr(system_path_buf.as_ptr() as *const c_char)
             .to_string_lossy()
             .into_owned()
-    };
-    system_path
+    }
 }
 
 #[tracing::instrument]

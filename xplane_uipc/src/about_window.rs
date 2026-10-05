@@ -113,5 +113,5 @@ unsafe extern "C" fn widget_handler(
         }
     }
 
-    return 0;
+    0
 }
