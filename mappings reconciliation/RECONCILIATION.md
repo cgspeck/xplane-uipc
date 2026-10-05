@@ -29,24 +29,11 @@ The mappings use 105 datarefs:
 
 | Result | Count |
 | --- | --- |
-| Exists in X-Plane, writability matches | 86 |
+| Exists in X-Plane, writability matches | 88 |
 | Not in `DataRefs.txt` | 17 |
-| **Read-only, but the mapping is `writable`** | 2 |
 
 - **Not in DataRefs.txt (expected):** all 17 come from add-ons or our own helper: Zibo 737 (`laminar/B738/...`), the 737 doors (`737u/...`), BetterPushback (`bp/started`) and the Lua helper (`xplane-uipc-helper/...`). They're only present when that add-on is loaded.
-- **Read-only but writable:** `0x023B` and `0x023C` use `sim/cockpit2/clock_timer/zulu_time_hours` and `zulu_time_minutes`. `DataRefs.txt` marks both `n` (read-only), which confirms the earlier test. Set `writable = false`, or later write through `sim/time/zulu_time_sec` (writable).
-- **Wrong dataref, `0x0BC8` (parking brake):** it uses `sim/cockpit2/controls/wheel_brake_ratio_applied`. That's "the overall brake applied by the brake master cylinder", so it includes the toe brakes and lags behind them. The parking brake itself is **`sim/flightmodel/controls/parkbrake`** (float, writable, "Parking Brake, 1 = max"). `sim/cockpit2/controls/parking_brake_ratio` is marked "REPLACED". Suggested fix:
 
-  ```toml
-  [[mapping]]
-  offset      = 0x0BC8  # parking brake
-  fsuipc_type = "u16"
-  dataref     = "sim/flightmodel/controls/parkbrake"
-  scale       = 32767
-  writable    = true
-  ```
-
-  The Zibo 737 may use its own parking brake datarefs; check in the aircraft.
 
 ## 2. mappings.toml against the guide
 

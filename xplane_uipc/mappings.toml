@@ -344,8 +344,8 @@ expr = "$Tank0 $Tank1 + $Tank2 + $Tank3 + $Tank4 + $Tank5 + $Tank6 + $Tank7 + $T
 [[mapping]]
 offset      = 0x0BC8  # parking brake
 fsuipc_type = "u16"
-dataref    = "sim/cockpit2/controls/wheel_brake_ratio_applied"
-scale        = 32767
+dataref    = "sim/flightmodel/controls/parkbrake"
+scale       = 32767
 writable    = true
 
 [[mapping]]
