@@ -54,6 +54,7 @@ impl EvalEngine {
                 datarefs,
                 expr,
                 update_if_expr: _,
+                write_exprs: _,
             } => {
                 let mut vars = HashMap::new();
                 let mut inputs = Vec::with_capacity(datarefs.len());
@@ -227,6 +228,7 @@ mod tests {
                 datarefs,
                 expr: Expr::parse("$Nav 1 * $Bcn 2 * +").unwrap(),
                 update_if_expr: None,
+                write_exprs: Default::default(),
             },
             false,
         )];
@@ -255,6 +257,7 @@ mod tests {
                 datarefs,
                 expr: Expr::parse("$Nav 1 * $Bcn 2 * +").unwrap(),
                 update_if_expr: Some(Expr::parse("42").unwrap()),
+                write_exprs: Default::default(),
             },
             false,
         )];
@@ -282,6 +285,7 @@ mod tests {
                 datarefs,
                 expr: Expr::parse("$Nav 1 * 2 +").unwrap(),
                 update_if_expr: None,
+                write_exprs: Default::default(),
             },
             false,
         )];
@@ -373,6 +377,7 @@ mod tests {
                     datarefs,
                     expr: Expr::parse("$Nav 1 * $Bcn 2 * +").unwrap(),
                     update_if_expr: None,
+                    write_exprs: Default::default(),
                 },
                 false,
             ),

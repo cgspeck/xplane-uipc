@@ -212,6 +212,7 @@ impl ResolvedMapping {
                 datarefs,
                 expr,
                 update_if_expr,
+                ..
             } => {
                 let refs = datarefs
                     .into_iter()

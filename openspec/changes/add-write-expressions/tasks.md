@@ -1,12 +1,12 @@
 ## 1. Loader (`uipc-mapping`)
 
-- [ ] 1.1 Add `write_exprs: Option<HashMap<String, String>>` to `RawMapping`, and `write_exprs: BTreeMap<String, Expr>` (sorted, empty when absent) to `MappingSource::Expr`
-- [ ] 1.2 Validate per the spec: needs `expr` and `writable = true`; non-empty; keys must name `datarefs` entries; each parses; variables (`Expr::vars()`) are `value` or `datarefs` names; no `datarefs` entry named `value`. Each failure is a load error naming the offset, and the mapping is skipped
-- [ ] 1.3 Reject a writable expression mapping without `write_exprs`
-- [ ] 1.4 Reject a writable single-dataref mapping with `scale = 0`, and keep loading read-only ones
-- [ ] 1.5 Reject a mapping with both `dataref` and `expr`
-- [ ] 1.6 Unit tests: a valid fan-out mapping loads; each rejection case above (1.2–1.5) gives a load error naming the offset; a read-only mapping without `write_exprs` loads unchanged; a read-only `scale = 0` mapping loads; `expr = "5"` with `write_exprs` and no `datarefs` is rejected
-- [ ] 1.7 Confirm the shipped `mappings.toml` loads with no new load errors
+- [x] 1.1 Add `write_exprs: Option<HashMap<String, String>>` to `RawMapping`, and `write_exprs: BTreeMap<String, Expr>` (sorted, empty when absent) to `MappingSource::Expr`
+- [x] 1.2 Validate per the spec: needs `expr` and `writable = true`; non-empty; keys must name `datarefs` entries; each parses; variables (`Expr::vars()`) are `value` or `datarefs` names; no `datarefs` entry named `value`. Each failure is a load error naming the offset, and the mapping is skipped
+- [x] 1.3 Reject a writable expression mapping without `write_exprs`
+- [x] 1.4 Reject a writable single-dataref mapping with `scale = 0`, and keep loading read-only ones
+- [x] 1.5 Reject a mapping with both `dataref` and `expr`
+- [x] 1.6 Unit tests: a valid fan-out mapping loads; each rejection case above (1.2–1.5) gives a load error naming the offset; a read-only mapping without `write_exprs` loads unchanged; a read-only `scale = 0` mapping loads; `expr = "5"` with `write_exprs` and no `datarefs` is rejected
+- [x] 1.7 Confirm the shipped `mappings.toml` loads with no new load errors
 
 ## 2. Plugin write path (`xplane_uipc`)
 
