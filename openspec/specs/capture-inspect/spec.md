@@ -16,42 +16,38 @@ The capture-inspect tool SHALL accept a list of `.bin` file paths as command-lin
 
 For each record in a capture file, the tool SHALL display:
 - Record number (1-based within file)
-- `reqID` as hex
-- `dwOffset` as hex and decimal
-- Operation type: `READ` or `WRITE` based on high bit of nBytes
+- Byte offset of the record header in the file, as hex
+- Record kind: `READ32`, `READ64` or `WRITE`, from `dwId`
+- `dwOffset` as hex
 - Data size in bytes
-- Sentinel status: `✓` if valid, `✗` with byte position if invalid
+- For reads, `pDest` as hex. For writes, the payload as hex bytes (truncated to 16 bytes)
 
-#### Scenario: Valid record displayed
-- **WHEN** a record has a valid sentinel
-- **THEN** the tool SHALL show `#1  reqID=0x0001  offset=0x3304  READ  8B  ✓`
+#### Scenario: Read record displayed
+- **WHEN** a file starts with a Read32 record for `0x3304`, 4 bytes, `pDest = 0x010AFFF8`
+- **THEN** the tool SHALL show a line like `#1    @0x0000  READ32  offset=0x3304  4B  pDest=0x010afff8`
 
-#### Scenario: Bad sentinel displayed
-- **WHEN** a record has an invalid sentinel
-- **THEN** the tool SHALL show `#2  ── BAD SENTINEL @ 0x0C ──`
-
-### Requirement: Gap display after bad sentinel
-
-When a bad sentinel is encountered and the scan finds the next valid record, the tool SHALL display the gap distance and the position of the next record.
-
-#### Scenario: Gap between bad sentinel and next record
-- **WHEN** a bad sentinel is at byte 12 and the next valid record is found at byte 35
-- **THEN** the tool SHALL show `#2  ── BAD SENTINEL @ 0x0C ──  (scan +23 → next at 0x23)`
+#### Scenario: Write record displayed
+- **WHEN** a file starts with a Write record for `0x8001` with 13 bytes
+- **THEN** the tool SHALL show a line like `#1    @0x0000  WRITE   offset=0x8001  13B  36 50 45 54 …`
 
 ### Requirement: End-of-data termination
 
-When a zero reqID is encountered and no further sentinel is found within the scan range, the tool SHALL display a termination indicator and stop.
+When a zero `dwId` is encountered, the tool SHALL display a termination indicator with the record count and stop. When parsing stops because the data is malformed, the tool SHALL display the reason and the byte offset where it stopped, followed by the record count.
 
 #### Scenario: Clean termination
-- **WHEN** the parser hits a zero reqID with no subsequent sentinel
-- **THEN** the tool SHALL show `── END OF DATA ──`
+- **WHEN** the parser hits a zero `dwId`
+- **THEN** the tool SHALL show `── END OF DATA ── (N records)`
+
+#### Scenario: Malformed termination
+- **WHEN** the parser hits an unknown `dwId` at byte `0x1D`
+- **THEN** the tool SHALL show `── MALFORMED: unknown dwId 0xfc000000 at 0x001d ── (N records)`
 
 ### Requirement: Non-zero exit on errors
 
-The tool SHALL exit with a non-zero status if any capture file contained corrupted records.
+The tool SHALL exit with a non-zero status if any capture file was malformed.
 
 #### Scenario: Corrupted file detection
-- **WHEN** any record in any file has a bad sentinel
+- **WHEN** any file stops parsing because it is malformed
 - **THEN** the tool SHALL exit with code 1
-- **WHEN** all records in all files have valid sentinels
+- **WHEN** all files parse to a terminator
 - **THEN** the tool SHALL exit with code 0

@@ -36,4 +36,4 @@
 - [x] 6.1 Rewrite the "FSUIPC binary protocol" section of `CLAUDE.md` (record table, no sentinel, result codes, SDK source references)
 - [x] 6.2 Document `key_write_log_level` in the README config section
 - [x] 6.3 Run `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test` and `cargo xtask dist`
-- [ ] 6.4 Manual check: deploy, connect FSInterrogate with `log_level = "debug"`, confirm no malformed-view warnings and see whether the status still alternates; capture an SLC write session for a future fixture
+- [x] 6.4 Manual check: deploy, connect FSInterrogate with `log_level = "debug"`, confirm no malformed-view warnings and see whether the status still alternates; capture an SLC write session for a future fixture (FSInterrogate passed: key write, 0x337E polls, stable connection. No SLC write captured yet; an FSInterrogate write to 0x023B was captured instead.)
