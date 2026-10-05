@@ -340,6 +340,35 @@ pub fn drop_builtin_offsets(mappings: Vec<DatarefMapping>) -> Vec<DatarefMapping
         .collect()
 }
 
+/// Put one mapping's reading for this update cycle into the value table.
+///
+/// `Retain` keeps the previous value. If there is none yet, e.g. an
+/// `update_if_expr` mapping that has been false since the plugin started, the
+/// offset is served as zero, as FSUIPC does at startup.
+fn apply_reading(table: &mut Table, mapping: &ResolvedMapping, reading: Reading) {
+    let value = match reading {
+        Reading::Value(value) => value,
+        Reading::Retain if table.get(mapping.offset).is_some() => {
+            table.keep(mapping.offset);
+            return;
+        }
+        Reading::Retain => match Value::from_f64(0.0, mapping.fsuipc_type) {
+            Some(zero) => zero,
+            None => return,
+        },
+        Reading::Missing => return,
+    };
+    table.insert(
+        mapping.offset,
+        ipc_host::value_table::Entry {
+            value,
+            source: 0,
+            destination: 0,
+            writable: mapping.writable,
+        },
+    );
+}
+
 // ─── Plugin state ──────────────────────────────────────────────────────────────
 
 pub struct PluginState {
@@ -375,19 +404,7 @@ impl PluginState {
         if let Ok(mut table) = table.write() {
             let previous = table.begin_update();
             for m in &self.mappings {
-                match m.read_xplane_value() {
-                    Reading::Value(value) => table.insert(
-                        m.offset,
-                        ipc_host::value_table::Entry {
-                            value,
-                            source: 0,
-                            destination: 0,
-                            writable: m.writable,
-                        },
-                    ),
-                    Reading::Retain => table.keep(m.offset),
-                    Reading::Missing => {}
-                }
+                apply_reading(&mut table, m, m.read_xplane_value());
             }
             self.update_builtins(&mut table);
             // Offsets that produced no value this cycle stop being served.
