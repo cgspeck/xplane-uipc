@@ -36,7 +36,14 @@ Logs are in:
 
 You can modify the trace logging level in `C:\X-Plane 12\Resources\plugins\xplane-uipc\config.toml`. Setting it to `debug` or `trace` will generate a large `uipc.log` file very quickly.
 
-Some clients, such as FSInterrogate, register an application key by writing it to offset `0x8001` when they connect. The plugin accepts these writes and logs the key at the level set by `key_write_log_level` in the same file (`info` by default; `off` silences it). `log_level` still applies on top, so a `debug` key-write level only shows up when `log_level` is `debug` or `trace`.
+Some client requests are logged at their own level, set in the `[log_levels]` table of the same file (`off`, `error`, `warn`, `info`, `debug` or `trace`; `info` by default). `log_level` still applies on top, so a `debug` level here only shows up when `log_level` is `debug` or `trace`.
+
+| Setting | Logs |
+|---|---|
+| `key_write` | Application keys that clients such as FSInterrogate write to offset `0x8001` when they connect. |
+| `lua_request` | Requests for FSUIPC to run a macro or Lua control, written to `0x0D70` (with a parameter at `0x0D6C`). The plugin can't run these; the log shows what a client asked for. |
+
+The older `[settings] key_write_log_level` still works, but `[log_levels] key_write` takes precedence when both are set.
 
 You can also start/stop capture UIPC messages by clicking  "X-Plane UIPC" ->  "Start Capture" / "Stop Capture". Binary dumps of the shared memory IPC messages will be written to `C:\X-Plane 12\Resources\plugins\xplane-uipc\capture`.
 
