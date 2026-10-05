@@ -104,7 +104,7 @@ impl EvalEngine {
                     keys.insert(dataref_path.clone());
                 }
                 MappingSource::Expr { datarefs, .. } => {
-                    for (_name, (path, _idx)) in datarefs {
+                    for (path, _idx) in datarefs.values() {
                         keys.insert(path.clone());
                     }
                 }
@@ -128,7 +128,7 @@ impl EvalEngine {
                     keys.insert(dataref_path.clone());
                 }
                 MappingSource::Expr { datarefs, .. } => {
-                    for (_name, (path, _idx)) in datarefs {
+                    for (path, _idx) in datarefs.values() {
                         keys.insert(path.clone());
                     }
                 }
