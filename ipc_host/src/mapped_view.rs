@@ -722,5 +722,22 @@ mod tests {
         assert!(outcome.malformed.is_none());
         let (records, _) = view.records();
         assert_eq!(records.len(), 2);
+        assert_eq!(view.payload_at(0, 4), &[0; 4]);
+    }
+
+    #[test]
+    fn test_unknown_offset_read_is_zero_filled() {
+        let mut view = View::default().read32(100, 2).end();
+        assert_eq!(view.payload_at(0, 2), &[0xAA, 0xAA]);
+        view.process(&Table::new());
+        assert_eq!(view.payload_at(0, 2), &[0, 0]);
+    }
+
+    #[test]
+    fn test_wide_read_of_narrow_value_zero_fills_rest() {
+        let table = table_with(&[(0x300, Value::UnsignedInteger16(0x1234), false)]);
+        let mut view = View::default().read32(0x300, 4).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 4), &[0x34, 0x12, 0, 0]);
     }
 }
