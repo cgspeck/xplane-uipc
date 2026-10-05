@@ -22,15 +22,15 @@ all: fmt clippy check test
 fmt:
 	cargo fmt --all -- --check
 
-## Lint portable crates natively + Windows crates via cross-compilation
+## Lint all targets, warnings as errors: portable crates natively + Windows crates via cross-compilation
 clippy:
 	@for c in $(PORTABLE_CRATES); do \
 		echo "── clippy $$c ──"; \
-		cargo clippy -p $$c || exit 1; \
+		cargo clippy -p $$c --all-targets -- -D warnings || exit 1; \
 	done
 	@for c in $(WINDOWS_CRATES); do \
 		echo "── clippy $$c (cross → $(WIN_TARGET)) ──"; \
-		cargo clippy --target $(WIN_TARGET) -p $$c || exit 1; \
+		cargo clippy --target $(WIN_TARGET) -p $$c --all-targets -- -D warnings || exit 1; \
 	done
 
 ## Type-check Windows crates via cross-compilation (no linker needed)
