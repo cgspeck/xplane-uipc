@@ -40,6 +40,16 @@ pub const F64IPC_READSTATEDATA_ID: u32 = 4;
 /// forwarded to the flight loop.
 pub const APP_KEY_OFFSET: u16 = 0x8001;
 
+/// Offset clients write the parameter for the next macro or Lua request to.
+pub const LUA_PARAM_OFFSET: u16 = 0x0D6C;
+
+/// Offset clients write a macro or Lua request to, for FSUIPC to run. We can't
+/// run them, so requests are logged, never forwarded.
+pub const LUA_REQUEST_OFFSET: u16 = 0x0D70;
+
+/// Size of the request text area at `LUA_REQUEST_OFFSET`.
+const LUA_REQUEST_LEN: usize = 40;
+
 /// Level application key writes to `APP_KEY_OFFSET` are logged at.
 static KEY_WRITE_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
 
@@ -58,8 +68,9 @@ pub fn set_lua_request_log_level(level: LevelFilter) {
     LUA_REQUEST_LOG_LEVEL.set(level);
 }
 
-/// The key text: bytes up to the first NUL, with anything unprintable escaped.
-fn key_text(payload: &[u8]) -> String {
+/// Text written by a client: bytes up to the first NUL, with anything
+/// unprintable escaped.
+fn client_text(payload: &[u8]) -> String {
     let end = payload
         .iter()
         .position(|&b| b == 0)
@@ -71,7 +82,30 @@ fn log_key_write(payload: &[u8]) {
     log_at!(
         KEY_WRITE_LOG_LEVEL,
         "Application key write: \"{}\"",
-        key_text(payload)
+        client_text(payload)
+    );
+}
+
+/// The parameter written to `LUA_PARAM_OFFSET`: up to 4 bytes, little-endian,
+/// zero-extended.
+fn lua_param(payload: &[u8]) -> u32 {
+    let mut bytes = [0u8; 4];
+    let len = payload.len().min(bytes.len());
+    bytes[..len].copy_from_slice(&payload[..len]);
+    u32::from_le_bytes(bytes)
+}
+
+fn log_lua_request(payload: &[u8], param: Option<u32>) {
+    let text = client_text(&payload[..payload.len().min(LUA_REQUEST_LEN)]);
+    let param = match param {
+        Some(p) => format!("param {}", p),
+        None => "no param".to_string(),
+    };
+    log_at!(
+        LUA_REQUEST_LOG_LEVEL,
+        "Lua/macro request \"{}\" ({}), not supported",
+        text,
+        param
     );
 }
 
@@ -262,12 +296,16 @@ pub struct ProcessOutcome {
 pub struct IpcState {
     /// Offsets already warned about, so each warning is logged once.
     pub(crate) warned: WarnedSet,
+    /// Last parameter written to `LUA_PARAM_OFFSET`, if any. Kept after use,
+    /// as FSUIPC reuses it for later requests.
+    pub(crate) lua_param: Option<u32>,
 }
 
 impl IpcState {
     pub fn new() -> Self {
         Self {
             warned: WarnedSet::new(),
+            lua_param: None,
         }
     }
 
@@ -377,7 +415,6 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
 
 /// Forward a write request to the flight loop. Returns false if it was rejected.
 fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut IpcState) -> bool {
-    let warned_set = &state.warned;
     let Ok(offset) = u16::try_from(record.dw_offset) else {
         tracing::debug!(
             "Ignoring write to out-of-range offset {:#x}",
@@ -390,10 +427,24 @@ fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut
         offset,
         record.n_bytes
     );
-    if offset == APP_KEY_OFFSET {
-        log_key_write(payload);
-        return true;
+    match offset {
+        APP_KEY_OFFSET => {
+            log_key_write(payload);
+            return true;
+        }
+        LUA_PARAM_OFFSET => {
+            let param = lua_param(payload);
+            tracing::debug!("Lua/macro parameter set to {}", param);
+            state.lua_param = Some(param);
+            return true;
+        }
+        LUA_REQUEST_OFFSET => {
+            log_lua_request(payload, state.lua_param);
+            return true;
+        }
+        _ => {}
     }
+    let warned_set = &state.warned;
     let entry = table.get(offset).filter(|_| table.is_writable(offset));
     let Some(entry) = entry else {
         if table.is_active(offset)
@@ -592,11 +643,11 @@ mod tests {
     }
 
     #[test]
-    fn test_key_text() {
-        assert_eq!(key_text(b"6PETEXPDRVW3\0"), "6PETEXPDRVW3");
-        assert_eq!(key_text(b"ABC\0junk"), "ABC");
-        assert_eq!(key_text(b"NO-NUL"), "NO-NUL");
-        assert_eq!(key_text(b"A\x01B\0"), "A\\x01B");
+    fn test_client_text() {
+        assert_eq!(client_text(b"6PETEXPDRVW3\0"), "6PETEXPDRVW3");
+        assert_eq!(client_text(b"ABC\0junk"), "ABC");
+        assert_eq!(client_text(b"NO-NUL"), "NO-NUL");
+        assert_eq!(client_text(b"A\x01B\0"), "A\\x01B");
     }
 
     #[test]
