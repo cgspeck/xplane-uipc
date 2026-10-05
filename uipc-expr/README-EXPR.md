@@ -142,8 +142,31 @@ Rules:
 
 - **All or nothing.** Every write expression is evaluated against the same snapshot of the datarefs before anything is written. If any result isn't a finite number, nothing is written and a warning is logged. So `{ A = "$B", B = "$A" }` swaps the two values.
 - **Sorted order.** Targets are written in sorted key order. Integer datarefs are rounded, and `dataref[N]` targets write element `N`.
-- **Checked at load.** Unlike read expressions, where an unknown variable is quietly `0.0`, a write expression that uses a name other than `value` or a `datarefs` name is a load error. So is a target that isn't a `datarefs` name, an empty `write_exprs`, a `datarefs` entry called `value`, and `writable = true` without `write_exprs`.
-- **Unavailable datarefs.** A target whose dataref is unavailable is skipped, and the others are still written. The first skip after loading mappings logs a warning, and later ones log at debug.
+- **Checked at load.** Unlike read expressions, where an unknown variable is quietly `0.0`, a write expression that uses a name other than `value` or a `datarefs` name is a load error. So is a target that isn't a `datarefs` name, an empty `write_exprs`, a `datarefs` entry called `value`, and `writable = true` with neither `write_exprs` nor `write_commands`.
+- **Unavailable targets.** A dataref or command that is unavailable is skipped, and the others are still written or run. The first skip of each one after mappings load logs an error, and later ones log at debug.
+
+### Write commands
+
+Some aircraft, such as the Zibo 738, override their switch datarefs every frame, so a written value reverts straight away. They respond only to X-Plane commands, and often only to toggles. `write_commands` covers them: each key is a command path, and each value is an expression with the same variables as `write_exprs`. The result is how many times to run the command: it's rounded and clamped to 0–10, and 0 means don't run it.
+
+Each command's expression picks out its own part of the written value and compares it with the switch's current state. In the lights offset, the landing lights are bit 4 (value 4):
+
+```toml
+datarefs       = { Land = "sim/cockpit2/switches/landing_lights_on", ZLand = "<add-on landing light state>" }
+expr           = "$Land 4 *"
+writable       = true
+write_exprs    = { Land = "$value 4 & 0 !=" }                                    # default aircraft
+write_commands = { "<add-on landing light toggle>" = "$value 4 & 0 != $ZLand 0 != !=" }
+```
+
+Writing `4` sets `landing_lights_on` to 1. It also runs the toggle once if `ZLand` is 0, and not at all if the add-on's lights are already on. With separate on and off commands, give each its own entry:
+
+```toml
+write_commands = { "<on>"  = "$value 4 & 0 != $ZLand 0 == &",     # want on, currently off
+                   "<off>" = "$value 4 & 0 == $ZLand 0 != &" }    # want off, currently on
+```
+
+Command expressions are evaluated in the same snapshot as `write_exprs`. A non-finite result in either table stops the whole write. Datarefs are written first, then commands run in sorted path order. Commands are looked up when mappings load (and again when an aircraft loads). A command an add-on registers after that isn't found until the next load.
 
 ## API
 

@@ -43,7 +43,9 @@
 #   Simple mappings reverse the linear transform: dataref = (value - offset_add) / scale.
 #   A writable simple mapping can't have scale = 0.
 #
-#   Expression mappings need write_exprs: one RPN expression per dataref to write,
+#   Expression mappings need write_exprs, write_commands or both.
+#
+#   write_exprs has one RPN expression per dataref to write,
 #   keyed by a name from datarefs. $value is the number the client wrote (in FSUIPC
 #   units) and every datarefs name holds that dataref's current value, e.g.:
 #
@@ -55,13 +57,25 @@
 #     writable    = true
 #     write_exprs = { Z = "$value 3600 * $Z 3600 % +" }   # new hour, same minutes and seconds
 #
-#   Every write expression is evaluated before anything is written. If any result is
-#   not a finite number, nothing is written. A write expression can only use $value and
-#   names from datarefs, and a datarefs entry can't be called "value".
+#   write_commands is for aircraft that override their datarefs and only respond to
+#   X-Plane commands. Each key is a command path, and each expression (same variables)
+#   gives how many times to run it: 0 = don't, 1 = once, up to 10. To toggle a switch
+#   only when it's in the wrong state, compare the requested part of $value with the
+#   switch's state dataref, e.g. for the landing-light bit:
+#
+#     write_commands = { "<toggle command>" = "$value 4 & 0 != $ZLand 0 != !=" }
+#
+#   Every expression is evaluated before anything is written. If any result is not a
+#   finite number, nothing is written and no command runs. Otherwise the datarefs are
+#   written first, then the commands run. A dataref or command that isn't available is
+#   skipped and the others still go ahead; the first skip of each one after mappings
+#   load logs an error. Expressions can only use $value and names from datarefs, and a
+#   datarefs entry can't be called "value".
 #
 #   These are load errors (logged, and the mapping is skipped):
-#     - writable = true on an expression mapping without write_exprs
-#     - write_exprs without expr, or without writable = true
+#     - writable = true on an expression mapping with neither write_exprs nor write_commands
+#     - write_exprs or write_commands without expr, or without writable = true
+#     - a write_commands key that isn't a command path (it has no "/")
 #     - writable = true with scale = 0
 #     - both dataref and expr on one mapping
 #
