@@ -12,23 +12,23 @@ For each record in a capture file, the tool SHALL display:
 
 #### Scenario: Read record displayed
 - **WHEN** a file starts with a Read32 record for `0x3304`, 4 bytes, `pDest = 0x010AFFF8`
-- **THEN** the tool SHALL show a line like `#1  @0x0000  READ32  offset=0x3304  4B  pDest=0x010afff8`
+- **THEN** the tool SHALL show a line like `#1    @0x0000  READ32  offset=0x3304  4B  pDest=0x010afff8`
 
 #### Scenario: Write record displayed
 - **WHEN** a file starts with a Write record for `0x8001` with 13 bytes
-- **THEN** the tool SHALL show a line like `#1  @0x0000  WRITE  offset=0x8001  13B  36 50 45 54 …`
+- **THEN** the tool SHALL show a line like `#1    @0x0000  WRITE   offset=0x8001  13B  36 50 45 54 …`
 
 ### Requirement: End-of-data termination
 
-When a zero `dwId` is encountered, the tool SHALL display a termination indicator and stop. When parsing stops because the data is malformed, the tool SHALL display the reason and the byte offset where it stopped.
+When a zero `dwId` is encountered, the tool SHALL display a termination indicator with the record count and stop. When parsing stops because the data is malformed, the tool SHALL display the reason and the byte offset where it stopped, followed by the record count.
 
 #### Scenario: Clean termination
 - **WHEN** the parser hits a zero `dwId`
-- **THEN** the tool SHALL show `── END OF DATA ──`
+- **THEN** the tool SHALL show `── END OF DATA ── (N records)`
 
 #### Scenario: Malformed termination
 - **WHEN** the parser hits an unknown `dwId` at byte `0x1D`
-- **THEN** the tool SHALL show `── MALFORMED @ 0x001d: unknown dwId 0xfc000000 ──`
+- **THEN** the tool SHALL show `── MALFORMED: unknown dwId 0xfc000000 at 0x001d ── (N records)`
 
 ### Requirement: Non-zero exit on errors
 
@@ -45,4 +45,4 @@ The tool SHALL exit with a non-zero status if any capture file was malformed.
 ### Requirement: Gap display after bad sentinel
 
 **Reason**: The protocol has no sentinel. Records are framed by `dwId`, and malformed data stops parsing instead of being scanned past.
-**Migration**: Malformed data is shown by the `── MALFORMED @ … ──` line.
+**Migration**: Malformed data is shown by the `── MALFORMED: … ──` line.

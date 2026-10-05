@@ -41,7 +41,7 @@ The parser SHALL stop and count one error when it finds an unknown `dwId`, when 
 
 ### Requirement: Answering reads
 
-For each read record whose offset is in the value table, the server SHALL write the value into the record's payload, never writing more than `nBytes` bytes. For a read whose offset isn't in the table, or whose `dwOffset` is above `0xFFFF`, the server SHALL write `nBytes` zero bytes into the payload.
+For each read record whose offset is in the value table, the server SHALL write the value into the record's payload, never writing more than `nBytes` bytes. Payload bytes the server can't fill SHALL be zero: all `nBytes` for a read whose offset isn't in the table or whose `dwOffset` is above `0xFFFF`, and the bytes past the value for a read wider than the offset's value.
 
 #### Scenario: Unknown offset zero-filled
 - **WHEN** a client reads 2 bytes from an offset not in the table and its payload holds `0xAB 0xCD`
@@ -69,7 +69,7 @@ A write to offset `0x8001` SHALL be treated as an application key registration. 
 
 ### Requirement: Message result
 
-The window procedure SHALL return `FS6IPC_MESSAGE_SUCCESS` (1) after processing a view that parsed without errors, and `FS6IPC_MESSAGE_FAILURE` (0) after processing a view that was malformed.
+The window procedure SHALL return `FS6IPC_MESSAGE_SUCCESS` (1) after processing a view that parsed without errors, and `FS6IPC_MESSAGE_FAILURE` (0) after processing a view that was malformed. Rejected writes alone SHALL NOT make the result a failure.
 
 #### Scenario: Clean view
 - **WHEN** a view parses with zero errors
