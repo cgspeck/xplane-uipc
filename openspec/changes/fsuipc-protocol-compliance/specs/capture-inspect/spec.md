@@ -1,0 +1,48 @@
+## MODIFIED Requirements
+
+### Requirement: Record-level display
+
+For each record in a capture file, the tool SHALL display:
+- Record number (1-based within file)
+- Byte offset of the record header in the file, as hex
+- Record kind: `READ32`, `READ64` or `WRITE`, from `dwId`
+- `dwOffset` as hex
+- Data size in bytes
+- For reads, `pDest` as hex. For writes, the payload as hex bytes (truncated to 16 bytes)
+
+#### Scenario: Read record displayed
+- **WHEN** a file starts with a Read32 record for `0x3304`, 4 bytes, `pDest = 0x010AFFF8`
+- **THEN** the tool SHALL show a line like `#1  @0x0000  READ32  offset=0x3304  4B  pDest=0x010afff8`
+
+#### Scenario: Write record displayed
+- **WHEN** a file starts with a Write record for `0x8001` with 13 bytes
+- **THEN** the tool SHALL show a line like `#1  @0x0000  WRITE  offset=0x8001  13B  36 50 45 54 …`
+
+### Requirement: End-of-data termination
+
+When a zero `dwId` is encountered, the tool SHALL display a termination indicator and stop. When parsing stops because the data is malformed, the tool SHALL display the reason and the byte offset where it stopped.
+
+#### Scenario: Clean termination
+- **WHEN** the parser hits a zero `dwId`
+- **THEN** the tool SHALL show `── END OF DATA ──`
+
+#### Scenario: Malformed termination
+- **WHEN** the parser hits an unknown `dwId` at byte `0x1D`
+- **THEN** the tool SHALL show `── MALFORMED @ 0x001d: unknown dwId 0xfc000000 ──`
+
+### Requirement: Non-zero exit on errors
+
+The tool SHALL exit with a non-zero status if any capture file was malformed.
+
+#### Scenario: Corrupted file detection
+- **WHEN** any file stops parsing because it is malformed
+- **THEN** the tool SHALL exit with code 1
+- **WHEN** all files parse to a terminator
+- **THEN** the tool SHALL exit with code 0
+
+## REMOVED Requirements
+
+### Requirement: Gap display after bad sentinel
+
+**Reason**: The protocol has no sentinel. Records are framed by `dwId`, and malformed data stops parsing instead of being scanned past.
+**Migration**: Malformed data is shown by the `── MALFORMED @ … ──` line.
