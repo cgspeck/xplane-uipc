@@ -477,10 +477,10 @@ mod tests {
             (36, Value::Integer64(i64::MIN)),
             // Floats
             (40, Value::Float32(0.0)),
-            (41, Value::Float32(3.14)),
+            (41, Value::Float32(1.25)),
             (42, Value::Float32(-273.15)),
             (43, Value::Float64(0.0)),
-            (44, Value::Float64(3.14159265358979)),
+            (44, Value::Float64(123.456789012345)),
             (45, Value::Float64(-273.15)),
             // Bool
             (50, Value::Bool(true)),

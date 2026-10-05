@@ -530,7 +530,7 @@ mod tests {
         table.insert(
             200,
             Entry {
-                value: Value::Float64(3.14159),
+                value: Value::Float64(1.23456),
                 source: 200,
                 destination: 0,
                 writable: false,
@@ -553,7 +553,7 @@ mod tests {
         let read_value = f64::from_le_bytes([
             data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
         ]);
-        assert!((read_value - 3.14159).abs() < 0.0001);
+        assert!((read_value - 1.23456).abs() < 0.0001);
     }
 
     #[test]
