@@ -353,6 +353,91 @@ mod tests {
         Table::new()
     }
 
+    /// Build a single-record view: header + payload, followed by a zero terminator.
+    fn single_record(offset: u16, n_bytes: u32, is_write: bool, payload: &[u8]) -> Vec<u8> {
+        let mut data = vec![0u8; 64];
+        data[0] = 1;
+        data[4..8].copy_from_slice(&(offset as u32).to_le_bytes());
+        let raw_n = if is_write {
+            n_bytes | 0x8000_0000
+        } else {
+            n_bytes
+        };
+        data[8..12].copy_from_slice(&raw_n.to_le_bytes());
+        data[12..16].copy_from_slice(&SENTINEL.to_le_bytes());
+        data[16..16 + payload.len()].copy_from_slice(payload);
+        data
+    }
+
+    #[test]
+    fn test_narrow_read_does_not_overrun_payload() {
+        let mut table = create_test_table();
+        table.insert(
+            0x300,
+            Entry {
+                value: Value::UnsignedInteger32(0x12345678),
+                source: 0,
+                destination: 0,
+                writable: false,
+            },
+        );
+        let mut data = single_record(0x300, 2, false, &[0xAA; 2]);
+        data[18] = 0xEE; // first byte after the 2-byte payload
+        data[19] = 0xEE;
+        let mut warned_set = WarnedSet::new();
+        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+        assert_eq!(&data[16..18], &[0x78, 0x56]);
+        assert_eq!(
+            &data[18..20],
+            &[0xEE, 0xEE],
+            "bytes past nBytes must be untouched"
+        );
+    }
+
+    /// All write-path checks share the global write channel, so keep them in one test.
+    #[test]
+    fn test_writes_decoded_by_entry_type() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        crate::set_write_channel(tx);
+
+        let mut table = create_test_table();
+        for (offset, value) in [
+            (0x10, Value::Integer16(0)),
+            (0x20, Value::Float32(0.0)),
+            (0x30, Value::UnsignedInteger32(0)),
+            (0x40, Value::Integer64(0)),
+        ] {
+            table.insert(
+                offset,
+                Entry {
+                    value,
+                    source: 0,
+                    destination: 0,
+                    writable: true,
+                },
+            );
+        }
+        let mut warned_set = WarnedSet::new();
+        let mut run = |offset: u16, payload: &[u8]| {
+            let data = single_record(offset, payload.len() as u32, true, payload);
+            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) }
+        };
+
+        assert_eq!(run(0x10, &[0xFF, 0xFF]), 0);
+        let w = rx.try_recv().unwrap();
+        assert_eq!((w.offset, w.value), (0x10, -1.0));
+
+        assert_eq!(run(0x20, &1.5f32.to_le_bytes()), 0);
+        assert_eq!(rx.try_recv().unwrap().value, 1.5);
+
+        assert_eq!(run(0x40, &(-3i64).to_le_bytes()), 0);
+        assert_eq!(rx.try_recv().unwrap().value, -3.0);
+
+        // Size mismatch: rejected, counted, not forwarded.
+        assert_eq!(run(0x30, &[1, 2]), 1);
+        assert!(rx.try_recv().is_err());
+    }
+
     #[test]
     fn test_process_empty_view() {
         let mut table = create_test_table();
