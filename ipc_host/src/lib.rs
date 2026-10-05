@@ -25,7 +25,7 @@ use windows::core::*;
 use crate::mapped_view::{IpcState, process_mapped_view};
 use crate::value_table::get_value_table;
 pub use capture::CaptureConfig;
-pub use mapped_view::set_key_write_log_level;
+pub use mapped_view::{set_key_write_log_level, set_lua_request_log_level};
 
 /// Message results the FSUIPC SDK client checks after `SendMessageTimeout`.
 const FS6IPC_MESSAGE_SUCCESS: LRESULT = LRESULT(1);

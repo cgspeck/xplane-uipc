@@ -49,6 +49,15 @@ pub fn set_key_write_log_level(level: LevelFilter) {
     KEY_WRITE_LOG_LEVEL.set(level);
 }
 
+/// Level macro and Lua requests written to `LUA_REQUEST_OFFSET` are logged at.
+static LUA_REQUEST_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
+
+/// Set the level macro and Lua requests written to `LUA_REQUEST_OFFSET` are
+/// logged at. `LevelFilter::OFF` silences them.
+pub fn set_lua_request_log_level(level: LevelFilter) {
+    LUA_REQUEST_LOG_LEVEL.set(level);
+}
+
 /// The key text: bytes up to the first NUL, with anything unprintable escaped.
 fn key_text(payload: &[u8]) -> String {
     let end = payload
