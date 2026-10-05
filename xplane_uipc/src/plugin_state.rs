@@ -15,7 +15,7 @@ use ipc_host::USER_AREA;
 use ipc_host::value_table::{Table, Value, get_value_table};
 use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
-use uipc_mapping::eval_write_exprs;
+use uipc_mapping::eval_writes;
 pub use uipc_mapping::{DatarefMapping, MappingSource};
 
 /// Bound a raw string read to `max_len` bytes, always ending in a NUL.
@@ -366,8 +366,9 @@ impl ResolvedMapping {
             } => {
                 let mut vars = read_vars(refs);
                 vars.insert("value".into(), fsuipc_value);
-                let results = match eval_write_exprs(write_exprs, &vars) {
-                    Ok(results) => results,
+                let no_commands = BTreeMap::new();
+                let results = match eval_writes(write_exprs, &no_commands, &vars) {
+                    Ok(plan) => plan.datarefs,
                     Err(e) => {
                         tracing::warn!("Offset {:#06x}: {}; nothing written", self.offset, e);
                         return false;
