@@ -22,12 +22,12 @@
 
 ## 3. Mappings
 
-- [ ] 3.1 `0x023B`, `0x023C`, `0x023A`, `0x0238`, `0x0239`: convert to expression mappings that keep reading the `clock_timer` datarefs and write through `sim/time/zulu_time_sec` (see design table); `writable = true`
-- [ ] 3.2 `0x0D0C`: add `write_exprs` for the nav, beacon, landing, taxi and strobe switches; `writable = true`
-- [ ] 3.3 `0x0BD0`: add the spoiler write expression; `writable = true`
-- [ ] 3.4 `0x3102`, `0x281C`: write `$value` to both battery datarefs; `writable = true`. Change `0x3102` to `u8` to match the guide (a 1-byte client write would otherwise be rejected by the size check)
-- [ ] 3.5 `0x7B91`: add the transponder write expression; `writable = true`
-- [ ] 3.6 Re-run `mappings reconciliation/check_datarefs.py` and confirm no write target is reported read-only (it will need to learn about `write_exprs` targets)
+- [x] 3.1 `0x023B`, `0x023C`, `0x023A`, `0x0238`, `0x0239`: convert to expression mappings that keep reading the `clock_timer` datarefs and write through `sim/time/zulu_time_sec` (see design table); `writable = true`
+- [x] 3.2 `0x0D0C`: add `write_exprs` for the nav, beacon, landing, taxi and strobe switches; `writable = true`
+- [x] 3.3 `0x0BD0`: add the spoiler write expression; `writable = true`
+- [x] 3.4 `0x3102`, `0x281C`: write `$value` to both battery datarefs; `writable = true`. Change `0x3102` to `u8` to match the guide (a 1-byte client write would otherwise be rejected by the size check)
+- [x] 3.5 `0x7B91`: add the transponder write expression; `writable = true`
+- [x] 3.6 Re-run `mappings reconciliation/check_datarefs.py` and confirm no write target is reported read-only (it will need to learn about `write_exprs` targets)
 
 ## 4. Docs
 

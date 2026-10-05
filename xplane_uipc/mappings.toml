@@ -204,6 +204,8 @@ offset      = 0x0BD0  # Spolier handle position, 4800 = armed
 fsuipc_type = "u32"
 datarefs    = { SB = "sim/cockpit2/controls/speedbrake_ratio" }
 expr        = "$SB 0 > $SB 10763 * 5620 + $SB 0 < $SB -9600 * 0 ? ?"     # 0..1 → 4800..16383
+writable    = true
+write_exprs = { SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?" }  # 4800 → armed (-0.5), 5620..16383 → 0..1
 
 
 [[mapping]]
@@ -217,12 +219,16 @@ offset      = 0x281C  # Battery master on, problematic, because generic always s
 fsuipc_type = "u32"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
+writable    = true
+write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
 fsuipc_type = "u8"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
+writable    = true
+write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
 
 [[mapping]]
 offset      = 0x0366  # SIM ON GROUND
@@ -260,6 +266,8 @@ offset      = 0x0D0C
 fsuipc_type = "u16"
 datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on", Wing = "laminar/B738/toggle_switch/wing_light", Logo = "laminar/B738/toggle_switch/logo_light"}
 expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * + $Wing 128 * + $Logo 256 * +"
+writable    = true
+write_exprs = { Nav = "$value 1 & 0 !=", Bcn = "$value 2 & 0 !=", Land = "$value 4 & 0 !=", Taxi = "$value 8 & 0 !=", Strb = "$value 16 & 0 !=" }
 
 [[mapping]]
 offset      = 0x02B4   # Ground velocity
@@ -473,29 +481,44 @@ scale       = 16383.0
 writable    = true
 
 [[mapping]]
-offset      = 0x0238
+offset      = 0x0238  # Local hour; local_time_sec is read-only, so a write shifts Zulu time
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/clock_timer/local_time_hours"
+datarefs    = { LH = "sim/cockpit2/clock_timer/local_time_hours", Z = "sim/time/zulu_time_sec" }
+expr        = "$LH"
+writable    = true
+write_exprs = { Z = "$Z $value $LH - 3600 * + 86400 + 86400 %" }
 
 [[mapping]]
-offset      = 0x0239
+offset      = 0x0239  # Local minute; a write shifts Zulu time
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/clock_timer/local_time_minutes"
+datarefs    = { LM = "sim/cockpit2/clock_timer/local_time_minutes", Z = "sim/time/zulu_time_sec" }
+expr        = "$LM"
+writable    = true
+write_exprs = { Z = "$Z $value $LM - 60 * + 86400 + 86400 %" }
 
 [[mapping]]
-offset      = 0x023A
+offset      = 0x023A  # Second
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/clock_timer/local_time_seconds"
+datarefs    = { S = "sim/cockpit2/clock_timer/local_time_seconds", Z = "sim/time/zulu_time_sec" }
+expr        = "$S"
+writable    = true
+write_exprs = { Z = "$Z $Z 60 % - $value +" }
 
 [[mapping]]
-offset      = 0x023B
+offset      = 0x023B  # Zulu hour
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/clock_timer/zulu_time_hours"
+datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec" }
+expr        = "$H"
+writable    = true
+write_exprs = { Z = "$value 3600 * $Z 3600 % +" }
 
 [[mapping]]
-offset      = 0x023C
+offset      = 0x023C  # Zulu minute
 fsuipc_type = "u8"
-dataref     = "sim/cockpit2/clock_timer/zulu_time_minutes"
+datarefs    = { M = "sim/cockpit2/clock_timer/zulu_time_minutes", Z = "sim/time/zulu_time_sec" }
+expr        = "$M"
+writable    = true
+write_exprs = { Z = "$Z $Z 3600 % - $value 60 * + $Z 60 % +" }
 
 # 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
 [[mapping]]
@@ -582,6 +605,8 @@ offset = 0x7b91  # SquawkBox Transponder mode, 0 = normal, 1 = standby: https://
 fsuipc_type = "u8"
 datarefs = { T_Mode = "sim/cockpit2/radios/actuators/transponder_mode" }
 expr = "$T_Mode 2 <"
+writable = true
+write_exprs = { T_Mode = "$value 0 != 1 $T_Mode 2 < 2 $T_Mode ? ?" }  # 1 → standby; 0 → on, keeping an existing on/alt mode
 
 [[mapping]]
 offset = 0x023e  # Zulu day of year (1 indexed)
