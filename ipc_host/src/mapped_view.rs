@@ -271,6 +271,32 @@ pub struct ProcessOutcome {
     pub rejected_writes: usize,
 }
 
+/// State the IPC window keeps between client messages. Owned by the window and
+/// used only on the IPC thread.
+pub struct IpcState {
+    /// Offsets already warned about, so each warning is logged once.
+    pub(crate) warned: WarnedSet,
+}
+
+impl IpcState {
+    pub fn new() -> Self {
+        Self {
+            warned: WarnedSet::new(),
+        }
+    }
+
+    /// Forget which offsets have been warned about. Other state is kept.
+    pub fn reset_warnings(&self) {
+        self.warned.clear_all();
+    }
+}
+
+impl Default for IpcState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Answer the read and write requests in a client's mapped view.
 ///
 /// # Safety
@@ -282,7 +308,7 @@ pub unsafe fn process_mapped_view(
     mapped_view_ptr: *const u8,
     view_size: usize,
     table: &Table,
-    warned_set: &mut WarnedSet,
+    state: &mut IpcState,
 ) -> ProcessOutcome {
     let mut rejected_writes = 0;
     // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid and writable
@@ -291,11 +317,11 @@ pub unsafe fn process_mapped_view(
             // SAFETY: iterate_records only yields payloads that lie within the view
             let payload = slice::from_raw_parts_mut(record.payload_ptr, record.n_bytes as usize);
             if record.kind.is_write() {
-                if !apply_write(&record, payload, table, warned_set) {
+                if !apply_write(&record, payload, table, state) {
                     rejected_writes += 1;
                 }
             } else {
-                answer_read(&record, payload, table, warned_set);
+                answer_read(&record, payload, table, &state.warned);
             }
         })
     };
@@ -364,12 +390,8 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
 }
 
 /// Forward a write request to the flight loop. Returns false if it was rejected.
-fn apply_write(
-    record: &ParsedRecord,
-    payload: &[u8],
-    table: &Table,
-    warned_set: &WarnedSet,
-) -> bool {
+fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut IpcState) -> bool {
+    let warned_set = &state.warned;
     let Ok(offset) = u16::try_from(record.dw_offset) else {
         tracing::debug!(
             "Ignoring write to out-of-range offset {:#x}",
@@ -482,15 +504,12 @@ mod tests {
         }
 
         fn process(&mut self, table: &Table) -> ProcessOutcome {
-            let mut warned_set = WarnedSet::new();
-            unsafe {
-                process_mapped_view(
-                    self.data.as_mut_ptr(),
-                    self.data.len(),
-                    table,
-                    &mut warned_set,
-                )
-            }
+            self.process_with(table, &mut IpcState::new())
+        }
+
+        /// Process with state that persists across calls, like the IPC window's.
+        fn process_with(&mut self, table: &Table, state: &mut IpcState) -> ProcessOutcome {
+            unsafe { process_mapped_view(self.data.as_mut_ptr(), self.data.len(), table, state) }
         }
     }
 

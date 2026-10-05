@@ -21,9 +21,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::*;
 
-use crate::mapped_view::process_mapped_view;
+use crate::mapped_view::{IpcState, process_mapped_view};
 use crate::value_table::get_value_table;
-use crate::warning::WarnedSet;
 pub use capture::CaptureConfig;
 pub use mapped_view::set_key_write_log_level;
 
@@ -88,13 +87,13 @@ unsafe extern "system" fn wnd_proc(
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
     tracing::debug!("Message is a registered message (greater than WM_USER)");
-    let warned_set = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut WarnedSet;
+    let state = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut IpcState;
     tracing::trace!(
-        "Retrieved warned_set pointer from window user data: {:?}",
-        warned_set
+        "Retrieved IPC state pointer from window user data: {:?}",
+        state
     );
-    if warned_set.is_null() {
-        tracing::error!("warned_set pointer is null, this should not happen");
+    if state.is_null() {
+        tracing::error!("IPC state pointer is null, this should not happen");
         return FS6IPC_MESSAGE_FAILURE;
     }
     // msg.wparam points to a GlobalAddAtomA, the text of which contains the name of a mapped file
@@ -217,8 +216,7 @@ unsafe extern "system" fn wnd_proc(
     let table = table_arc.read().unwrap();
     tracing::trace!("Aquired table lock");
     tracing::trace!("Calling process_mapped_view");
-    let outcome =
-        unsafe { process_mapped_view(mapped_view_ptr, view_size, &table, &mut *warned_set) };
+    let outcome = unsafe { process_mapped_view(mapped_view_ptr, view_size, &table, &mut *state) };
 
     if outcome.rejected_writes > 0 {
         tracing::error!("Rejected {} write request(s)", outcome.rejected_writes);
@@ -239,8 +237,8 @@ unsafe extern "system" fn wnd_proc(
     }
 }
 
-#[tracing::instrument(skip(warned_set_ptr))]
-pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND> {
+#[tracing::instrument(skip(state_ptr))]
+pub fn create_ipc_window(state_ptr: *mut IpcState) -> anyhow::Result<HWND> {
     tracing::info!("Creating IPC Window...");
     unsafe {
         let instance: HINSTANCE = GetModuleHandleW(None)?.into();
@@ -281,7 +279,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
             None,
             None,
             some_instance,
-            Some(warned_set_ptr as *mut _), // Pass the warned_set pointer as the lpParam to the window, so we can access it in the wnd_proc
+            Some(state_ptr as *mut _), // Passed as lpParam; WM_NCCREATE stores it in GWLP_USERDATA for wnd_proc
         );
 
         let unwrapped_hwnd = hwnd?;
@@ -307,7 +305,7 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
 ///
 /// Call this from a dedicated thread, and run only one instance at a time.
 /// The window belongs to the calling thread, and its window procedure uses a
-/// `WarnedSet` that this function frees when the loop exits.
+/// `IpcState` that this function frees when the loop exits.
 #[tracing::instrument(skip(config))]
 pub unsafe fn create_ipc_window_and_run(
     rx: Receiver<IpcCommands>,
@@ -344,13 +342,12 @@ pub unsafe fn create_ipc_window_and_run(
         }
     }
 
-    let warned_set = Box::new(WarnedSet::new());
-    let warned_set_ptr = Box::into_raw(warned_set);
+    let state_ptr = Box::into_raw(Box::new(IpcState::new()));
 
-    let hwnd = match create_ipc_window(warned_set_ptr) {
+    let hwnd = match create_ipc_window(state_ptr) {
         Ok(hwnd) => hwnd,
         Err(e) => {
-            unsafe { drop(Box::from_raw(warned_set_ptr)) };
+            unsafe { drop(Box::from_raw(state_ptr)) };
             return Err(e);
         }
     };
@@ -366,13 +363,9 @@ pub unsafe fn create_ipc_window_and_run(
             match cmd {
                 IpcCommands::ResetWarnings => {
                     tracing::info!("Resetting warnings...");
-                    unsafe {
-                        let warned_set_ptr =
-                            GetWindowLongPtrW(HWND(hwnd), GWLP_USERDATA) as *mut WarnedSet;
-                        if !warned_set_ptr.is_null() {
-                            (&*warned_set_ptr).clear_all();
-                        }
-                    }
+                    // SAFETY: state_ptr stays valid until after the loop, and the
+                    // window procedure only uses it on this thread.
+                    unsafe { (*state_ptr).reset_warnings() };
                 }
                 IpcCommands::StartCapture => {
                     tracing::info!("Starting capture...");
@@ -411,6 +404,6 @@ pub unsafe fn create_ipc_window_and_run(
         }
     }
 
-    unsafe { drop(Box::from_raw(warned_set_ptr)) };
+    unsafe { drop(Box::from_raw(state_ptr)) };
     Ok(())
 }
