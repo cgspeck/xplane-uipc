@@ -565,6 +565,42 @@ mod tests {
         // Out-of-range offset: ignored, not forwarded and not wrapped onto 0x0010.
         assert_eq!(run(0x1_0010, &[1, 0]), 0);
         assert!(rx.try_recv().is_err());
+
+        // Application key write: accepted, not forwarded, even if 0x8001 were mapped.
+        let mut table = table;
+        table.insert(
+            APP_KEY_OFFSET,
+            Entry {
+                value: Value::String(vec![0; 13]),
+                source: 0,
+                destination: 0,
+                writable: true,
+            },
+        );
+        let outcome = View::default()
+            .write(APP_KEY_OFFSET as u32, b"6PETEXPDRVW3\0")
+            .end()
+            .process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(outcome.rejected_writes, 0);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_key_text() {
+        assert_eq!(key_text(b"6PETEXPDRVW3\0"), "6PETEXPDRVW3");
+        assert_eq!(key_text(b"ABC\0junk"), "ABC");
+        assert_eq!(key_text(b"NO-NUL"), "NO-NUL");
+        assert_eq!(key_text(b"A\x01B\0"), "A\\x01B");
+    }
+
+    #[test]
+    fn test_key_write_log_level_round_trips() {
+        for level in KEY_WRITE_LEVELS {
+            set_key_write_log_level(level);
+            assert_eq!(key_write_log_level(), level);
+        }
+        set_key_write_log_level(LevelFilter::INFO);
     }
 
     #[test]
