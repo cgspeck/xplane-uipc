@@ -612,4 +612,42 @@ mod tests {
         assert_eq!(parse_level_setting("x", None), LevelFilter::INFO);
         assert_eq!(parse_level_setting("x", Some("loud")), LevelFilter::INFO);
     }
+
+    #[test]
+    fn log_levels_table_is_parsed() {
+        let config: Config = toml::from_str(
+            "[settings]\nlog_level = \"info\"\n[log_levels]\nkey_write = \"off\"\nlua_request = \"debug\"\n",
+        )
+        .unwrap();
+        assert_eq!(config.log_levels.key_write.as_deref(), Some("off"));
+        assert_eq!(config.log_levels.lua_request.as_deref(), Some("debug"));
+    }
+
+    #[test]
+    fn config_without_log_levels_still_parses() {
+        let config: Config = toml::from_str("[settings]\nkey_write_log_level = \"off\"\n").unwrap();
+        assert!(config.log_levels.key_write.is_none());
+        assert!(config.log_levels.lua_request.is_none());
+        assert_eq!(config.settings.key_write_log_level.as_deref(), Some("off"));
+    }
+
+    #[test]
+    fn shipped_config_parses_with_log_levels() {
+        let config: Config = toml::from_str(include_str!("../config.toml")).unwrap();
+        assert_eq!(config.log_levels.key_write.as_deref(), Some("info"));
+        assert_eq!(config.log_levels.lua_request.as_deref(), Some("info"));
+        assert!(config.settings.key_write_log_level.is_none());
+    }
+
+    #[test]
+    fn deprecated_key_write_setting_used_when_new_one_missing() {
+        assert_eq!(key_write_setting(None, Some("off")), Some("off"));
+        assert_eq!(key_write_setting(None, None), None);
+    }
+
+    #[test]
+    fn new_key_write_setting_wins_over_deprecated_one() {
+        assert_eq!(key_write_setting(Some("info"), Some("off")), Some("info"));
+        assert_eq!(key_write_setting(Some("debug"), None), Some("debug"));
+    }
 }
