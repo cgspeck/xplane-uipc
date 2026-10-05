@@ -724,6 +724,56 @@ mod tests {
     }
 
     #[test]
+    fn test_lua_request_logged_once_per_text_and_param() {
+        let mut state = IpcState::new();
+        let table = Table::new();
+        let request = |state: &mut IpcState, text: &[u8]| {
+            View::default()
+                .write(LUA_REQUEST_OFFSET as u32, text)
+                .end()
+                .process_with(&table, state);
+        };
+        request(&mut state, b"LuaSet slc_doors\0");
+        request(&mut state, b"LuaSet slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 1);
+        assert!(
+            state
+                .logged_lua_requests
+                .contains(&("LuaSet slc_doors".to_string(), None))
+        );
+
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &3u32.to_le_bytes())
+            .end()
+            .process_with(&table, &mut state);
+        request(&mut state, b"LuaSet slc_doors\0");
+        request(&mut state, b"LuaSet slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 2);
+        assert!(
+            state
+                .logged_lua_requests
+                .contains(&("LuaSet slc_doors".to_string(), Some(3)))
+        );
+
+        request(&mut state, b"LuaKill slc_doors\0");
+        assert_eq!(state.logged_lua_requests.len(), 3);
+    }
+
+    #[test]
+    fn test_reset_warnings_clears_lua_requests_keeps_param() {
+        let mut state = IpcState::new();
+        View::default()
+            .write(LUA_PARAM_OFFSET as u32, &5u32.to_le_bytes())
+            .write(LUA_REQUEST_OFFSET as u32, b"LuaSet slc_doors\0")
+            .end()
+            .process_with(&Table::new(), &mut state);
+        assert_eq!(state.logged_lua_requests.len(), 1);
+        state.reset_warnings();
+        assert!(state.logged_lua_requests.is_empty());
+        assert_eq!(state.lua_param, Some(5));
+    }
+
+    #[test]
     fn test_lua_request_text_cut_at_nul_and_40_bytes() {
         assert_eq!(
             lua_request_text(b"LuaKill slc_doors\0junk"),
