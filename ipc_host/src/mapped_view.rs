@@ -18,10 +18,11 @@
 use byteorder::{ByteOrder, LittleEndian};
 use std::fmt;
 use std::slice;
-use std::sync::atomic::{AtomicU8, Ordering};
-use tracing::{Level, level_filters::LevelFilter};
+use tracing::level_filters::LevelFilter;
 
 use crate::{
+    log_at,
+    runtime_level::RuntimeLevel,
     try_send_write,
     value_table::{Table, Value},
     warning::{WarnCategory, WarnedSet},
@@ -39,31 +40,13 @@ pub const F64IPC_READSTATEDATA_ID: u32 = 4;
 /// forwarded to the flight loop.
 pub const APP_KEY_OFFSET: u16 = 0x8001;
 
-/// Levels selectable for key-write logging, indexed by `KEY_WRITE_LOG_LEVEL`.
-const KEY_WRITE_LEVELS: [LevelFilter; 6] = [
-    LevelFilter::OFF,
-    LevelFilter::ERROR,
-    LevelFilter::WARN,
-    LevelFilter::INFO,
-    LevelFilter::DEBUG,
-    LevelFilter::TRACE,
-];
-
-/// Index into `KEY_WRITE_LEVELS`; defaults to INFO.
-static KEY_WRITE_LOG_LEVEL: AtomicU8 = AtomicU8::new(3);
+/// Level application key writes to `APP_KEY_OFFSET` are logged at.
+static KEY_WRITE_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
 
 /// Set the level application key writes to `APP_KEY_OFFSET` are logged at.
 /// `LevelFilter::OFF` silences them.
 pub fn set_key_write_log_level(level: LevelFilter) {
-    let index = KEY_WRITE_LEVELS
-        .iter()
-        .position(|l| *l == level)
-        .unwrap_or(3);
-    KEY_WRITE_LOG_LEVEL.store(index as u8, Ordering::Relaxed);
-}
-
-pub fn key_write_log_level() -> LevelFilter {
-    KEY_WRITE_LEVELS[KEY_WRITE_LOG_LEVEL.load(Ordering::Relaxed) as usize]
+    KEY_WRITE_LOG_LEVEL.set(level);
 }
 
 /// The key text: bytes up to the first NUL, with anything unprintable escaped.
@@ -76,17 +59,11 @@ fn key_text(payload: &[u8]) -> String {
 }
 
 fn log_key_write(payload: &[u8]) {
-    let Some(level) = key_write_log_level().into_level() else {
-        return;
-    };
-    let text = key_text(payload);
-    match level {
-        Level::ERROR => tracing::error!("Application key write: \"{}\"", text),
-        Level::WARN => tracing::warn!("Application key write: \"{}\"", text),
-        Level::INFO => tracing::info!("Application key write: \"{}\"", text),
-        Level::DEBUG => tracing::debug!("Application key write: \"{}\"", text),
-        _ => tracing::trace!("Application key write: \"{}\"", text),
-    }
+    log_at!(
+        KEY_WRITE_LOG_LEVEL,
+        "Application key write: \"{}\"",
+        key_text(payload)
+    );
 }
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
@@ -611,15 +588,6 @@ mod tests {
         assert_eq!(key_text(b"ABC\0junk"), "ABC");
         assert_eq!(key_text(b"NO-NUL"), "NO-NUL");
         assert_eq!(key_text(b"A\x01B\0"), "A\\x01B");
-    }
-
-    #[test]
-    fn test_key_write_log_level_round_trips() {
-        for level in KEY_WRITE_LEVELS {
-            set_key_write_log_level(level);
-            assert_eq!(key_write_log_level(), level);
-        }
-        set_key_write_log_level(LevelFilter::INFO);
     }
 
     #[test]
