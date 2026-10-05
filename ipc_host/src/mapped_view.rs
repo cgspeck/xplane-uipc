@@ -417,6 +417,16 @@ mod tests {
                 },
             );
         }
+        // Read-only built-in, like the 0x337E activity counter.
+        table.insert(
+            0x337E,
+            Entry {
+                value: Value::UnsignedInteger16(7),
+                source: 0,
+                destination: 0,
+                writable: false,
+            },
+        );
         let mut warned_set = WarnedSet::new();
         let mut run = |offset: u16, payload: &[u8]| {
             let data = single_record(offset, payload.len() as u32, true, payload);
@@ -435,6 +445,10 @@ mod tests {
 
         // Size mismatch: rejected, counted, not forwarded.
         assert_eq!(run(0x30, &[1, 2]), 1);
+        assert!(rx.try_recv().is_err());
+
+        // Non-writable offset: not forwarded.
+        assert_eq!(run(0x337E, &[1, 0]), 0);
         assert!(rx.try_recv().is_err());
     }
 
