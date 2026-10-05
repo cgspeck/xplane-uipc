@@ -642,4 +642,37 @@ static_value_str = \"hello\"
         let err = result.unwrap_err();
         assert!(err.contains("cannot have both 'dataref' and 'static_value_str'"));
     }
+
+    /// Load a file holding one mapping that should be rejected; return the error.
+    fn load_error(content: &str) -> String {
+        let (path, _name) = test_toml(content);
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("0x1000"),
+            "error should name the offset: {}",
+            err
+        );
+        err
+    }
+
+    #[test]
+    fn dataref_and_expr() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/a\"
+scale       = 100.0
+datarefs    = { A = \"sim/a\" }
+expr        = \"$A\"
+",
+        );
+        assert!(
+            err.contains("cannot have both 'dataref' and 'expr'"),
+            "{}",
+            err
+        );
+    }
 }
