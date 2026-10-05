@@ -1,3 +1,11 @@
+# Offset Value Semantics Specification
+
+## Purpose
+
+How mapped values are converted to and from FSUIPC types, when an offset is served, and how client reads and writes are bounded and decoded.
+
+## Requirements
+
 ### Requirement: Offsets without a current value are not served
 
 Each update cycle, the value table SHALL contain an entry for an offset only if its mapping produced a value in that cycle, or deliberately retained its previous value. All other entries SHALL be removed.

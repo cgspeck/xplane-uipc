@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Float Mod Operator Specification
+
+## Purpose
+
+The behaviour of the modulo operators in the `uipc-expr` RPN language: `%` on floating-point values and `imod` on integers.
+
+## Requirements
 
 ### Requirement: Modulo operator uses floating-point remainder
 The `%` operator in `uipc-expr` SHALL compute the IEEE 754 floating-point remainder (`a % b` in Rust) rather than casting operands to integers first.
