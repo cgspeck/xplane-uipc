@@ -51,7 +51,7 @@
 - [x] 6.6 Report missing targets per target: an error the first time a dataref or command is skipped since mappings were loaded, debug after that. This replaces the once-per-mapping warning
 - [x] 6.7 Test: two different missing targets give two errors, and repeats give none
 - [x] 6.8 Time offsets `0x0238`–`0x023C`: also write `sim/time/use_system_time = 0`
-- [ ] 6.9 `0x2E80`: convert to an expression mapping with `write_exprs = { Av = "$value 0 !=" }`
+- [x] 6.9 `0x2E80`: convert to an expression mapping with `write_exprs = { Av = "$value 0 !=" }`
 - [ ] 6.10 Add commented Zibo `write_commands` and state-dataref placeholders (TODO: confirm with DataRefTool) to `0x281C`, `0x3102`, `0x2E80` and `0x0D0C`
 - [ ] 6.11 Docs: `write_commands` in the `mappings.toml` header and `README-EXPR.md`; update the PR description
 - [ ] 6.12 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`

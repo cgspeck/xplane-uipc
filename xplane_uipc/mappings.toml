@@ -238,10 +238,12 @@ write_exprs = { SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?" }  # 48
 
 
 [[mapping]]
-offset      = 0x2E80  # Avionics master switch
+offset      = 0x2E80  # Avionics master switch; an expression mapping so it can also run add-on commands
 fsuipc_type = "u32"
-dataref     = "sim/cockpit2/switches/avionics_power_on"
+datarefs    = { Av = "sim/cockpit2/switches/avionics_power_on" }
+expr        = "$Av"
 writable    = true
+write_exprs = { Av = "$value 0 !=" }
 
 [[mapping]]
 offset      = 0x281C  # Battery master on, problematic, because generic always seems to be on
