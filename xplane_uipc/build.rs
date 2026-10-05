@@ -95,6 +95,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allowlist_function("XPLMSetDatavf")
         .allowlist_function("XPLMSetDatavi")
         .allowlist_function("XPLMGetDatab")
+        .allowlist_function("XPLMFindCommand")
+        .allowlist_function("XPLMCommandOnce")
         .allowlist_function("XPLMRegisterFlightLoopCallback")
         .allowlist_function("XPLMUnregisterFlightLoopCallback")
         .allowlist_function("XPLMCreateFlightLoop")
@@ -104,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allowlist_type("XPWidgetMessage")
         .allowlist_type("XPWidgetID")
         .allowlist_type("XPLMDataRef")
+        .allowlist_type("XPLMCommandRef")
         // allow-list variables
         .allowlist_var("xplmFont_Proportional")
         .allowlist_var("xpWidgetClass_MainWindow")

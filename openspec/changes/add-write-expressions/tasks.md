@@ -47,7 +47,7 @@
 - [x] 6.2 Loader tests: commands only, both tables, a key that isn't a path, unknown variable, empty table, `write_commands` without `writable`, writable with neither table
 - [x] 6.3 Replace `eval_write_exprs` with `eval_writes`, returning dataref values and command run counts (rounded, clamped to 0..=10) from one snapshot; a non-finite result anywhere is an error
 - [x] 6.4 Evaluator tests: rounding and clamping, the bit-toggle example, a shared snapshot, a non-finite command result blocking dataref writes
-- [ ] 6.5 Add `XPLMFindCommand` and `XPLMCommandOnce` to the bindgen allowlist. Find each command when the mapping is resolved (load-time warning if not found). In `write_xplane`, write the datarefs, then run each command its count of times
+- [x] 6.5 Add `XPLMFindCommand` and `XPLMCommandOnce` to the bindgen allowlist. Find each command when the mapping is resolved (load-time warning if not found). In `write_xplane`, write the datarefs, then run each command its count of times
 - [ ] 6.6 Report missing targets per target: an error the first time a dataref or command is skipped since mappings were loaded, debug after that. This replaces the once-per-mapping warning
 - [ ] 6.7 Test: two different missing targets give two errors, and repeats give none
 - [ ] 6.8 Time offsets `0x0238`–`0x023C`: also write `sim/time/use_system_time = 0`

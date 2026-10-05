@@ -162,6 +162,18 @@ impl ResolvedRef {
     }
 }
 
+/// Find a command by path. Null (with a warning) if X-Plane has no such command.
+fn find_command(path: &str) -> XPLMCommandRef {
+    let handle = match CString::new(path) {
+        Ok(cs) => unsafe { XPLMFindCommand(cs.as_ptr()) },
+        Err(_) => std::ptr::null_mut(),
+    };
+    if handle.is_null() {
+        tracing::warn!("command not found: '{}'", path);
+    }
+    handle
+}
+
 // ─── Resolved mapping ─────────────────────────────────────────────────────────
 
 pub enum ResolvedSource {
@@ -183,6 +195,10 @@ pub enum ResolvedSource {
         update_if_expr: Option<Expr>,
         /// Target name (a key of `refs`) → expression for the value to write there.
         write_exprs: BTreeMap<String, Expr>,
+        /// Command path → expression for how many times to run it.
+        write_commands: BTreeMap<String, Expr>,
+        /// Command path → handle, null if X-Plane has no such command.
+        commands: HashMap<String, XPLMCommandRef>,
     },
 }
 
@@ -229,7 +245,7 @@ impl ResolvedMapping {
                 expr,
                 update_if_expr,
                 write_exprs,
-                ..
+                write_commands,
             } => {
                 let refs: HashMap<String, ResolvedRef> = datarefs
                     .into_iter()
@@ -248,11 +264,17 @@ impl ResolvedMapping {
                         );
                     }
                 }
+                let commands = write_commands
+                    .keys()
+                    .map(|path| (path.clone(), find_command(path)))
+                    .collect();
                 ResolvedSource::Expr {
                     refs,
                     expr,
                     update_if_expr,
                     write_exprs,
+                    write_commands,
+                    commands,
                 }
             }
             MappingSource::Static { static_value } => ResolvedSource::Static {
@@ -333,17 +355,19 @@ impl ResolvedMapping {
     }
 
     /// Write a client's value back to X-Plane. Returns whether any dataref
-    /// was written.
+    /// was written or command run.
     ///
     /// Simple mappings reverse `scale`/`offset_add`. Expression mappings
-    /// evaluate every write expression against one snapshot of their datarefs
-    /// (unavailable ones read as 0.0) and write nothing if any result isn't
-    /// finite.
+    /// evaluate every write expression and command expression against one
+    /// snapshot of their datarefs (unavailable ones read as 0.0), and do
+    /// nothing if any result isn't finite. Otherwise they write the datarefs,
+    /// then run each command its count of times.
     pub fn write_xplane(&mut self, fsuipc_value: f64) -> bool {
         if !self.writable {
             return false;
         }
         let mut written = false;
+        // Descriptions of the targets skipped because they're unavailable.
         let mut skipped = Vec::new();
         match &self.source {
             ResolvedSource::Simple {
@@ -358,54 +382,78 @@ impl ResolvedMapping {
                 if dr.write((fsuipc_value - offset_add) / scale) {
                     written = true;
                 } else {
-                    skipped.push(dr.path.clone());
+                    skipped.push(format!("dataref '{}'", dr.path));
                 }
             }
             ResolvedSource::Expr {
-                refs, write_exprs, ..
+                refs,
+                write_exprs,
+                write_commands,
+                commands,
+                ..
             } => {
                 let mut vars = read_vars(refs);
                 vars.insert("value".into(), fsuipc_value);
-                let no_commands = BTreeMap::new();
-                let results = match eval_writes(write_exprs, &no_commands, &vars) {
-                    Ok(plan) => plan.datarefs,
+                let plan = match eval_writes(write_exprs, write_commands, &vars) {
+                    Ok(plan) => plan,
                     Err(e) => {
                         tracing::warn!("Offset {:#06x}: {}; nothing written", self.offset, e);
                         return false;
                     }
                 };
                 // The loader checks every target names a dataref.
-                for (target, v) in results {
+                for (target, v) in plan.datarefs {
                     let Some(dr) = refs.get(target) else { continue };
                     if dr.write(v) {
                         written = true;
                     } else {
-                        skipped.push(dr.path.clone());
+                        skipped.push(format!("dataref '{}'", dr.path));
+                    }
+                }
+                for (path, runs) in plan.commands {
+                    if runs == 0 {
+                        continue;
+                    }
+                    match commands.get(path) {
+                        Some(&cmd) if !cmd.is_null() => {
+                            for _ in 0..runs {
+                                unsafe { XPLMCommandOnce(cmd) };
+                            }
+                            tracing::debug!(
+                                "Offset {:#06x}: ran command '{}' {} time(s)",
+                                self.offset,
+                                path,
+                                runs
+                            );
+                            written = true;
+                        }
+                        _ => skipped.push(format!("command '{}'", path)),
                     }
                 }
             }
             ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. } => {}
         }
-        for path in skipped {
-            self.report_unavailable(&path);
+        for target in skipped {
+            self.report_unavailable(&target);
         }
         written
     }
 
-    /// Log a write skipped because its dataref is unavailable: a warning the
+    /// Log a write target skipped because it's unavailable: a warning the
     /// first time for this mapping since mappings were loaded, debug after.
-    fn report_unavailable(&mut self, path: &str) {
+    /// `target` describes it, e.g. "dataref 'sim/a'".
+    fn report_unavailable(&mut self, target: &str) {
         if self.unavailable_warned {
             tracing::debug!(
-                "Offset {:#06x}: dataref '{}' is unavailable; not written",
+                "Offset {:#06x}: {} is unavailable; skipped",
                 self.offset,
-                path
+                target
             );
         } else {
             tracing::warn!(
-                "Offset {:#06x}: dataref '{}' is unavailable; not written (further skips for this offset are logged at debug level)",
+                "Offset {:#06x}: {} is unavailable; skipped (further skips for this offset are logged at debug level)",
                 self.offset,
-                path
+                target
             );
             self.unavailable_warned = true;
         }
