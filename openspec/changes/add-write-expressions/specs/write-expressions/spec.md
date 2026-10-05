@@ -50,7 +50,7 @@ The loader SHALL reject a mapping, with a load error naming the offset, when:
 - a write expression uses a variable that is neither `value` nor a name in `datarefs`
 - `write_exprs` is present and `datarefs` has an entry named `value`
 
-A mapping without `write_exprs` SHALL load exactly as before.
+The loader SHALL also reject a writable expression mapping that has no `write_exprs`. A read-only mapping without `write_exprs` SHALL load exactly as before.
 
 #### Scenario: Unknown target
 
@@ -67,11 +67,32 @@ A mapping without `write_exprs` SHALL load exactly as before.
 - **WHEN** a mapping has `write_exprs` but no `writable = true`
 - **THEN** the mapping is not loaded and a load error says `write_exprs` requires `writable = true`
 
+#### Scenario: Writable without write expressions
+
+- **WHEN** an expression mapping has `writable = true` and no `write_exprs`
+- **THEN** the mapping is not loaded and a load error says a writable expression mapping needs `write_exprs`
+
+#### Scenario: Expression mapping without datarefs
+
+- **WHEN** a mapping has `expr = "5"`, no `datarefs`, `writable = true` and `write_exprs = { X = "$value" }`
+- **THEN** the mapping is not loaded and a load error mentions `X`
+
 ### Requirement: Writability warnings cover write targets
 
-When mappings are resolved, the plugin SHALL warn once for each write target whose dataref X-Plane reports as read-only. A writable expression mapping without `write_exprs` SHALL keep the warning that writes to it have no effect. A writable expression mapping with `write_exprs` SHALL NOT get that warning.
+When mappings are resolved, the plugin SHALL warn once for each write target whose dataref X-Plane reports as read-only.
 
 #### Scenario: Read-only target
 
 - **WHEN** a mapping's `write_exprs` targets `sim/cockpit2/clock_timer/zulu_time_hours`
 - **THEN** a warning names the offset and that dataref as read-only
+
+### Requirement: Unavailable write targets are reported once per load
+
+When a write skips a target because its dataref is unavailable, the plugin SHALL log a warning naming the offset and the dataref the first time this happens for that mapping since mappings were last loaded. Later skips SHALL be logged at debug level.
+
+#### Scenario: Repeated writes to a missing add-on dataref
+
+- **GIVEN** a write target whose dataref belongs to an add-on that isn't loaded
+- **WHEN** a client writes the offset three times
+- **THEN** one warning is logged, and the other two skips are logged at debug level
+- **AND** after "Reload Mappings", the next skip logs a warning again

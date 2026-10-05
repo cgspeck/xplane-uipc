@@ -6,6 +6,8 @@ A client write reaches the flight loop as `WriteRequest { offset, value: f64, si
 dr.write((fsuipc_value - offset_add) / scale)   // ints are rounded in ResolvedRef::write
 ```
 
+For anything other than `Simple`, `write_xplane` does nothing, and `write_offset` still logs "Wrote value…". `ResolvedRef::write` also returns quietly when its handle is null. A write can therefore vanish with nothing in the log beyond a load-time warning. When `scale` is 0, `write_xplane` uses 1 instead.
+
 Expression mappings (`ResolvedSource::Expr { refs, expr, update_if_expr }`) are read by building a `HashMap<String, f64>` from every ref, with unavailable datarefs read as `0.0`, and calling `Expr::eval`. `uipc-expr` is a dependency-free, side-effect-free RPN evaluator. `Expr::vars()` lists the variables an expression uses.
 
 ## Goals / Non-Goals
@@ -50,7 +52,21 @@ Expression mappings (`ResolvedSource::Expr { refs, expr, update_if_expr }`) are 
    - an expression that fails to parse
    - an empty `write_exprs` table
 
-5. **Writability warnings.** The load-time `XPLMCanWriteDataRef` check that covers single-dataref mappings is extended to every write target of an expression mapping. A writable expression mapping without `write_exprs` keeps its "writes will have no effect" warning.
+5. **Writability warnings.** The load-time `XPLMCanWriteDataRef` check that covers single-dataref mappings is extended to every write target of an expression mapping.
+
+6. **A writable mapping must be reversible.** `writable = true` promises a client that its write does something. Two cases break that promise today, quietly. Both become load errors:
+   - **Expression mapping without `write_exprs`.** It has no way to be written. Today it gets a warning and every write is dropped, while the client sees success. With `write_exprs` available there's always a fix, so the warning becomes an error. `write_exprs` without `writable` is already an error (decision 4), so the two now have to come together.
+   - **Single-dataref mapping with `scale = 0`.** The read is `dataref * 0 + offset_add`, a constant, so no dataref value maps back to the client's number. Today `write_xplane` swaps in a scale of 1 and writes `value - offset_add`, which isn't the reverse of anything. A read-only `scale = 0` mapping stays legal (it behaves like a static value), though `static_value` is the clearer way to write it.
+   - *Alternative:* keep warnings. Rejected: a warning in `uipc.log` that nobody reads, plus a client that thinks its write landed, is the failure this change is meant to remove. No shipped mapping hits either case.
+
+7. **One source per mapping.** The loader picks `expr` first, then `dataref`, then the static values. A mapping with both `dataref` and `expr` loses its `dataref`, `scale` and `offset_add` without a word. That was only confusing for reads. Now that there are two write paths (linear for `dataref`, `write_exprs` for `expr`), it decides how a write behaves, so it becomes a load error. String mappings already reject `dataref` together with `static_value_str`. This decision doesn't add the other combinations (such as `expr` with `static_value`); they don't affect writes, and they can be tightened separately.
+
+8. **Report writes that don't happen.** Each of these is logged:
+   - `ResolvedRef::write` returns whether it wrote, instead of returning quietly on a null handle or an unexpected dataref type.
+   - For a single-dataref mapping, `write_xplane` warns when its dataref is unavailable. That matches what decision 3 does for write-expression targets.
+   - `write_xplane` returns whether any dataref was written. `write_offset` logs "Wrote value…" at debug only in that case. When nothing was written, the warning has already been logged.
+
+   Clients can write the same offset every frame, so a repeated warning could flood the log. Each mapping warns about an unavailable dataref once per load. Later writes log at debug. The flag goes back to false on "Reload Mappings", because resolving builds fresh `ResolvedMapping`s.
 
 ## Mapping updates
 
@@ -73,6 +89,7 @@ The time offsets keep reading from the `clock_timer` datarefs, so their read exp
 ## Risks / Trade-offs
 
 - [Medium] **Add-on datarefs may ignore writes.** The Zibo battery and light switches are add-on datarefs that may only respond to commands. The writability warning catches read-only ones, but a writable dataref an add-on overrides every frame will look like a write that didn't stick. Document it, and leave commands to a later change.
+- [Medium] **New load errors break some user mapping files.** A user `mappings.toml` with a writable expression mapping, a writable `scale = 0` mapping, or `dataref` together with `expr` loses those mappings after upgrading. The shipped file is clean. The load error names the offset and says what to change, and the release notes call it out. The mapping was already doing nothing useful on write (or, for `dataref` + `expr`, not doing what it says).
 - [Low] **Several targets aren't one atomic step.** All values are computed before writing, but X-Plane sees them as separate writes within one flight loop callback. Nothing renders in between, so a client can't see a half-applied state.
 - [Low] **Rounding in the time maths.** Seconds writes drop the fractional second. That's acceptable for a time-of-day setting.
 
