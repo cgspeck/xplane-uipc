@@ -87,17 +87,18 @@ impl ResolvedRef {
 
         if let Some(array_index) = self.array_index {
             memo = match ty {
+                // Get*v returns the number of elements copied; 0 means the index is out of range.
                 _ if (ty & xplmType_IntArray) != 0 => unsafe {
                     let mut v: i32 = 0;
-                    XPLMGetDatavi(self.handle, &mut v, array_index, 1);
+                    let n = XPLMGetDatavi(self.handle, &mut v, array_index, 1);
                     tracing::trace!("retrieve array index: {}, i32 value: {}", array_index, v);
-                    Some(v as f64)
+                    (n == 1).then_some(v as f64)
                 },
                 _ if (ty & xplmType_FloatArray) != 0 => unsafe {
                     let mut v: f32 = 0.0;
-                    XPLMGetDatavf(self.handle, &mut v, array_index, 1);
+                    let n = XPLMGetDatavf(self.handle, &mut v, array_index, 1);
                     tracing::trace!("retrieve array index: {}, f32 value: {}", array_index, v);
-                    Some(v as f64)
+                    (n == 1).then_some(v as f64)
                 },
                 _ => None,
             };
