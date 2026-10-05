@@ -37,6 +37,6 @@
 
 ## 5. Verification
 
-- [ ] 5.1 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
+- [x] 5.1 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
 - [ ] 5.2 Sim check with FSInterrogate: write `0x023B` (Zulu hour, 1 byte), `0x0D0C` (lights bitfield, 2 bytes), `0x0BD0` (spoilers armed = 4800, 4 bytes) and confirm the effect in X-Plane; confirm no read-only-target warnings in `uipc.log`
 - [ ] 5.3 Sim check, unavailable dataref: write to an offset whose dataref belongs to an add-on that isn't loaded, twice. Confirm one warning and no "Wrote value" in `uipc.log`
