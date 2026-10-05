@@ -633,6 +633,36 @@ mod tests {
         ));
     }
 
+    /// Counts warning events, to check what a test logs.
+    struct CountWarnings(Arc<std::sync::atomic::AtomicUsize>);
+
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for CountWarnings {
+        fn on_event(
+            &self,
+            event: &tracing::Event<'_>,
+            _ctx: tracing_subscriber::layer::Context<'_, S>,
+        ) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+    }
+
+    #[test]
+    fn unavailable_dataref_warns_once_per_load() {
+        use tracing_subscriber::layer::SubscriberExt;
+
+        let warnings = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let subscriber = tracing_subscriber::registry().with(CountWarnings(warnings.clone()));
+        let mut mapping = touchdown_vs_mapping();
+        tracing::subscriber::with_default(subscriber, || {
+            for _ in 0..3 {
+                mapping.report_unavailable("addon/missing");
+            }
+        });
+        assert_eq!(warnings.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
     #[test]
     fn missing_is_not_served() {
         let mapping = touchdown_vs_mapping();
