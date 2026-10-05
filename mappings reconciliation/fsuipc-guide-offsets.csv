@@ -1,0 +1,1314 @@
+offset,size,description,source
+0x0020,4,"Ground altitude in Metres x 256. (see also offset 0B4C)",main
+0x0024,Varies,"Zero terminated string giving the Start-Up situation or flight name, including the path from the FS folder (usually PILOTS\ ...)",main
+0x012C,Varies,"Zero terminated string giving the name of the current Log book, with the default being called just `logbook' instead of the true filename. [This applies to FS2002, but hasn't been verified on the others]",main
+0x0238,1,"Hour of local time in FS (0-23)",main
+0x0239,1,"Minute of local time in FS (0-59)",main
+0x023A,1,"Second of time in FS (0-59)",main
+0x023B,1,"Hour of Zulu time in FS (also known at UTC or GMT)",main
+0x023C,1,"Minute of Zulu time in FS2",main
+0x023E,2,"Day number in Year in FS (counting from 1)",main
+0x0240,2,"Year in FS",main
+0x0246,2,"Local time offset from Zulu (minutes). +ve = behind Zulu, -ve = ahead",main
+0x0248,2,"Season: 0=Winter, 1=Spring, 2=Summer, 3=Fall",main
+0x0262,2,"Pause control (write 1 to pause, 0 to un-pause).",main
+0x0264,2,"Pause indicator (0=Not paused, 1=Paused)",main
+0x0274,2,"Frame rate is given by 32768/this value",main
+0x0278,2,"Auto-co-ordination (""auto-rudder""), 1=on, 0=off",main
+0x0280,1,"Lights: this operates the NAV lights, plus, on FS2000, the TAXI, PANEL and WING lights. For separate switches on FS2000 (and CFS2?) see offset 0D0C",main
+0x0281,1,"Beacon and Strobe lights. For separate switches on FS2000 (and CFS2?( see offset 0D0C",main
+0x028C,1,"Landing lights. (See also offset 0D0C on FS2000, and maybe CFS2).",main
+0x029C,1,"Pitot Heat switch (0=off, 1=on)",main
+0x02A0,2,"Magnetic variation (signed, -ve = West). For degrees *360/65536. Convert True headings to Magnetic by subtracting this value, Magnetic headings to True by adding this value.",main
+0x02B2,2,"Zoom factor: FS2002 only, and read-only. 64=x1, 128=x2 et cetera",main
+0x02B4,4,"GS: Ground Speed, as 65536*metres/sec. Not updated in Slew mode!",main
+0x02B8,4,"TAS: True Air Speed, as knots * 128",main
+0x02BC,4,"IAS: Indicated Air Speed, as knots * 128",main
+0x02C4,4,"Barber pole airspeed, as knots * 128",main
+0x02C8,4,"Vertical speed, signed, as 256 * metres/sec. For the more usual ft/min you need to apply the conversion *60*3.28084/256",main
+0x02CC,8,"Whiskey Compass, degrees in `double' floating point format (FLOAT64)",main
+0x02D4,2,"[FS2004 only] ADF2 Frequency: main 3 digits, in Binary Coded Decimal. See also offset 02D6. A frequency of 1234.5 will have 0x0234 here and 0x0105 in offset 02D6.",main
+0x02D6,2,"[FS2004 only] Extended ADF2 frequency. The high byte contains the 1000's digit and the low byte the fraction, so, for a frequency of 1234.5 this offset will contain 0x0105.",main
+0x02D8,2,"[FS2004 only] ADF2: relative bearing to NDB ( *360/65536 for degrees, -ve left, +ve right)",main
+0x02DC,6,"[FS2004 only] ADF2 IDENTITY (string supplied: 6 bytes including zero terminator)",main
+0x02E2,25,"[FS2004 only] ADF2 name (string supplied: 25 bytes including zero terminator)",main
+0x02FB,1,"[FS2004 only] ADF2 morse ID sound (1 = on, 0 = off), read for state, write to control",main
+0x0300,2,"VOR1 DME distance, 16-bit integer, nm * 10 [FS2002+]",main
+0x0302,2,"VOR1 DME speed, 16-bit integer, kts * 10 [FS2002+]",main
+0x0304,2,"VOR1 DME time to station, 16-bit integer, secs * 10 [FS2002+]",main
+0x0306,2,"VOR2 DME distance, 16-bit integer, nm * 10 [FS2002+]",main
+0x0308,2,"VOR2 DME speed, 16-bit integer, kts * 10 [FS2002+]",main
+0x030A,2,"VOR2 DME time to station, 16-bit integer, secs * 10 [FS2002+]",main
+0x030C,4,"Vertical speed, copy of offset 02C8 whilst airborne, not updated whilst the ""on ground"" flag (0366) is set. Can be used to check hardness of touchdown (but watch out for bounces which may change this). [FS2002+]",main
+0x0310,8,"FS2002 timer (double float, elapsed seconds including fractions, incremented each `tick' - i.e. 1/18th sec). This runs all the time. It is used for all sorts of things, including the elapsed time between key/mouse-originated controls, to determine whether to accelerate inc/dec types. See also 0368, Only FS2002/4",main
+0x032C,2,"""Plane is in fuel box"" flag (same as Scenery BGL variable 0288)",main
+0x0330,2,"Altimeter pressure setting (""Kollsman"" window). As millibars (hectoPascals) * 16",main
+0x0338,2,"Airframe can suffer damage if stressed (0=no, 1=yes) NO NO",main
+0x033A,2,"Manual fuel tank selection if set (appears to be standard anyway in FS2000) NO NO",main
+0x033C,2,"Engine stops when out of fuel if set NO NO",main
+0x033E,2,"Jet engine can flameout if set (appears not an option in FS2000?) NO NO",main
+0x0340,2,"Manual magneto controls if set (appears to be standard anyway in FS2000) NO NO",main
+0x0342,2,"Manual mixture control if set",main
+0x034C,2,"ADF1 Frequency: main 3 digits, in Binary Coded Decimal. See also offset 0356. A frequency of 1234.5 will have 0x0234 here and 0x0105 in offset 0356. (See also offset 0389)",main
+0x034E,2,"COM1 frequency, 4 digits in BCD format. A frequency of 123.45 is represented by 0x2345. The leading 1 is assumed.",main
+0x0350,2,"NAV1 frequency, 4 digits in BCD format. A frequency of 113.45 is represented by 0x1345. The leading 1 is assumed. (See also offset 0388)",main
+0x0352,2,"NAV2 frequency, 4 digits in BCD format. A frequency of 113.45 is represented by 0x1345. The leading 1 is assumed. (See also offset 0388)",main
+0x0354,2,"Transponder setting, 4 digits in BCD format: 0x1200 means 1200 on the dials.",main
+0x0356,2,"Extended ADF1 frequency. The high byte contains the 1000's digit and the low byte the fraction, so, for a frequency of 1234.5 this offset will contain 0x0105.",main
+0x0358,2,"COM frequency settable in 25KHz increments if true (else 50KHz)",main
+0x035C,2,"ADF frequency settable in 100Hz increments if true (else 1KHz)",main
+0x0366,2,"Aircraft on ground flag (0=airborne, 1=on ground). Not updated in Slew mode.",main
+0x0368,4,"Control timer 2 (see also 0310), a 32-bit `float'.",main
+0x036C,1,"Stall warning (0=no, 1=stall)",main
+0x036D,1,"Overspeed warning (0=no, 1=overspeed)",main
+0x036E,1,"Turn co-ordinator ball position (slip and skid). -128 is extreme left, +127 is extreme right, 0 is balanced.",main
+0x0371,1,"Reserved (used in FSUIPC4)",main
+0x0372,2,"Reliability % (0-100). (Not sure if this is effective in FS2000)",main
+0x0374,2,"NAV1 or NAV2 select (256=NAV1, 512=NAV2)",main
+0x0378,2,"DME1 or DME2 select (1=DME1, 2=DME2)",main
+0x037C,2,"Turn Rate (for turn coordinator). 0=level, -512=2min Left, +512=2min Right",main
+0x0388,1,"NAV radio activation. If you change the NAV1 or NAV2 frequencies, writing 2 here makes FS re-scan for VORs to receive on those frequencies.",main
+0x0389,1,"ADF radio activation. If you change the ADF frequency, writing 2 here makes FS re-scan for an NDB to receive on that frequency. (Although FS2000 seems to do this quite soon in any case)",main
+0x038A,1,"COM radio activation. If you change the COM radio, writing a 1 here makes FS scan for ATIS broadcasts to receive on that frequency.",main
+0x03B0,8,"Left aileron deflection, in radians, as a double floating point value",main
+0x03B8,8,"Right aileron deflection, in radians, as a double floating point value",main
+0x03C0,64,"The current state of the buttons on actively scanned joysticks (local ones, 0 to 15). Each of the 16 DWORDS contain the 32- bit state of the joystick 0-15, in order. Button 0 is the least significant bit (bit 0) in each DWORD.",main
+0x0400,128,"The filename of the last flight (or situation) saved, as an ASCII string with a zero terminator. The filetype (.flt or .stn) is not included. Use the counter at 3BD2 to determine when this has changed.",main
+0x0480,8,"Aileron trim axis input, 64-bit floating point (double), read-only",main
+0x0488,8,"Rudder trim axis input, 64-bit floating point (double), read-only",main
+0x0490,8,"Aileron trim axis required value, 64-bit floating point (double). If 2^0 is set in the byte at 04A0, then, when written, this value is copied to the FS trim (2EB0) instead of the value in 0480",main
+0x0498,8,"Rudder trim axis required value, 64-bit floating point (double). If 2^1 is set in the byte at 04A0, then, when written, this value is Ok Ok copied to the FS trim (2EC0) instead of the value in 0488",main
+0x04A0,1,"Aileron and rudder trim connection control. See offsets 480- 0498 above. 2^0 = 1 to disconnect aileron trim (2EB0) from FS 2^1 = 1 to disconnect rudder trim (2EC0) from FS This byte will be cleared and the connection restored (together with the most recent axis values) within about 10 seconds of it being written non-zero, so you need to write this every few seconds.",main
+0x04A8,8,"Elapsed seconds value, as a double. Accurate to fractions of a second but only updated frame by frame. This value counts simulated time, stopping in paused and menu modes, speeding up and slowing down according to the actual sim rate.",main
+0x04B0,48,"Area reserved by FSUIPC. (See details for user accessible parts earlier in this document). [FS2000 & CFS2 only]. The more useful ones follow:",main
+0x04B4,2,"FS2K ADVENTURE WEATHER: This provides the TEMPERATURE_SURFACE_ALT in metres. This is used to provide the METAR reporting station altitude so that the cloud bases can be converted to AGL.",main
+0x04BA,2,"FS2K ADVENTURE WEATHER: This provides the WIND_SURF_TURB which is used to provide the surface wind's upper gust speed in knots, with zero indicating no gusts.",main
+0x04BC,2,"FS2K ADVENTURE WEATHER: This provides the BAROMETRIC_DRIFT variable, which is used to provide the difference between the current aircraft position QNH (which may be in transition), and the METAR reported QNH as set by the weather control program. Adding this `drift' value to the pressure will give the correct value for ATIS reports",main
+0x04C0,2,"FS2K ADVENTURE WEATHER: This provides the FSUIPC_VISIBILITY in statute miles * 100",main
+0x04C2,2,"FS2K ADVENTURE WEATHER: This provides the CLOUD_THUNDER_BASE in metres AMSL",main
+0x04C4,2,"FS2K ADVENTURE WEATHER: This provides the CLOUD_LOW_BASE in metres AMSL",main
+0x04C6,2,"FS2K ADVENTURE WEATHER: This provides the CLOUD_HIGH_BASE in metres AMSL",main
+0x04C8,2,"Dew point as degrees C *256, for the surface temperature layer, FS2k/CFS2 read only",main
+0x04CB,1,"Precipitation rate, 0-5, FS2k/CFS2 read only. Note that in FS2004, rate 0 = light drizzle. Type=0 is no rain/snow",main
+0x04CC,1,"Precipitation type, 0=none, 1=rain, 2=snow, FS2k/CFS2 read only.",main
+0x04CD,1,"FS2K ADVENTURE WEATHER: This provides the CLOUD_THUNDER_COVER 0-8",main
+0x04CE,1,"FS2K ADVENTURE WEATHER: This provides the CLOUD_LOW_COVER 0-8",main
+0x04CF,1,"FS2K ADVENTURE WEATHER: This provides the CLOUD_HIGH_COVER 0-8",main
+0x04D2,2,"Precipitation control: write hi-byte=type 0-2 (see above), low byte=rate 0-5. Write 0xFFFF to release control back to FS2k/CFS2.",main
+0x04D4,2,"Dew point control: degrees C * 256. Sets surface layer dewpoint only, FSUIPC does rest. Write 0x8000 to release control back to FS2k/CFS2.",main
+0x04D8,2,"Surface layer wind speed, in knots (FS2k/CFS2). This may be different to the current wind speed at the aircraft--see offset 0E90. This also provides WIND_SURF_VEL for FS2k Adventures.",main
+0x04DA,2,"Surface layer wind direction, *360/65536 to get degrees Ok Ok MAGNETIC (FS2k/CFS2). This may be different to the current wind direction at the aircraft--see offset 0E92. This also provides WIND_SURF_DIR for FS2k Adventures.",main
+0x04E0,88,"Area reserved for Project Magenta",main
+0x0538,8,"Design speed VS0 (stall speed full flaps), ft/sec, as a double (64- bit floating point).",main
+0x0540,8,"Design speed VS1 (stall speed clean), ft/sec, as a double (64-bit floating point).",main
+0x0548,8,"Design speed VC (cruise speed), ft/sec, as a double (64-bit floating point).",main
+0x0550,8,"Minimum drag velocity, ft/sec, as a double (64-bit floating point).",main
+0x0560,8,"Latitude of aircraft in FS units. To convert to Degrees: If your compiler supports long long (64-bit) integers then use such a variable to simply copy this 64-bit value into a double floating point variable and multiply by 90.0/(10001750.0 * 65536.0 * 65536.0). Otherwise you will have to handle the high 32-bits and the low 32-bits separately, combining them into one double floating point value (say dHi). To do, copy the high part (the 32-bit int at 0564) to one double and the low part (the 32-bit unsigned int at 0560) to another (say dLo). Remember that the low part is only part of a bigger number, so doesn't have a sign of its own. Divide dLo by (65536.0 * 65536.0) to give it its proper magnitude compared to the high part, then either add it to or subtract it from dHi according to whether dHi is positive or negative. This preserves the integrity of the original positive or negative number. Finally multiply the result by 90.0/10001750.0 to get degrees. Either way, a negative result is South, positive North. [Can be written to move aircraft: in FS2002 only in slew or pause states]",main
+0x0568,8,"Longitude of aircraft in FS format. To convert to Degrees: If your compiler supports long long (64-bit) integers then use such a variable to simply copy this 64-bit value into a double floating point variable and multiply by 360.0/(65536.0 * 65536.0 * 65536.0 * 65536.0). Otherwise you will have to handle the high 32-bits and the low 32-bits separately, combining them into one double floating point value (say dHi). To do, copy the high part (the 32-bit int at 056C) to one double and the low part (the 32-bit unsigned int at 0568) to another (say dLo). Remember that the low part is only part of a bigger number, so doesn't have a sign of its own. Divide dLo by (65536.0 * 65536.0) to give it its proper magnitude compared to the high part, then either add it to or subtract it from dHi according to whether dHi is positive or negative. This preserves the integrity of the original positive or negative number. Finally multiply the result by 360.0/(65536.0 * 65536.0) to get degrees. Either way, a negative result is West, positive East. If you did it all unsigned then values over 180.0 represent West longitudes of (360.0 - the value). [Can be written to move aircraft: in FS2002 only in slew or pause states]",main
+0x0570,8,"Altitude, in metres and fractional metres. The units are in the high 32-bit integer (at 0574) and the fractional part is in the low 32-bit integer (at 0570). [Can be written to move aircraft: in FS2002 only in slew or pause states]",main
+0x0578,4,"Pitch, *360/(65536*65536) for degrees. 0=level, -ve=pitch up, +ve=pitch down [Can be set in slew or pause states]",main
+0x057C,4,"Bank, *360/(65536*65536) for degrees. 0=level, -ve=bank right, +ve=bank left [Can be set in slew or pause states]",main
+0x0580,4,"Heading, *360/(65536*65536) for degrees TRUE. [Can be set in slew or pause states]",main
+0x05B0,24,"The viewpoint Latitude (8 bytes), Longitude (8 bytes) and Altitude (8 bytes) in the same format as 0560-0577 above. This is read only and seems to relate to the position of the viewer whether in cockpit, tower or spot views.",main
+0x05C8,4,"The viewpoint Pitch, *360/(65536*65536) for degrees. 0=level, -ve=pitch up, +ve=pitch down. [Read only]",main
+0x05CC,4,"The viewpoint Bank, *360/(65536*65536) for degrees. 0=level, -ve=bank right, +ve=bank left. [Read only]",main
+0x05D0,4,"The viewpoint Heading, *360/(65536*65536) for degrees TRUE. [Read only]",main
+0x05D4,2,"Smoke system available if True NO",main
+0x05D8,2,"Smoke system enable: write 1 to switch on, 0 to switch off (see also 05D4)",main
+0x05DC,2,"Slew mode (indicator and control), 0=off, 1=on. (See 05DE also).",main
+0x05DE,2,"Slew control: write non-zero value here at same time as changing 05DC above, and the Slew mode change includes the swapping of the assigned joystick axes. [ignored in FS2004 - the axes are swapped in any case. See offset 310B for control of axis connection in slew mode]",main
+0x05E4,2,"Slew roll rate: 0=static, -ve = right roll, +ve=left roll, rate is such that 192 gives a complete 360 roll in about one minute.",main
+0x05E6,2,"Slew yaw rate: 0=heading constant, -ve = right, +ve=left, rate is such that 24 gives a complete 360 turn in about one minute.",main
+0x05E8,2,"Slew vertical rate: 16384=no change, 16385-32767 increasing rate down, 16383-0 increasing rate up. One keypress on Q (up) or A (down) makes a change of 512 units.",main
+0x05EB,1,"Slew forward/backward movement: +ve=backward, - ve=forward. Values 1-127 give slow to fast slewing (-128 is the fastest forward slew).",main
+0x05ED,1,"Slew left/right movement: +ve=right, -ve=left. Values 1-127 give slow to fast sideways slewing (-128 is the fastest leftward slew).",main
+0x05EE,2,"Slew pitch rate: 16384=no change, <16384=pitch up, >16384 pitch down, range 0-32767.",main
+0x05F4,2,"Slew mode display: 0=off, 1=coords/hdg/spd, 2=fps, 3=all",main
+0x05FC,2,"Flight mode display: 0=off, 1=coords/hdg/spd, 2=fps, 3=all",main
+0x0609,1,"Engine type: 0=Piston (and some FS2004 Helos), 1=Jet, 2=Sailplane, 3=Helo, 4=Rocket, 5=Turboprop",main
+0x060C,2,"Gear type. 0=non-retractable standard, 1=retractable, 2=slides",main
+0x060E,2,"Retractable gear flag (0 if not, 1 if retractable)",main
+0x0612,2,"Display IAS if TRUE, TAS otherwise",main
+0x0628,4,"Instant replay flag & control, 1=on, 0=off. Can write to turn on and off whilst there is still time to play (see offset 062C)",main
+0x062C,4,"Instant replay: time left to run, in seconds. Whilst this is non- Ok Ok zero, the flag in offset 0628 controls the playback.",main
+0x06D0,144,"Area used for operating, controlling and configuring the facilities in FSUIPC for feedback flight control (bank, pitch, speed, yaw). For full details of this please see the separate TXT documentation in the SDK. Ok Ok 0760 4? Video recording flag, 1=on, 0=off",main
+0x0764,4,"Autopilot available",main
+0x0768,4,"Autopilot V/S hold available",main
+0x076C,4,"Autothrottle airspeed hold available",main
+0x0770,4,"Autothrottle mach hold available",main
+0x0774,4,"Autothrottle RPM hold available",main
+0x0778,4,"Flaps available",main
+0x077C,4,"Stall horn available",main
+0x0780,4,"Engine mixture available",main
+0x0784,4,"Carb heat available",main
+0x0788,4,"Pitot heat available",main
+0x078C,4,"Spoiler available",main
+0x0790,4,"Aircraft is tail dragger",main
+0x0794,4,"Strobes available",main
+0x0798,4,"Prop type available",main
+0x079C,4,"Toe brakes available",main
+0x07A0,4,"NAV1 available",main
+0x07A4,4,"NAV2 available",main
+0x07A8,4,"Marker indicators available",main
+0x07AC,4,"NAV1 OBS available",main
+0x07B0,4,"NAV2 OBS available",main
+0x07B4,4,"VOR2 gauge available",main
+0x07B8,4,"Gyro drift available",main
+0x07BC,4,"Autopilot Master switch",main
+0x07C0,4,"Autopilot wing leveller",main
+0x07C4,4,"Autopilot NAV1 lock",main
+0x07C8,4,"Autopilot heading lock",main
+0x07CC,2,"Autopilot heading value, as degrees*65536/360",main
+0x07D0,4,"Autopilot altitude lock",main
+0x07D4,4,"Autopilot altitude value, as metres*65536",main
+0x07D8,4,"Autopilot attitude hold",main
+0x07DC,4,"Autopilot airspeed hold",main
+0x07E2,2,"Autopilot airspeed value, in knots",main
+0x07E4,4,"Autopilot mach hold",main
+0x07E8,4,"Autopilot mach value, as Mach*65536",main
+0x07EC,4,"Autopilot vertical speed hold [Not connected in FS2002/4]",main
+0x07F2,2,"Autopilot vertical speed value, as ft/min",main
+0x07F4,4,"Autopilot RPM hold",main
+0x07FA,2,"Autopilot RPM value ??",main
+0x07FC,4,"Autopilot GlideSlope hold N.B. In at least FS2002 and FS2004 (and maybe FS2000 as well) setting this also sets 0800, approach hold. To clear both you need to write 0 to them in the same FSUIPC process call, as if they are separated by an FS frame, an interlock stops them clearing.",main
+0x0800,4,"Autopilot Approach hold. See the note above, for offset 07FC.",main
+0x0804,4,"Autopilot Back course hold. The note for offset 07FC may also apply here.",main
+0x0808,4,"Yaw damper",main
+0x080C,4,"Autothrottle TOGA (take off power)",main
+0x0810,4,"Autothrottle Arm",main
+0x0814,4,"Flight analysis mode (0=0ff, 1=Landing, 2=Course tracking, 3=Manoevres)",main
+0x0830,4,"Action on crash (0=ignore, 1=reset, 2=graph). [Graph mode not applicable to FS2002]",main
+0x0834,4,"[FS2002/4 only]: DME2 Latitude when available separately. Same units as in 085C above. Only",main
+0x0838,4,"[FS2002/4 only]: DME2 Longitude when available separately. Same units as in 0864 above. Only",main
+0x083C,4,"[FS2002/4 only]: DME2 elevation in metres when available separately. Only",main
+0x0840,2,"Crashed flag",main
+0x0842,2,"Vertical speed in metres per minute, but with -ve for UP, +ve for DOWN. Multiply by 3.28084 and reverse the sign for the normal fpm measure. This works even in slew mode (except in FS2002). Ok - but not in slew mode",main
+0x0844,2,"NAV2 ILS localiser inverse runway heading if VOR2 is ILS. Convert to degrees by *360/65536. This is 180 degrees different to the direction of flight to follow the localiser. [FS2002+]",main
+0x0846,2,"NAV2 ILS glideslope inclination if VOR2 is ILS. Convert to degrees by *360/65536. [FS2002+]",main
+0x0848,2,"Off-runway crash detection",main
+0x084A,2,"Can collide with dynamic scenery",main
+0x084C,4,"VOR2 Latitude, as in 085C above, except when NAV2 is tuned to an ILS, in which case this gives the localiser Latitude. [FS2002 and later] Only",main
+0x0850,4,"[FS2002/4 only]: VOR2 Longitude, as in 0864 above, except when NAV2 is tuned to an ILS, in which case this gives the localiser Longitude. Only",main
+0x0854,4,"[FS2002/4 only]: VOR2 Elevation, as in 086C above, except when NAV2 is tuned to an ILS, in which case this gives the localiser Elevation. Only",main
+0x0858,4,"VOR2 Latitude in FS form. Convert to degrees by *90/10001750. If NAV2 is tuned to an ILS this gives the glideslope transmitter Latitude. [FS2002+]",main
+0x085C,4,"VOR1 Latitude in FS form. Convert to degrees by *90/10001750.If NAV1 is tuned to an ILS this gives the glideslope transmitter Latitude.",main
+0x0860,4,"VOR2 Longitude in FS form. Convert to degrees by *360/(65536*65536). If NAV2 is tuned to an ILS this gives the glideslope transmitter Longitude. [FS2002+]",main
+0x0864,4,"VOR1 Longitude in FS form. Convert to degrees by *360/(65536*65536). If NAV1 is tuned to an ILS this gives the glideslope transmitter Longitude.",main
+0x0868,4,"VOR2 Elevation in metres. If NAV2 is tuned to an ILS this gives the glideslope transmitter Elevation. [FS2002+]",main
+0x086C,4,"VOR1 Elevation in metres. If NAV1 is tuned to an ILS this gives the glideslope transmitter Elevation.",main
+0x0870,2,"NAV1 ILS localiser inverse runway heading if VOR1 is ILS. Convert to degrees by *360/65536. This is 180 degrees different to the direction of flight to follow the localiser.",main
+0x0872,2,"NAV1 ILS glideslope inclination if VOR1 is ILS. Convert to degrees by *360/65536",main
+0x0874,4,"VOR1 Latitude, as in 085C above, except when NAV1 is tuned to an ILS, in which case this gives the localiser Latitude. [FS2002 and later] Only",main
+0x0878,4,"[FS2002/4 only]: VOR1 Longitude, as in 0864 above, except when NAV1 is tuned to an ILS, in which case this gives the localiser Longitude. Only",main
+0x087C,4,"[FS2002/4 only]: VOR1 Elevation, as in 086C above, except when NAV1 is tuned to an ILS, in which case this gives the localiser Elevation. Only",main
+0x0880,4,"[FS2002/4 only]: DME1 Latitude when available separately. Same units as in 085C above. Only",main
+0x0884,4,"[FS2002/4 only]: DME1 Longitude when available separately. Same units as in 0864 above. Only",main
+0x0888,1,"Active engine (select) flags. Bit 0 = Engine 1 selected ... Bit 3 = Engine 4 selected. See notes against offset 0892.",main
+0x0889,1,"Rotor clutch switch, when applicable. 1=On, 0=Off. Can be read and written. [FS2004 only]",main
+0x088A,2,"[FS2002/4 only]: DME1 Elevation in metres, when available separately. Only",main
+0x088C,152,"ENGINE 1 values, as detailed below",main
+0x088C,2,"Engine 1 Throttle lever, -4096 to +16384 [Programs controlling throttle directly from user inputs should write to 089A instead if the input should be disconnectable via offset 310A (e.g. for auto-throttle management)]",main
+0x088E,2,"Engine 1 Prop lever, -4096 to +16384",main
+0x0890,2,"Engine 1 Mixture lever, 0",main
+0x0892,2,"Engine 1 Starter switch position (Magnetos), Jet/turbojet: 0=Off, 1=Start, 2=Gen Prop: 0=Off, 1=right, 2=Left, 3=Both, 4=Start Notes (for FS2K/CFS2): · Don't forget to switch fuel on to start (mixture to max). · For FS2k type starting you need to set the `Start' value here and monitor the combustion flag (below). When that is set, change the starter switch to another position (Both or Gen). FS98 models start immediately but you should still adopt the same procedure. · The Engine addressed by writes to this and the equivalent Engine 2-4 offsets will become selected (see 0888 above). It needs to stay selected during engine start, which means you can only start engines in sequence, not together. The original Ok Ok selection is restored automatically, however--but only when the starter is `released' by writing a non-start value here. · FS98 prop planes transposed to FS2000 have misbehaving Magneto/Starter switch controls (whether FSUIPC is installed or not). You can start engines okay, but don't expect to be able to select the Magnetos reliably.",main
+0x0894,2,"Engine 1 combustion flag (TRUE if engine firing)",main
+0x0896,2,"Engine 1 Jet N2 as 0 - 16384 (100%). This also appears to be the Turbine RPM % for proper helo models (and now also for the FS2004 Robinson model and derivatives)",main
+0x0898,2," Engine 1 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by the RPM Scaler (see 08C8) and dividing by 65536). Note that Prop RPM is signed and negative for counter-rotating propellers. In FS2004 this also now gives the Robinson model's RPM, when scaled by the RPM scaler.",main
+0x089A,2,"Engine 1 Throttle lever, -4096 to +16384, same as 088C above except that values written here are treated like axis inputs and are disconnectable via offset 310A, and have the last written value obtainable from offset 3330",main
+0x08A0,2,"Engine 1 Fuel Flow PPH SSL (pounds per hour, standardised to sea level). Don't know units, but it seems to match some gauges if divided by 128. Not maintained in all cases.",main
+0x08B2,2,"Engine 1 Anti-Ice or Carb Heat switch (1=On)",main
+0x08B8,2,"Engine 1 Oil temperature, 16384 = 140 C.",main
+0x08BA,2,"Engine 1 Oil pressure, 16384 = 55 psi. Not that in some FS2000 aircraft (the B777) this can exceed the 16-bit capacity of this location. FSUIPC limits it to fit, i.e.65535 = 220 psi",main
+0x08BC,2,"Engine 1 Pressure Ratio (where calculated): 16384 = 1.60",main
+0x08BE,2,"Engine 1 EGT, 16384 = 860 C. [Note that for Props this value is not actually correct. For FS2004 at least you will get the correct value from 3B70. In FS2004 the value here has been derived by FSUIPC to be compatible with FS2002 et cetera]",main
+0x08C0,2,"Engine 1 Manifold Pressure: Inches Hg * 1024",main
+0x08C8,2,"Engine 1 RPM Scaler: For Props, use this to calculate RPM - see offset 0898 (On turboprops this will give the shaft RPM, since there is currently no Gear Reduction Ratio available to fix values on such aircraft)",main
+0x08D0,4,"Engine 1 Oil Quantity: 16384 = 100% On FS2000 FSUIPC usually has to derive this from a leakage value as it isn't provided directly.",main
+0x08D4,4," Engine 1 Vibration: 16384 = 5.0. This is a relative measure of amplitude from the sensors on the engine which when too high is an indication of a problem. The value at which you should be concerned varies according to aircraft and engine.",main
+0x08D8,4,"Engine 1 Hydraulic pressure: appears to be 4*psi",main
+0x08DC,4,"Engine 1 Hydraulic quantity: 16384 = 100%",main
+0x08E8,8,"Engine 1 CHT, degrees F in double floating point (FLOAT64)",main
+0x08F0,4,"Engine 1 Turbine temperature: degree C *16384, valid for FS2004 helo models",main
+0x08F4,4,"Engine 1 Torque % (16384 = 100%), valid for FS2004 helo models",main
+0x08F8,4,"Engine 1 Fuel pressure, psf (i.e. psi*144): not all aircraft files provide this, valid for FS2004 helo models. Ok? Ok 08FC 2? Engine 1 electrical load, possibly valid for FS2004 helo models. Ok?",main
+0x0900,4,"Engine 1 Transmission oil pressure (psi * 16384): for helos Ok?",main
+0x0904,4,"Engine 1 Transmission oil temperature (degrees C * 16384): for helos Ok?",main
+0x0908,4,"Engine 1 Rotor RPM % (16384=100%): for helos Ok?",main
+0x0918,8,"Engine 1 Fuel Flow Pounds per Hour, as floating point double (FLOAT64)",main
+0x0920,4,"Engine 1 Torque, in FLOAT32 format, probably in ft-lbs. (not jets)",main
+0x0924,152,"ENGINE 2 values, as detailed below As ENG1 As ENG1",main
+0x0924,2,"Engine 2 Throttle lever, -4096 to +16384 [Programs controlling throttle directly from user inputs should write to 0932 instead if the input should be disconnectable via offset 310A (e.g. for auto-throttle management)] | |",main
+0x0926,2,"Engine 2 Prop lever, -4096 to +16384 | |",main
+0x0928,2,"Engine 2 Mixture lever, 0",main
+0x092A,2,"Engine 2 Starter switch position (Magnetos), Jet/turbo: 0=Off, 1=Start, 2=Gen; Prop: 0=Off, 1=right, 2=Left, 3=Both, 4=Start (See Notes in Engine 1 entry) | |",main
+0x092C,2,"Engine 2 combustion flag (TRUE if engine firing) | |",main
+0x092E,2,"Engine 2 Jet N2 as 0",main
+0x0930,2,"Engine 2 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by the RPM Scaler (see 08C8) and dividing by 65536). Note that Prop RPM is signed and negative for counter-rotating propellers. | |",main
+0x0932,2,"Engine 2 Throttle lever, -4096 to +16384, same as 088C above except that values written here are treated like axis inputs and are disconnectable via offset 310A, and have the last written value obtainable from offset 3332",main
+0x0938,2,"Engine 2 Fuel Flow PPH SSL (pounds per hour, standardised to sea level). Don't know units, but it seems to match some gauges if divided by 128. Not maintained in all cases. | |",main
+0x094A,2,"Engine 2 Anti-Ice or Carb Heat switch (1=On) | |",main
+0x0950,2,"Engine 2 Oil temperature, 16384 = 140 C. | |",main
+0x0952,2,"Engine 2 Oil pressure, 16384 = 55 psi. Not that in some FS2000 aircraft (the B777) this can exceed the 16-bit capacity of this location. FSUIPC limits it to fit, i.e.65535 = 220 psi | |",main
+0x0954,2,"Engine 2 Pressure Ratio (where calculated): 16384 = 1.60 | |",main
+0x0956,2,"Engine 2 EGT, 16384 = 860 C. [Note that for Props this value is not actually correct. For FS2004 at least you will get the correct value from 3AB0. In FS2004 the value here has been derived by FSUIPC to be compatible with FS2002 et cetera] | |",main
+0x0958,2,"Engine 2 Manifold Pressure: Inches Hg * 1024 | |",main
+0x0960,2,"Engine 2 RPM Scaler: For Props, use this to calculate RPM",main
+0x0968,4,"Engine 2 Oil Quantity: 16384 = 100% On FS2000 FSUIPC usually has to derive this from a leakage value as it isn't provided directly. | |",main
+0x096C,4,"Engine 2 Vibration: 16384 = 5.0. This is a relative measure of amplitude from the sensors on the engine which when too high is an indication of a problem. The value at which you should be concerned varies according to aircraft and engine. | |",main
+0x0970,4,"Engine 2 Hydraulic pressure: appears to be 4*psi | |",main
+0x0974,4,"Engine 2 Hydraulic quantity: 16384 = 100% | |",main
+0x0980,8,"Engine 2 CHT, degrees F in double floating point (FLOAT64) | |",main
+0x0988,4,"Engine 2 Turbine temperature: degree C *16384 | |",main
+0x098C,4,"Engine 2 Torque % (16384 = 100%) | |",main
+0x0990,4,"Engine 2 Fuel pressure, psf (i.e. psi*144): not all aircraft files provide this. | |",main
+0x0998,4,"Engine 2 Transmission pressure (psi * 16384): for helos | |",main
+0x099C,4,"Engine 2 Transmission temperature (degrees C * 16384): for helos | |",main
+0x09A0,4,"Engine 2 Rotor RPM % (16384=100%): for helos | |",main
+0x09B0,8,"Engine 2 Fuel Flow Pounds per Hour, as floating point double (FLOAT64) | |",main
+0x09B8,4,"Engine 2 Torque, in FLOAT32 format, probably in ft-lbs. (not jets) | |",main
+0x09BC,152,"ENGINE 3 values, as detailed below As ENG1 As ENG1",main
+0x09BC,2,"Engine 3 Throttle lever, -4096 to +16384 [Programs controlling throttle directly from user inputs should write to 09CA instead if the input should be disconnectable via offset 310A/B (e.g. for auto-throttle management)] | |",main
+0x09BE,2,"Engine 3 Prop lever, -4096 to +16384 | |",main
+0x09C0,2,"Engine 3 Mixture lever, 0",main
+0x09C2,2,"Engine 3 Starter switch position (Magnetos), Jet/turbo: 0=Off, 1=Start, 2=Gen; Prop: 0=Off, 1=right, 2=Left, 3=Both, 4=Start (see Notes in Engine 1 entry) | |",main
+0x09C4,2,"Engine 3 combustion flag (TRUE if engine firing) | |",main
+0x09C6,2,"Engine 3 Jet N2 as 0",main
+0x09C8,2,"Engine 3 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by the RPM Scaler (see 08C8) and dividing by 65536). Note that Prop RPM is signed and negative for counter-rotating propellers. | |",main
+0x09CA,2,"Engine 3 Throttle lever, -4096 to +16384, same as 088C above except that values written here are treated like axis inputs and are disconnectable via offset 310A/B, and have the last written value obtainable from offset 3334",main
+0x09D0,2,"Engine 3 Fuel Flow PPH SSL (pounds per hour, standardised to sea level). Don't know units, but it seems to match some gauges if divided by 128. Not maintained in all cases. | |",main
+0x09E2,2,"Engine 3 Anti-Ice or Carb Heat switch (1=On) | |",main
+0x09E8,2,"Engine 3 Oil temperature, 16384 = 140 C. | |",main
+0x09EA,2,"Engine 3 Oil pressure, 16384 = 55 psi. Not that in some FS2000 aircraft (the B777) this can exceed the 16-bit capacity of this location. FSUIPC limits it to fit, i.e.65535 = 220 psi | |",main
+0x09EC,2,"Engine 3 Pressure Ratio (where calculated): 16384 = 1.60 | |",main
+0x09EE,2,"Engine 3 EGT, 16384 = 860 C. [Note that for Props this value is not actually correct. For FS2004 at least you will get the correct value from 39F0. In FS2004 the value here has been derived by FSUIPC to be compatible with FS2002 et cetera] | |",main
+0x09F0,2,"Engine 3 Manifold Pressure: Inches Hg * 1024 | |",main
+0x09F8,2,"Engine 3 RPM Scaler: For Props, use this to calculate RPM",main
+0x0A00,4,"Engine 3 Oil Quantity: 16384 = 100% On FS2000 FSUIPC usually has to derive this from a leakage value as it isn't provided directly. | |",main
+0x0A04,4,"Engine 3 Vibration: 16384 = 5.0. This is a relative measure of amplitude from the sensors on the engine which when too high is an indication of a problem. The value at which you should be concerned varies according to aircraft and engine. | |",main
+0x0A08,4,"Engine 3 Hydraulic pressure: appears to be 4*psi | |",main
+0x0A0C,4,"Engine 3 Hydraulic quantity: 16384 = 100% | |",main
+0x0A18,8,"Engine 3 CHT, degrees F in double floating point (FLOAT64) | |",main
+0x0A20,4,"Engine 3 Turbine temperature: degree C *16384 | |",main
+0x0A24,4,"Engine 3 Torque % (16384 = 100%) | |",main
+0x0A28,4,"Engine 3 Fuel pressure, psf (i.e. psi*144): not all aircraft files provide this. | |",main
+0x0A30,4,"Engine 3 Transmission pressure (psi * 16384): for helos | |",main
+0x0A34,4,"Engine 3 Transmission temperature (degrees C * 16384): for helos | |",main
+0x0A38,4,"Engine 3 Rotor RPM % (16384=100%): for helos | |",main
+0x0A48,8,"Engine 3 Fuel Flow Pounds per Hour, as floating point double (FLOAT64) | |",main
+0x0A50,4,"Engine 3 Torque, in FLOAT32 format, probably in ft-lbs. (not jets) | |",main
+0x0A54,152,"ENGINE 4 values, as detailed below As ENG1 As ENG1",main
+0x0A54,2,"Engine 4 Throttle lever, -4096 to +16384 [Programs controlling throttle directly from user inputs should write to 0A62 instead if the input should be disconnectable via offset 310A/B (e.g. for auto-throttle management)] | |",main
+0x0A56,2,"Engine 4 Prop lever, -4096 to +16384 | |",main
+0x0A58,2,"Engine 4 Mixture lever, 0",main
+0x0A5A,2,"Engine 4 Starter switch position (Magnetos), Jet/turbo: 0=Off, 1=Start, 2=Gen; Prop: 0=Off, 1=right, 2=Left, 3=Both, 4=Start (see Notes in Engine 1 entry) | |",main
+0x0A5C,2,"Engine 4 combustion flag (TRUE if engine firing) | |",main
+0x0A5E,2,"Engine 4 Jet N2 as 0",main
+0x0A60,2,"Engine 4 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by the RPM Scaler (see 08C8) and dividing by 65536). Note that Prop RPM is signed and negative for counter-rotating propellers. | |",main
+0x0A62,2,"Engine 4 Throttle lever, -4096 to +16384, same as 088C above except that values written here are treated like axis inputs and are disconnectable via offset 310A/B, and have the last written value obtainable from offset 3336",main
+0x0A68,2,"Engine 4 Fuel Flow PPH SSL (pounds per hour, standardised to sea level). Don't know units, but it seems to match some gauges if divided by 128. Not maintained in all cases. | |",main
+0x0A7A,2,"Engine 4 Anti-Ice or Carb Heat switch (1=On) | |",main
+0x0A80,2,"Engine 4 Oil temperature, 16384 = 140 C. | |",main
+0x0A82,2,"Engine 4 Oil pressure, 16384 = 55 psi. Not that in some FS2000 aircraft (the B777) this can exceed the 16-bit capacity of this location. FSUIPC limits it to fit, i.e.65535 = 220 psi | |",main
+0x0A84,2,"Engine 4 Pressure Ratio (where calculated): 16384 = 1.60 | |",main
+0x0A86,2,"Engine 4 EGT, 16384 = 860 C. [Note that for Props this value is not actually correct. For FS2004 at least you will get the correct value from 3930. In FS2004 the value here has been derived by FSUIPC to be compatible with FS2002 et cetera] | |",main
+0x0A88,2,"Engine 4 Manifold Pressure: Inches Hg * 1024 | |",main
+0x0A90,2,"Engine 4 RPM Scaler: For Props, use this to calculate RPM",main
+0x0A98,4,"Engine 4 Oil Quantity: 16384 = 100% On FS2000 FSUIPC usually has to derive this from a leakage value as it isn't provided directly. | |",main
+0x0A9C,4,"Engine 4 Vibration: 16384 = 5.0. This is a relative measure of amplitude from the sensors on the engine which when too high is an indication of a problem. The value at which you should be concerned varies according to aircraft and engine. | |",main
+0x0AA0,4,"Engine 4 Hydraulic pressure: appears to be 4*psi | |",main
+0x0AA4,4,"Engine 4 Hydraulic quantity: 16384 = 100% | |",main
+0x0AB0,8,"Engine 4 CHT, degrees F in double floating point (FLOAT64) | |",main
+0x0AB8,4,"Engine 4 Turbine temperature: degree C *16384 | |",main
+0x0ABC,4,"Engine 4 Torque % (16384 = 100%) | |",main
+0x0AC0,4,"Engine 4 Fuel pressure, psf (i.e. psi*144): not all aircraft files provide this. | |",main
+0x0AC8,4,"Engine 4 Transmission pressure (psi * 16384): for helos | |",main
+0x0ACC,4,"Engine 4 Transmission temperature (degrees C * 16384): for helos | |",main
+0x0AD0,4,"Engine 4 Rotor RPM % (16384=100%): for helos | |",main
+0x0AE0,8,"Engine 4 Fuel Flow Pounds per Hour, as floating point double (FLOAT64) | |",main
+0x0AE8,4,"Engine 4 Torque, in FLOAT32 format, probably in ft-lbs. (not jets) | |",main
+0x0AEC,2,"Number of Engines",main
+0x0AF0,2,"Propeller pitch control: 0=Fixed, 1=Auto, 2=Manual. On FS2004 this is 0=fixed pitch, 1=constant speed, no differentiation between auto and manual.",main
+0x0AF4,2,"Fuel weight as pounds per gallon * 256",main
+0x0AF8,2,"Fuel tank selector: 0=None, 1=All, 2=Left, 3=Right, 4=LeftAux, 5=RightAux, 6=Centre, 7=Centre2, 8=Centre3, 9=External1, 10=External2, 11=Right Tip, 12=Left Tip, 14=Crossfeed LtoR, 15=Crossfeed RtoL. According to information received, in FS2002 all of these except the wing tip tanks can be selected and drained.",main
+0x0B00,2,"Throttle lower limit, 16384=100%. (e.g. for aircraft with reverse thrust this is normally: -4096 indicating 25% in reverse)",main
+0x0B0C,4,"Mach Max Operating speed *20480",main
+0x0B18,8,"Gyro suction in inches of mercury (Hg), floating point double (FLOAT64)",main
+0x0B20,2,"Sound control: 0 to switch off, 1 to switch on",main
+0x0B24,2,"Sound flag: reads 0 is off, 1 if on",main
+0x0B4C,2,"Ground altitude (metres). See 0020 for more accuracy.",main
+0x0B60,2,"Scenery complexity level, 0 - 4 in FS98, 0",main
+0x0B64,1,"Fail mode: 0 ok, ADF inoperable = 1 (both ADFs on FS2004)",main
+0x0B65,1,"Fail mode: 0 ok, ASI inoperable = 1",main
+0x0B66,1,"Fail mode: 0 ok, Altimeter inoperable = 1",main
+0x0B67,1,"Fail mode: 0 ok, Attitude Indicator inoperable = 1",main
+0x0B68,1,"Fail mode: 0 ok, COM1 radio inoperable = 1 See also 3BD6 (FS2002/FS2004)",main
+0x0B69,1,"Fail mode: 0 ok, Mag Compass inoperable = 1",main
+0x0B6A,1,"Fail mode: 0 ok, Electrics inoperable = 1",main
+0x0B6B,1,"Fail mode: 0 ok, Engine inoperable = 1, extended for FS2000/CFS2 for up to 4 individual engines: bit 0 =Engine 1 ... bit 3= Engine 4. (but note that this may not work for FS98 aircraft transposed into FS2k/CFS2).",main
+0x0B6C,1,"Fail mode: 0 ok, Fuel indicators inoperable = 1",main
+0x0B6D,1,"Fail mode: 0 ok, Direction Indicator inoperable = 1",main
+0x0B6E,1,"Fail mode: 0 ok, VSI inoperable = 1",main
+0x0B6F,1,"Fail mode: 0 ok, Transponder inoperable = 1",main
+0x0B70,1,"Fail mode: 0 ok, NAV radios inoperable = 1 (NAV1 only in FS2002 and FS2004: see also 3BD6)",main
+0x0B71,1,"Fail mode: 0 ok, Pitot inoperable = 1",main
+0x0B72,1,"Fail mode: 0 ok, Turn coordinator inoperable = 1",main
+0x0B73,1,"Fail mode: 0 ok, Vacuum inoperable = 1",main
+0x0B74,4,"Fuel: centre tank level, % * 128 * 65536",main
+0x0B78,4,"Fuel: centre tank capacity: US Gallons (see also offsets 1244- for extra FS2k/CFS2 fuel tanks)",main
+0x0B7C,4,"Fuel: left main tank level, % * 128 * 65536",main
+0x0B80,4,"Fuel: left main tank capacity: US Gallons",main
+0x0B84,4,"Fuel: left aux tank level, % * 128 * 65536",main
+0x0B88,4,"Fuel: left aux tank capacity: US Gallons",main
+0x0B8C,4,"Fuel: left tip tank level, % * 128 * 65536",main
+0x0B90,4,"Fuel: left tip tank capacity: US Gallons",main
+0x0B94,4,"Fuel: right main tank level, % * 128 * 65536",main
+0x0B98,4,"Fuel: right main tank capacity: US Gallons",main
+0x0B9C,4,"Fuel: right aux tank level, % * 128 * 65536",main
+0x0BA0,4,"Fuel: right aux tank capacity: US Gallons",main
+0x0BA4,4,"Fuel: right tip tank level, % * 128 * 65536",main
+0x0BA8,4,"Fuel: right tip tank capacity: US Gallons",main
+0x0BAC,2,"Inner Marker: activated when TRUE",main
+0x0BAE,2,"Middle Marker: activated when TRUE",main
+0x0BB0,2,"Outer Marker: activated when TRUE",main
+0x0BB2,2,"Elevator control input: -16383 to +16383",main
+0x0BB4,2,"Elevator position indicator (maybe adjusted from input!)",main
+0x0BB6,2,"Aileron control input: -16383 to +16383",main
+0x0BB8,2,"Aileron position indicator (maybe adjusted from input!)",main
+0x0BBA,2,"Rudder control input: -16383 to +16383",main
+0x0BBC,2,"Rudder position indicator (maybe adjusted from input!)",main
+0x0BBE,2,"Helo pitch (elevator) trim control: -16383 to +16383, but only when ""ApplyHeloTrim"" set.",main
+0x0BC0,2,"Elevator trim control input: -16383 to +16383",main
+0x0BC2,2,"Elevator trim indicator (follows input)",main
+0x0BC4,2,"Left brake application read-out (0 off, 16383 full: parking brake=16383). You can apply a fixed brake pressure here, or else use the byte at 0C01 to apply brakes emulating the keypress. [Note: In FS2002 reading this ranges up to 32767, i.e. twice the written value.]",main
+0x0BC6,2,"Right brake application read-out (0 off, 16383 full: parking brake=16383). You can apply a fixed brake pressure here, or else use the byte at 0C00 to apply brakes emulating the keypress. [Note: In FS2002 reading this ranges up to 32767, i.e. twice the written value.]",main
+0x0BC8,2,"Parking brake: 0=off, 32767=on",main
+0x0BCA,2,"Braking indicator: brake applied if non-zero (16383=on, 0=off). Note that in FS2002 this is artificially created by FSUIPC from the previous three settings.",main
+0x0BCC,4,"Spoilers arm (0=off, 1=arm for auto deployment)",main
+0x0BD0,4,"Spoilers control, 0 off, 4800 arm, then 5620 (7%) to 16383 (100% fully deployed). The 4800 value is set by arming. Values from 0 to somewhere close to, but below, 4800 do nothing. The percentage extension is the proportion of the distance in the range 4800 to 16383, even though values 4800 to 5619 cannot be used--7% seems to be the minimum. [These details have now been verified on FS2000, FS2002 and FS2004.]",main
+0x0BD4,4,"Spoiler Left position indicator (0-16383)",main
+0x0BD8,4,"Spoiler Right position indicator (0-16383)",main
+0x0BDC,4,"Flaps control, 0=up, 16383=full. The ""notches"" for different aircraft are spaced equally across this range: calculate the increment by 16383/(number of positions-1), ignoring fractions. See also offset 3BFA below. N.B. Do not expect to read this and see 100% accurate values. For example, 3x2047=6141 for the 3rd détente up. But FS2000, at least, stores the flaps lever position in the FLT file as a % of 16384, and the percentage is stored to two decimal places. 6141 gets saved as 37.48% which converts back to 6140.7232 and this gets truncated here as 6140. However, 6140/2047 = 2.9995 which is as close as you need. Just round if you are using integers.",main
+0x0BE0,4,"Flaps position indicator (left). Note that in FS2002 and FS2004 this gives the correct proportional amount, with 16383=full Ok but different Ok deflection. It doesn't correspond to the equally spaced notches used for the control lever. If you know the maximum deflection angle you can derive the current angle by ((max * position indicator) / 16383). Also, in FS2002 and FS2004 this only gives the inboard trailing edge flaps. Please see offsets 30E0-30FF for greater details where needed.",main
+0x0BE4,4,"Flaps position indicator (right). Note that in FS2002 and FS2004 this gives the correct proportional amount, with 16384=full deflection. It doesn't correspond to the equally spaced notches used for the control lever. Also, in FS2002 and FS2004 this only gives the inboard trailing edge flaps. Please see offsets 30E0-30FF for greater details where needed.",main
+0x0BE8,4,"Gear control: 0=Up, 16383=Down",main
+0x0BEC,4,"Gear position (nose): 0=full up, 16383=full down",main
+0x0BF0,4,"Gear position (right): 0=full up, 16383=full down",main
+0x0BF4,4,"Gear position (left): 0=full up, 16383=full down",main
+0x0BF8,4,"Unlimited visibility value, as 1600* statute miles. This is the value set in the Display Quality Settings.",main
+0x0C00,1,"Right toe brake control: 0",main
+0x0C01,1,"Left toe brake control: 0 -200, proportional braking with timed decay",main
+0x0C06,2,"Helo bank (aileron) trim control: -16383 to +16383, but only when ""ApplyHeloTrim"" set to `Both'.",main
+0x0C08,2,"Steering tiller input value (FSUIPC optional axis), -16384 to +16383, if calibrated",main
+0x0C0A,2,"Rudder input value, -16384 to +16383, if calibrated",main
+0x0C18,2,"International units: 0=US, 1=Metric+feet, 2=Metric+metres",main
+0x0C1A,2,"Simulation rate *256 (i.e. 256=1x)",main
+0x0C20,9,"Local time in character format: ""hh:mm:ss"" (with zero terminator)",main
+0x0C29,5,"DME1 distance as character string, either ""nn.n"" or ""nnn."" (when > 99.9 nm). The 5th character may be a zero or a space. Don't rely on it.",main
+0x0C2E,5,"DME1 speed as character string, ""nnn"" followed by either space then zero or just zero.",main
+0x0C33,5,"DME2 distance as character string, either ""nn.n"" or ""nnn."" (when > 99.9 nm). The 5th character may be a zero or a space. Don't rely on it.",main
+0x0C38,5,"DME2 speed as character string, ""nnn"" followed by either space then zero or just zero.",main
+0x0C3E,2,"Gyro drift amount ( *360/65536 for degrees).",main
+0x0C44,2,"Realism setting, 0",main
+0x0C46,2,"Realism options, bits allocated (but not all used in FS2K, necessarily): 0 ?? 1 elevator trim ratchets (?) 2 gyro drifts [FS2k ok] 3 lights burn out 4 fast throttle kills engine (?) 5 manual light control for instruments [FS2k ok] 6 pressure drifts (unlikely to apply to FS2k] No?",main
+0x0C48,1,"NAV1 Localiser Needle: -127 left to +127 right",main
+0x0C49,1,"NAV1 Glideslope Needle: -127 up to +127 down",main
+0x0C4A,1,"NAV1 Back Course flags: Ok 0 BC available 1 Localiser tuned in 2 On Back Course (?) 7 Station active (even if no BC)",main
+0x0C4B,1,"NAV1 To/From flag: 0=not active, 1=To, 2=From",main
+0x0C4C,1,"NAV1 GS flag: TRUE if GS alive",main
+0x0C4D,1,"NAV1 code flags, bits used as follows: 0 DME available 1 TACAN 2 Voice available 3 No signal available 4 DME transmitter at GS transmitter 5 No back course 6 GS available 7 This is a localiser (else it's a VOR) [FS2002+, Not yet tested]",main
+0x0C4E,2,"NAV1 OBS setting (degrees, 0-359)",main
+0x0C50,2,"NAV1 radial ( *360/65536 for degrees). Note that this is in degrees Magnetic for a VOR, but TRUE for an ILS LOC.",main
+0x0C52,4,"NAV1 signal strength: For Localisers, seems to be either 0 or 256 For VORs varies from 0 to over 1,000,000 when really close!",main
+0x0C56,2,"NAV1: relative bearing to VOR1, in degrees (0-359)",main
+0x0C59,1,"NAV2 Localiser Needle: -127 left to +127 right",main
+0x0C5A,1,"NAV2 Back Course flags: 0 BC available 1 Localiser tuned in 2 On Back Course (?) 7 Station active (even if no BC)",main
+0x0C5B,1,"NAV2 To/From flag: 0=not active, 1=To, 2=From",main
+0x0C5C,2,"NAV2: relative bearing to VOR2, in degrees (0-359)",main
+0x0C5E,2,"NAV2 OBS setting (degrees, 0-359)",main
+0x0C60,2,"NAV2 radial ( *360/65536 for degrees). Note that this is in degrees Magnetic for a VOR, but TRUE for an ILS LOC.",main
+0x0C62,4,"NAV2 signal strength: For Localisers, seems to be either 0 or 256 For VORs varies from 0 to over 1,000,000 when really close!",main
+0x0C6A,2,"ADF1: relative bearing to NDB ( *360/65536 for degrees, -ve left, +ve right)",main
+0x0C6C,2,"ADF1: dial bearing, where adjustable (in degrees, 1-360)",main
+0x0C6E,1,"NAV2 Glideslope Needle: -127 up to +127 down [FS2002+]",main
+0x0C6F,1,"NAV2 GS flag: TRUE if GS alive [FS2002+]",main
+0x0C70,1,"NAV2 code flags, bits used as follows: 8 DME available 9 TACAN 10 Voice available 11 No signal available 12 DME transmitter at GS transmitter 13 No back course 14 GS available 15 This is a localiser (else it's a VOR) [FS2002+, Not yet tested]",main
+0x0C92,2,"Texture quality, 0-3, as on FS2K's slider in Display Quality",main
+0x0D0C,2,"Lights (FS2k/CFS2), a switch for each one (bits from lo to hi): 0 Navigation 1 Beacon 2 Landing 3 Taxi 4 Strobes Ok Ok 5 Instruments 6 Recognition 7 Wing 8 Logo 9 Cabin",main
+0x0D50,24,"The Tower Latitude (8 bytes), Longitude (8 bytes) and Altitude (8 bytes) in the same format as 0560-0577 above.",main
+0x0D6C,4,"Parameter associated with any Macro or Lua call sent to the following offset (0D70)",main
+0x0D70,40,"Write here the complete identity string of a Macro control or Lua program control in order to have FSUIPC execute it. For a Macro, the string should begin with up to 16 characters giving the .MCRO file name (just the name part, not the type), and then, separated by a `:' character, the macro name within that file--again, up to 16 characters. Spaces either side of the `:' are optional. For a Lua program operation, the actual Lua control should be provided, followed (with one space or `:' separator) by the Lua program name (without the .Lua suffix). The valid Lua controls are: Lua, LuaDebug, LuaKill, LuaSet, LuaClear, LuaToggle Note that a parameter should always be written first for the Set, Clear and Toggle controls as this specifies the flag to be changed (0-31). A parameter is never used with ""Lua Kill"". If a parameter is to be supplied, it should first be written to offset 0D6C, above. Otherwise whatever was last written there will be supplied.",main
+0x0D98,2,"International N/S setting: 2=North, 3=South",main
+0x0D9C,2,"International E/W setting: 0=East, 1=West",main
+0x0DD6,2,"Scenery BGL variable ""usrvar"" (originally 0312h in BGL) (*In FS2004 this is moved to globals by FSUIPC unless `MoveBGLvariables=No')",main
+0x0DD8,2,"Scenery BGL variable ""usrvr2"" (originally 0314h in BGL) (*In FS2004 this is moved to globals by FSUIPC unless `MoveBGLvariables=No')",main
+0x0DDA,2,"Scenery BGL variable ""usrvr3"" (originally 0316h in BGL) (*In FS2004 this is moved to globals by FSUIPC unless `MoveBGLvariables=No')",main
+0x0DDC,2,"Scenery BGL variable ""usrvr4"" (originally 0318h in BGL) (*In FS2004 this is moved to globals by FSUIPC unless `MoveBGLvariables=No')",main
+0x0DDE,2,"Scenery BGL variable ""usrvr5"" (originally 031Ah in BGL) (*In FS2004 this is moved to globals by FSUIPC unless `MoveBGLvariables=No')",main
+0x0DE2,2,"Scenery BGL variable ""spar10"" (originally 031Eh in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DE4,2,"Scenery BGL variable ""spar11"" (originally 0320h in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DE6,2,"Scenery BGL variable ""spar12"" (originally 0322h in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DE8,2,"Scenery BGL variable ""spar13"" (originally 0324h in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DEA,2,"Scenery BGL variable ""spar14"" (originally 0326h in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DEC,2,"Scenery BGL variable ""spar15"" (originally 0328h in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DEE,2,"Scenery BGL variable ""spar16"" (originally 032Ah in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DF0,2,"Scenery BGL variable ""spar17"" (originally 032Ch in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0DF2,2,"Scenery BGL variable ""spar18"" (originally 032Eh in BGL) (doesn't appear to be supported at all in FS2004)",main
+0x0E5A,2,"EFIS active (1=enabled)",main
+0x0E5C,2,"EFIS VOR/ILS elevation in metres",main
+0x0E5E,2,"EFIS density: 0=thin, 1=medium, 2=thick",main
+0x0E60,2,"EFIS range: 0=short, 1=medium, 2=long",main
+0x0E62,2,"EFIS mode: 0=normal, 1=reset, 2=plot intercept",main
+0x0E64,2,"EFIS via VOR (2) or ILS (4)",main
+0x0E66,2,"EFIS NAV select (1 or 2)",main
+0x0E68,2,"EFIS display type: 0=rectangles, 1=telegraph poles, 2=yellow brick road",main
+0x0E84,1,"Cloud type at aircraft, 1-10, if the aircraft is in a cloud layer. Otherwise 0",main
+0x0E85,1,"Cloud coverage at aircraft, 0-8 ""Oktas"" or eighths of the sky",main
+0x0E86,2,"Cloud icing level at aircraft 0-4",main
+0x0E88,2,"Cloud turbulence level at aircraft, 0-255 (as for older offsets 0EFC etc).",main
+0x0E8A,2,"Current visibility (Statue miles * 100)",main
+0x0E8C,2,"Outside Air Temperature (OAT), degrees C * 256",main
+0x0E8E,2,"Dew point, degrees C * 256 [FS2004 only]. This is interpolated for the aircraft altitude from the temperature layer specifications below and above.",main
+0x0E90,2,"Ambient wind speed (at aircraft) in knots",main
+0x0E92,2,"Ambient wind direction (at aircraft), *360/65536 to get degrees Magnetic or True. For compatibility with FS98, the direction is Magnetic for surface winds (aircraft below the altitude set into offset 0EEE), but True for all upper winds. See offset 02A0 for magnetic variation and how to convert.",main
+0x0E94,2,"Wind gusting value at aircraft (max speed in knots, or 0 if no gusts)",main
+0x0E96,2,"Wind directional variation at aircraft --degrees in the same units as wind directions",main
+0x0E98,2,"Wind turbulence value at aircraft, 0-255, just like offset 0ED2, etc.",main
+0x0E9A,112,"Current Weather as Set: details follow. [See 0F1C for Global weather setting area] On FS2000/CFS2 FSUIPC maps writes to this area to the Global weather area starting at 0F1C, and reads from the Global weather area to this Current weather area. Therefore you may not always read back what you last wrote. The main differences occur when FS local weather is in operation. N.B. See also 0E8A above, which is the ""current"" visibility equivalent of the global setting at 0F8C.",main
+0x0E9A,2,"Upper cloud layer ceiling in metres AMSL",main
+0x0E9C,2,"Upper cloud layer base in metres AMSL",main
+0x0E9E,2,"Upper cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0EA0,2,"Upper cloud layer, cloud altitude variation (metres)",main
+0x0EA2,2,"Lower cloud layer ceiling in metres AMSL",main
+0x0EA4,2,"Lower cloud layer base in metres AMSL",main
+0x0EA6,2,"Lower cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0EA8,2,"Lower cloud layer, cloud altitude variation (metres)",main
+0x0EAA,2,"Storm layer ceiling in metres AMSL",main
+0x0EAC,2,"Storm layer base in metres AMSL (if a Storm layer is present, it must be the lowest, below ""Lower Cloud"").",main
+0x0EAE,2,"Storm cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0EB0,2,"Storm cloud layer, cloud altitude variation (metres)",main
+0x0EB2,2,"Upper Temperature level, metres AMSL",main
+0x0EB4,2,"Upper Temperature in degrees C * 256",main
+0x0EB6,2,"Middle Temperature level, metres AMSL",main
+0x0EB8,2,"Middle Temperature in degrees C * 256",main
+0x0EBA,2,"Lower Temperature level, metres AMSL",main
+0x0EBC,2,"Lower Temperature in degrees C * 256",main
+0x0EBE,2,"Surface Temperature level, metres AMSL (best to be the ground elevation)",main
+0x0EC0,2,"Surface Temperature in degrees C * 256",main
+0x0EC2,2,"Temperature drift, degrees C *256 (not used in FS2k/CFS2?)",main
+0x0EC4,2,"Temperature day/night variation, degrees C *256",main
+0x0EC6,2,"Pressure (QNH) as millibars (hectoPascals) *16.",main
+0x0EC8,2,"Pressure drift as millibars *16 (not used on FS2k/CFS2?)",main
+0x0ECA,2,"Upper wind ceiling, metres AMSL",main
+0x0ECC,2,"Upper wind base, metres AMSL",main
+0x0ECE,2,"Upper wind speed, knots",main
+0x0ED0,2,"Upper wind direction, *360/65536 gives degrees True",main
+0x0ED2,2,"Upper wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0ED4,2,"Upper wind gusts, enabled if True.",main
+0x0ED6,2,"Middle wind ceiling, metres AMSL",main
+0x0ED8,2,"Middle wind base, metres AMSL",main
+0x0EDA,2,"Middle wind speed, knots",main
+0x0EDC,2,"Middle wind direction, *360/65536 gives degrees True",main
+0x0EDE,2,"Middle wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0EE0,2,"Middle wind gusts, enabled if True.",main
+0x0EE2,2,"Lower wind ceiling, metres AMSL",main
+0x0EE4,2,"Lower wind base, metres AMSL",main
+0x0EE6,2,"Lower wind speed, knots",main
+0x0EE8,2,"Lower wind direction, *360/65536 gives degrees True",main
+0x0EEA,2,"Lower wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0EEC,2,"Lower wind gusts, enabled if True.",main
+0x0EEE,2,"Surface wind ceiling, metres AGL",main
+0x0EF0,2,"Surface wind speed, knots. [See also 04D8]",main
+0x0EF2,2,"Surface wind direction, *360/65536 gives degrees Magnetic (!). [See also 04DA]",main
+0x0EF4,2,"Surface wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0EF6,2,"Surface wind gusts, enabled if True.",main
+0x0EF8,2,"Upper cloud layer type: 0=user-defined, 1=cirrus, 8=stratus, 9=cumulus",main
+0x0EFA,2,"Upper cloud layer icing: enabled if True",main
+0x0EFC,2,"Upper cloud layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0EFE,2,"Lower cloud layer type: 0=user-defined, 1=cirrus, 8=stratus, 9=cumulus",main
+0x0F00,2,"Lower cloud layer icing: enabled if True",main
+0x0F02,2,"Lower cloud layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0F04,2,"Storm layer type: 10=storm. [FSUIPC allows this to be a third Ok Ok and lowest layer of any type, for FS2k/CFS2, so then: 0=user- defined, 1=cirrus, 8=stratus, 9=cumulus]",main
+0x0F06,2,"Storm layer icing: enabled if True",main
+0x0F08,2,"Storm layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0F1C,114,"Global Weather setting area: details follow. [See 0E9A for Current weather setting area] On FS2000/CFS2 FSUIPC maps reads from this area to the Current weather area starting at 0E9A, and writes to the Current weather area to this Global weather area. Therefore you may not always read back what you last wrote. The main differences occur when FS local weather is in operation.",main
+0x0F1C,2,"Upper cloud layer ceiling in metres AMSL",main
+0x0F1E,2,"Upper cloud layer base in metres AMSL",main
+0x0F20,2,"Upper cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0F22,2,"Upper cloud layer, cloud altitude variation (metres)",main
+0x0F24,2,"Lower cloud layer ceiling in metres AMSL",main
+0x0F26,2,"Lower cloud layer base in metres AMSL",main
+0x0F28,2,"Lower cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0F2A,2,"Lower cloud layer, cloud altitude variation (metres)",main
+0x0F2C,2,"Storm layer ceiling in metres AMSL",main
+0x0F2E,2,"Storm layer base in metres AMSL (if a Storm layer is present, it must be the lowest, below ""Lower Cloud"").",main
+0x0F30,2,"Storm cloud layer coverage, 65535 = 8 oktas, ... 32768= 4 oktas ... 0 = clear",main
+0x0F32,2,"Storm cloud layer, cloud altitude variation (metres)",main
+0x0F34,2,"Upper Temperature level, metres AMSL",main
+0x0F36,2,"Upper Temperature in degrees C * 256",main
+0x0F38,2,"Middle Temperature level, metres AMSL",main
+0x0F3A,2,"Middle Temperature in degrees C * 256",main
+0x0F3C,2,"Lower Temperature level, metres AMSL",main
+0x0F3E,2,"Lower Temperature in degrees C * 256",main
+0x0F40,2,"Surface Temperature level, metres AMSL (set this to the ground elevation of the weather reporting station)",main
+0x0F42,2,"Surface Temperature in degrees C * 256",main
+0x0F44,2,"Temperature drift, degrees C *256 (not used in FS2k/CFS2?)",main
+0x0F46,2,"Temperature day/night variation, degrees C *256",main
+0x0F48,2,"Pressure (QNH) as millibars (hectoPascals) *16.",main
+0x0F4A,2,"Pressure drift as millibars *16 (not used on FS2k/CFS2?)",main
+0x0F4C,2,"Upper wind ceiling, metres AMSL",main
+0x0F4E,2,"Upper wind base, metres AMSL",main
+0x0F50,2,"Upper wind speed, knots",main
+0x0F52,2,"Upper wind direction, *360/65536 gives degrees True",main
+0x0F54,2,"Upper wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0F56,2,"Upper wind gusts, enabled if True.",main
+0x0F58,2,"Middle wind ceiling, metres AMSL",main
+0x0F5A,2,"Middle wind base, metres AMSL",main
+0x0F5C,2,"Middle wind speed, knots",main
+0x0F5E,2,"Middle wind direction, *360/65536 gives degrees True",main
+0x0F60,2,"Middle wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0F62,2,"Middle wind gusts, enabled if True.",main
+0x0F64,2,"Lower wind ceiling, metres AMSL",main
+0x0F66,2,"Lower wind base, metres AMSL",main
+0x0F68,2,"Lower wind speed, knots",main
+0x0F6A,2,"Lower wind direction, *360/65536 gives degrees True",main
+0x0F6C,2,"Lower wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0F6E,2,"Lower wind gusts, enabled if True.",main
+0x0F70,2,"Surface wind ceiling, metres AGL",main
+0x0F72,2,"Surface wind speed, knots. [See also 04D8]",main
+0x0F74,2,"Surface wind direction, *360/65536 gives degrees Magnetic (!). [See also 04DA]",main
+0x0F76,2,"Surface wind turbulence setting, 0 none, 64, 128, 192, 224, 255 worst",main
+0x0F78,2,"Surface wind gusts, enabled if True.",main
+0x0F7A,2,"Upper cloud layer type: 0=user-defined, 1=cirrus, 8=stratus, 9=cumulus",main
+0x0F7C,2,"Upper cloud layer icing: enabled if True",main
+0x0F7E,2,"Upper cloud layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0F80,2,"Lower cloud layer type: 0=user-defined, 1=cirrus, 8=stratus, 9=cumulus",main
+0x0F82,2,"Lower cloud layer icing: enabled if True",main
+0x0F84,2,"Lower cloud layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0F86,2,"Storm layer type: 10=storm. [FSUIPC allows this to be a third and lowest layer of any type, for FS2k/CFS2, so then: 0=user- defined, 1=cirrus, 8=stratus, 9=cumulus]",main
+0x0F88,2,"Storm layer icing: enabled if True",main
+0x0F8A,2,"Storm layer turbulence (0 to 255 I think). Divided into steps by FSUIPC for FS2k/CFS2.",main
+0x0F8C,2,"Visibility setting as 100 * statute miles",main
+0x0FF0,272,"Path and filename reading facility: see section in text preceding this table",main
+0x115E,1,"Time of day indicator, 1=Day, 2=Dusk or Dawn, 4=Night. Set according to the local time, read for lighting effects and so on in BGLs.",main
+0x11A2,1,"Ground scenery shadows on/off (1=On, 2=Off). [not checked on FS98 or FS2000]",main
+0x11A4,2,"Aircraft shadows on/off. Can write to this to control them (1= On, 0=Off). [not checked on FS98 or FS2000]",main
+0x11B6,1,"Aircraft reflections on/off. (2=On, 1=Off). [not checked on FS98 or FS2000]",main
+0x11B8,2,"G Force: copy of 11BA on touchdown.",main
+0x11BA,2,"G Force: units unknown, but /625 seems to give quite sensible values.",main
+0x11BE,2,"Angle of Attack. This is actually a relative value, giving in %*32767 the difference between the current AofA and the maximum angle of attack for the current aircraft. For a relative measure of AofA calculate 100-(100*#/32767), where # is this number. (Thanks to Sergey Khantsis for this clarification). Note: later analysis leads me to believe that this is, in fact, an Indicator angle rather than the actual AofA in any case, with the angle expressed in usual FS units (360 degrees = 65536) and with 180 degrees pointing to the 0.0 position (right and down about 35 degrees in a Boeing type AofA indicator).",main
+0x11C6,2,"Mach speed *20480.",main
+0x11D0,2,"Total Air Temperature (TAT), degrees Celsius * 256",main
+0x11D4,4,"This is an internal pointer, not for specific use by applications, except that it can be used as a flag to indicate when it is possible to read or write most of the simulation variables. When this DWORD is zero FSUIPC cannot obtain correct values from Ok Not applicabl e SIM1.SIM (SIM1.DLL in FS2002) because either it isn't loaded or because it is busy re-calculating values by reading and processing Flight or aircraft files.",main
+0x1244,4,"Fuel: centre 2 tank level, % * 128 * 65536 [FS2k/CFS2 only]",main
+0x1248,4,"Fuel: centre 2 tank capacity: US Gallons [FS2k/CFS2 only]",main
+0x124C,4,"Fuel: centre 3 tank level, % * 128 * 65536 [FS2k/CFS2 only]",main
+0x1250,4,"Fuel: centre 3 tank capacity: US Gallons [FS2k/CFS2 only]",main
+0x1254,4,"Fuel: external 1 tank level, % * 128 * 65536 [FS2k/CFS2 only]",main
+0x1258,4,"Fuel: external 1 tank capacity: US Gallons [FS2k/CFS2 only]",main
+0x125C,4,"Fuel: external 2 tank level, % * 128 * 65536 [FS2k/CFS2 only]",main
+0x1260,4,"Fuel: external 2 tank capacity: US Gallons [FS2k/CFS2 only]",main
+0x1274,2,"Text display mode (eg for ATIS): =0 static, =1 scrolling [FS2k/CFS2 only]. (Note that this is accessible in FS98 at 1254, but this was discovered after the FS2k extra fuel information was mapped.) OK",main
+0x132C,4,"NAV/GPS switch, in FS2000 & FS2002. 0=NAV, 1=GPS",main
+0x1334,4,"Max Gross weight, lbs * 256. This is the maximum aircraft weight including payload and fuel.",main
+0x13FC,4,"Count of Payload Stations (FS2004 only)",main
+0x1400,48,"x n A set of Payload Station data, 48 bytes for each payload station (the count is in 13FC above). [FS2004 only]. Each 48 byte entry contains: double weight (lbs) double lateral distance from datum (feet) double vertical distance from datum (feet) double longitudinal distance from datum (feet) char Name[16]; // 16 char name, including 0 at end There's room for up to 61 such stations here. If there are more you can't access them this way. These loadings can be changed, and this does have some effect, but such changes are not being promulgated to the overall weights (offsets 30C0, 30C8, 3BFC) nor balance (2EF8), and it looks like they have to refreshed, as FS overrides them from time to time. It has also been reported that FS can crash if a lot of changes are made here, so care and full testing is needed. No Ok 1F80 * Write-only area for a TCAS_DATA structure, used to add entries to the TCAS data tables--see offset, below, and the section on TCAS earlier in this document. * The length of data written here is determined by the size of the TCAS_DATA structure, currently 40 bytes (but read this from offset F000).",main
+0x2000,8,"Turbine Engine 1 N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2008,8,"Turbine Engine 1 N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2010,8,"Turbine Engine 1 corrected N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2018,8,"Turbine Engine 1 corrected N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2020,8,"Turbine Engine 1 corrected fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2028,8,"Turbine Engine 1 max torque fraction (range 0.0-1.0) as a",main
+0x2030,8,"Turbine Engine 1 EPR as a double (FLOAT64). This is for jets and turboprops.",main
+0x2038,8,"Turbine Engine 1 ITT (interstage turbine temperature) in degrees Rankine, as a double (FLOAT64). This is for jets and turboprops.",main
+0x2048,4,"Turbine Engine 1 Afterburner switch (1 = on, 0 = off)",main
+0x204C,8,"Turbine Engine 1 jet thrust, in pounds, as a double (FLOAT64). This is the jet thrust. See 2410 for propeller thrust (turboprops have both).",main
+0x205C,4,"Turbine Engine 1, number of fuel tanks available",main
+0x2060,8,"Turbine Engine 1 fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops.",main
+0x206C,8,"Turbine Engine 1 bleed air pressure (pounds per square inch) as a double (FLOAT64). This is for jets and turboprops.",main
+0x207C,8,"Turbine Engine 1 reverser fraction, a double (FLOAT64), in the range 0.0-1.0, providing the reverse as a proportion of the maximum reverse throttle position.",main
+0x2100,8,"Turbine Engine 2 N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2108,8,"Turbine Engine 2 N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2110,8,"Turbine Engine 2 corrected N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2118,8,"Turbine Engine 2 corrected N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2120,8,"Turbine Engine 2 corrected fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2128,8,"Turbine Engine 2 max torque fraction (range 0.0-1.0) as a double (FLOAT64). (Only tested on turboprops).",main
+0x2130,8,"Turbine Engine 2 EPR as a double (FLOAT64). This is for jets and turboprops.",main
+0x2138,8,"Turbine Engine 2 ITT (interstage turbine temperature) in degrees Rankine, as a double (FLOAT64). This is for jets and turboprops.",main
+0x2148,4,"Turbine Engine 2 Afterburner switch (1 = on, 0 = off)",main
+0x214C,8,"Turbine Engine 2 jet thrust, in pounds, as a double (FLOAT64). This is the jet thrust. See 2510 for propeller thrust (turboprops have both).",main
+0x215C,4,"Turbine Engine 2, number of fuel tanks available",main
+0x2160,8,"Turbine Engine 2 fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops.",main
+0x216C,8,"Turbine Engine 2 bleed air pressure (pounds per square inch) as a double (FLOAT64). This is for jets and turboprops.",main
+0x217C,8,"Turbine Engine 2 reverser fraction, a double (FLOAT64), in the range 0.0-1.0, providing the reverse as a proportion of the maximum reverse throttle position.",main
+0x2200,8,"Turbine Engine 3 N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2208,8,"Turbine Engine 3 N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2210,8,"Turbine Engine 3 corrected N1 value (%) as a double Ok Ok (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2218,8,"Turbine Engine 3 corrected N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2220,8,"Turbine Engine 3 corrected fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2228,8,"Turbine Engine 3 max torque fraction (range 0.0-1.0) as a double (FLOAT64). (Only tested on turboprops).",main
+0x2230,8,"Turbine Engine 3 EPR as a double (FLOAT64). This is for jets and turboprops.",main
+0x2238,8,"Turbine Engine 3 ITT (interstage turbine temperature) in degrees Rankine, as a double (FLOAT64). This is for jets and turboprops.",main
+0x2248,4,"Turbine Engine 3 Afterburner switch (1 = on, 0 = off)",main
+0x224C,8,"Turbine Engine 3 jet thrust, in pounds, as a double (FLOAT64). This is the jet thrust. See 2610 for propeller thrust (turboprops have both).",main
+0x225C,4,"Turbine Engine 3, number of fuel tanks available",main
+0x2260,8,"Turbine Engine 3 fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops.",main
+0x226C,8,"Turbine Engine 3 bleed air pressure (pounds per square inch) as a double (FLOAT64). This is for jets and turboprops.",main
+0x227C,8,"Turbine Engine 3 reverser fraction, a double (FLOAT64), in the range 0.0-1.0, providing the reverse as a proportion of the maximum reverse throttle position.",main
+0x2300,8,"Turbine Engine 4 N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2308,8,"Turbine Engine 4 N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2310,8,"Turbine Engine 4 corrected N1 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2318,8,"Turbine Engine 4 corrected N2 value (%) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2320,8,"Turbine Engine 4 corrected fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops--it has no meaning on reciprocating prop aircraft.",main
+0x2328,8,"Turbine Engine 4 max torque fraction (range 0.0-1.0) as a double (FLOAT64). (Only tested on turboprops).",main
+0x2330,8,"Turbine Engine 4 EPR as a double (FLOAT64). This is for jets and turboprops.",main
+0x2338,8,"Turbine Engine 4 ITT (interstage turbine temperature) in degrees Rankine, as a double (FLOAT64). This is for jets and turboprops.",main
+0x2348,4,"Turbine Engine 4 Afterburner switch (1 = on, 0 = off)",main
+0x234C,8,"Turbine Engine 4 jet thrust, in pounds, as a double (FLOAT64). This is the jet thrust. See 2710 for propeller thrust (turboprops have both).",main
+0x235C,4,"Turbine Engine 4, number of fuel tanks available",main
+0x2360,8,"Turbine Engine 4 fuel flow (pounds per hour) as a double (FLOAT64). This is for jets and turboprops.",main
+0x236C,8,"Turbine Engine 4 bleed air pressure (pounds per square inch) as a double (FLOAT64). This is for jets and turboprops.",main
+0x237C,8,"Turbine Engine 4 reverser fraction, a double (FLOAT64), in the Ok Ok range 0.0-1.0, providing the reverse as a proportion of the maximum reverse throttle position.",main
+0x2400,8,"Propeller 1 RPM as a double (FLOAT64). This value is for props and turboprops and is negative for counter-rotating propellers.",main
+0x2408,8,"Propeller 1 RPM as a fraction of the maximum RPM. (double)",main
+0x2410,8,"Propeller 1 thrust in pounds, as a double (FLOAT64). This is for props and turboprops.",main
+0x2418,8,"Propeller 1 Beta blade angle in radians, as a double (FLOAT64). This is for props and turboprops.",main
+0x2500,8,"Propeller 2 RPM as a double (FLOAT64). This value is for props and turboprops and is negative for counter-rotating propellers.",main
+0x2508,8,"Propeller 2 RPM as a fraction of the maximum RPM. (double)",main
+0x2510,8,"Propeller 2 thrust in pounds, as a double (FLOAT64). This is for props and turboprops.",main
+0x2518,8,"Propeller 2 Beta blade angle in radians, as a double (FLOAT64). This is for props and turboprops.",main
+0x2600,8,"Propeller 3 RPM as a double (FLOAT64). This value is for props and turboprops and is negative for counter-rotating propellers.",main
+0x2608,8,"Propeller 3 RPM as a fraction of the maximum RPM. (double)",main
+0x2610,8,"Propeller 3 thrust in pounds, as a double (FLOAT64). This is for props and turboprops.",main
+0x2618,8,"Propeller 3 Beta blade angle in radians, as a double (FLOAT64). This is for props and turboprops.",main
+0x2700,8,"Propeller 4 RPM as a double (FLOAT64). This value is for props and turboprops and is negative for counter-rotating propellers.",main
+0x2708,8,"Propeller 4 RPM as a fraction of the maximum RPM. (double)",main
+0x2710,8,"Propeller 4 thrust in pounds, as a double (FLOAT64). This is for props and turboprops.",main
+0x2718,8,"Propeller 4 Beta blade angle in radians, as a double (FLOAT64). This is for props and turboprops.",main
+0x281C,4,"Master battery switch (1=On, 0=Off)",main
+0x28C0,8,"Ambient air density, in slugs per cubic foot, double floating point. (FS2002+)",main
+0x28C8,8,"Ambient air pressure, in lbs per square foot, double floating point. (FS2002+)",main
+0x28D0,8,"Static air temperature, in degrees Fahrenheit, double floating point. (FS2002+)",main
+0x28D8,8,"Static air temperature, in degrees Rankine, double floating point. (FS2002+)",main
+0x28E0,8,"""Theta"", or standard temperature ratio (i.e ambient air temperature divided by standard ISO air temperature), double floating point. (FS2002+)",main
+0x28E8,8,"""Delta"", or standard pressure ratio (ambient pressure divided by the ISO standard pressure, double floating point. (FS2002+)",main
+0x28F0,8,"""Sigma"", or standard density ratio (ambient density divided by the ISO standard density, double floating point. (FS2002+)",main
+0x2900,12,"A.I. traffic control. Write all 3 32-bit values (i.e. 12 bytes) together to send an FS control to a specific AI aircraft. The values needed are: Bytes 0-3: Aircraft Id (from the TCAS table) Bytes 4-7: The FS Control (see published lists) Bytes 8-11: A parameter for the control, if needed Note that most of the many hundreds of FS controls will have no noticeable affect on the AI aircraft. Experimentation is needed. If folks find out what does what, please let me know and I'll try to Ok Ok publish a collated guide as an appendix later. FSUIPC offers one special extra control. Just set the aircraft ID and an FS control of 0xFFFF (65535) and the aircraft will be deleted. Note that you can write these values in separate FSUIPC Writes, but if you do the ID must be last, as it is only when this is written that the control is activated.",main
+0x290C,4,"Number of Hot Joystick Button slots available for Application Programs to use. Currently this is fixed at 56, representing the 56 DWORDs available in the following offsets:",main
+0x2910,224,"56 DWORDs containing zero (when free for use), or a Hot Joystick Button specification as detailed earlier in this document. See also 32FF below.",main
+0x29F0,4,"This DWORD provides a facility to set, clear or toggle any of the virtual buttons at offset 3340 without needing to read anything first. To do this, write to offset 29F0 a 32-bit value (4 bytes) made up as follows: Byte 0: Button Number on Joystick (0 - 31) Byte 1: Virtual Joystick Number (64 - 72) Byte 2: Action: 0 = Toggle 1 = Set (Press/On) 2 = Clear (Release/Off). Byte 3: 0 (Reserved)",main
+0x2A48,8,"Folding wing (for reading), left percent, as double float. [FS2002+]",main
+0x2A50,8,"Folding wing (for reading), right percent, as double float. [FS2002+]",main
+0x2A70,8,"Canopy open, as double float. [FS2002+]",main
+0x2A78,8,"Water left rudder extended (double float)",main
+0x2A80,8,"Water right rudder extended (double float)",main
+0x2A88,4,"Water rudder handle position (BOOLean, I think?)",main
+0x2AAC,4,"NAV1 course deviation needle (CDI), 32-bit float value, -127.0 left to +127.0 right",main
+0x2AB0,4,"NAV1 glideslope needle (CDI), 32-bit float value, -127.0 up to +127.0 down",main
+0x2AB4,4,"NAV2 course deviation needle (CDI), 32-bit float value, -127.0 left to +127.0 right",main
+0x2AB8,4,"NAV2 glideslope needle (CDI), 32-bit float value, -127.0 up to +127.0 down",main
+0x2B00,8,"Gyro compass heading (magnetic), including any drift. 64-bit floating point.",main
+0x2DC8,8,"For FS2004 only, this is the wind at the aircraft in the lateral (X) axis--relative to the aircraft orientation, in feet per second, as a 64-bit double.",main
+0x2DD0,8,"For FS2004 only, this is the wind at the aircraft in the vertical (Y) axis--relative to the aircraft orientation, in feet per second, as a 64-bit double.",main
+0x2DD8,8,"For FS2004 only, this is the wind at the aircraft in the longitudinal (Z) axis--relative to the aircraft orientation, in feet per second, as a 64-bit double.",main
+0x2DE0,8,"For FS2004 only, Wind direction at the aircraft, in degrees True, as a 64-bit double floating point - for writing, not reading. See 3490 for reading. This can be written to directly affect the wind direction at the aircraft. This value is set before FSUIPC performs any smoothing or limiting actions, and effectively become the new No Ok, but see Note ** target value. FSUIPC sustains this as a target for a maximum of 14 seconds, with the next write to the same location restarting this timeout. After the timeout has been allowed to expire the intended FS value will take over, with smoothing and so on if enabled. Note that wind direction set in this fashion is not reflected in any weather data supplied by the weather system in FS nor FSUIPC. It is acting locally to the aircraft and can be monitored by Shift+Z or the ambient weather read-outs in FSUIPC.",main
+0x2DE8,8,"For FS2004 only, Wind speed at the aircraft, in knots, as a 64-bit double floating point - for writing, not reading. See 3488 for reading. This can be written to directly affect the wind speed at the aircraft. This value is set before FSUIPC performs any smoothing or limiting actions, and effectively become the new target value. FSUIPC sustains this as a target for a maximum of 14 seconds, with the next write to the same location restarting this timeout. After the timeout has been allowed to expire the intended FS value will take over, with smoothing and so on if enabled.",main
+0x2DF0,8,"For FS2004 only, Visibility at the aircraft, in metres, as a 64-bit double floating point - for writing, not reading. This can be written to directly affect the visibility at the aircraft. This value is set before FSUIPC performs any smoothing or limiting actions, and effectively become the new target value. FSUIPC sustains this as a target for a maximum of 14 seconds, with the next write to the same location restarting this timeout. After the timeout has been allowed to expire the intended FS value will take over, with smoothing and so on if enabled. Note that visibility set in this fashion is not reflected in any weather data supplied by the weather system in FS nor FSUIPC. It is acting locally to the aircraft and can be monitored by Shift+Z or the ambient weather read-outs in FSUIPC.",main
+0x2E80,4,"Master avionics switch (0=Off, 1=On)",main
+0x2E88,4,"Panel auto-feather arm switch (0=Off, 1=On)",main
+0x2E98,8,"Elevator deflection, in radians, as a double (FLOAT64). Up positive, down negative.",main
+0x2EA0,8,"Elevator trim deflection, in radians, as a double (FLOAT64). Up positive, down negative.",main
+0x2EA8,8,"Aileron deflection, in radians, as a double (FLOAT64). Right turn positive, left turn negative.",main
+0x2EB0,8,"Aileron trim deflection, in radians, as a double (FLOAT64). Right turn positive, left turn negative.",main
+0x2EB8,8,"Rudder deflection, in radians, as a double (FLOAT64).",main
+0x2EC0,8,"Rudder trim deflection, in radians, as a double (FLOAT64).",main
+0x2EC8,4,"Prop sync active (1=Active, 0=Inactive)",main
+0x2ED0,8,"Incidence ""alpha"", in radians, as a double (FLOAT64). This is the aircraft body angle of attack (AoA) not the wing AoA.",main
+0x2ED8,8,"Incidence ""beta"", in radians, as a double (FLOAT64). This is the side slip angle.",main
+0x2EE0,4,"Flight Director Active, control and indicator. 1=active, 0=inactive. [FS2000-FS2004 only]",main
+0x2EE8,8,"Flight director pitch value, in degrees. Double floating point format, only when FD is active. [FS2000-FS2004 only]",main
+0x2EF0,8,"Flight director bank value, in degrees. Double floating point format, right is negative, left positive. [FS2000-FS2004 only]",main
+0x2EF8,8,"CG percent, as a double (FLOAT64). This is the position of the actual CoG as a fraction (%/100) of MAC",main
+0x2F70,8,"Attitude indicator pitch value, in degrees. Double floating point format. This is the ATTITUDE_INDICATOR _PITCH_DEGREES variable previously listed as specific to FS2000. [FS2000/FS2002 only]",main
+0x2F78,8,"Attitude indicator bank value, in degrees. Double floating point format. This is the ATTITUDE_INDICATOR_BANK_DEGREES variable previously listed as specific to FS2000. [FS2000/FS2002 only]",main
+0x2F80,1,"PANEL AUTOBRAKE SWITCH Read to check setting, write to change it. 0=RTO, 1=Off, 2=brake1, 3=brake2, 4=brake3, 5=max",main
+0x2F88,8,"HSI CDI needle position, -127.0 to +127.0 double floating point. Full range represents -10 to +10 degrees for a VOR, -2.5 to +2.5 degrees for a LOC",main
+0x2F90,8,"HSI GSI needle position, -119.0 to +119.0 double floating point. Full range represents -0.7 to +0.7 degrees",main
+0x2F98,8,"HSI speed, as a double floating point. I think it should be in metres/sec, but it doesn't look right--feedback please! Ok? Ok?",main
+0x2FA0,8,"HSI distance, as a double floating point. In metres.",main
+0x2FA8,2,"HSI bearing. In degrees? Doesn't seem to work. Feedback?",main
+0x2FAA,1,"HSI CDI valid flag. Doesn't appear to work?",main
+0x2FAB,1,"HSI GSI valid flag.",main
+0x2FAC,1,"HSI bearing valid flag. (Not seen this set yet",main
+0x2FAD,1,"HSI To/From flag: 0=off, 1=To, 2=From",main
+0x2FAE,1,"HSI `has localiser' flag",main
+0x2FB0,6,"HSI ident string",main
+0x2FE0,32,"Modules Menu, application item write area (see earlier in this document)",main
+0x3000,6,"VOR1 IDENTITY (string supplied: 6 bytes including zero terminator)",main
+0x3006,25,"VOR1 name (string supplied: 25 bytes including zero terminator)",main
+0x301F,6,"VOR2 IDENTITY (string supplied: 6 bytes including zero terminator)",main
+0x3025,25,"VOR2 name (string supplied: 25 bytes needed including zero terminator)",main
+0x303E,6,"ADF1 IDENTITY (string supplied: 6 bytes including zero terminator)",main
+0x3044,25,"ADF1 name (string supplied: 25 bytes including zero terminator)",main
+0x3060,8,"X (lateral, or left/right) acceleration in ft/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3068,8,"Y (vertical, or up/down) acceleration in ft/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3070,8,"Z (longitudinal, or forward/backward) acceleration in ft/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3078,8,"Pitch acceleration in radians/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3080,8,"Roll acceleration in radians/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3088,8,"Yaw acceleration in radians/sec/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3090,8,"Z (longitudinal, or forward/backward) GS-velocity in ft/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x3098,8,"X (lateral, or left/right) GS-velocity in ft/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30A0,8,"Y (vertical, or up/down) GS-velocity in ft/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30A8,8,"Pitch velocity in rads/sec relative to the body axes (see Note at Ok end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30B0,8,"Roll velocity in rads/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30B8,8,"Yaw velocity in rads/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30C0,8,"Current loaded weight in lbs. This is in double floating point format (FLOAT64). [FS2000 and later]",main
+0x30C8,8,"Plane's current mass, in slugs (1 slug = 1lb*G = 32.174049 lbs) mass. This is in double floating point format (FLOAT64). The current mass = current loaded weight (as in 30C0) * G, where G is 32.174049.",main
+0x30D0,8,"Vertical acceleration in G's. This is in double floating point format (FLOAT64). [FS2k only]",main
+0x30D8,8,"Dynamic pressure (lbs/sqft). [FS2k/CFS2/FS2002 only]",main
+0x30E0,2,"[FS2002/4 only]: Trailing edge left inboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30E2,2,"[FS2002/4 only]: Trailing edge left outboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30E4,2,"[FS2002/4 only]: Trailing edge right inboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30E6,2,"[FS2002/4 only]: Trailing edge right outboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30E8,2,"[FS2002/4 only]: Leading edge left inboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30EA,2,"[FS2002/4 only]: Leading edge left outboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30EC,2,"[FS2002/4 only]: Leading edge right inboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30EE,2,"[FS2002/4 only]: Leading edge right outboard flap extension as a percentage of its maximum, with 16383 = 100%",main
+0x30F0,2,"[FS2002/4 only]: Trailing edge left inboard flap extension in degrees * 256.",main
+0x30F2,2,"[FS2002/4 only]: Trailing edge left outboard flap extension in degrees * 256.",main
+0x30F4,2,"[FS2002/4 only]: Trailing edge right inboard flap extension in degrees * 256.",main
+0x30F6,2,"[FS2002/4 only]: Trailing edge right outboard flap extension in degrees * 256.",main
+0x30F8,2,"[FS2002/4 only]: Leading edge left inboard flap extension in degrees * 256.",main
+0x30FA,2,"[FS2002/4 only]: Leading edge left outboard flap extension in degrees * 256.",main
+0x30FC,2,"[FS2002/4 only]: Leading edge right inboard flap extension in degrees * 256.",main
+0x30FE,2,"[FS2002/4 only]: Leading edge right outboard flap extension in degrees * 256.",main
+0x3100,1,"Engine primer (just write a non-zero byte to operate the primer. This is a one-shot and reading it is meaningless) [FS2000+]",main
+0x3101,1,"Alternator (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3102,1,"Battery (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3103,1,"Avionics (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3104,1,"Fuel pump (1 = on, 0 = off), read for state, write to control Ok [FS2000+]. For separate switches for separate fuel pumps see offset 3125.",main
+0x3105,1,"VOR1 morse ID sound (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3106,1,"VOR2 morse ID sound (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3107,1,"ADF1 morse ID sound (1 = on, 0 = off), read for state, write to control [FS2000+]",main
+0x3108,1,"Write 1 here to disable FSUIPC's ""AutoTune ADF1"" facility, if this has been enabled by the user in FSUIPC.INI.",main
+0x3109,1,"This is a bit-oriented control flag byte. These bits are allocated so far: 2^0 (1) = 1 to disable AxisCalibration even if enabled in FSUIPC.INI. Note that this ""AxisCalibration"" is the one specifically concerned with direct offset values--see the Advanced User's guide for the description of the INI parameter for more details. 2^1 (2) = 1 to allow the older (FS98-compatible) axis controls to remain connected even when the main axis controls are disconnected via bits in 310A and 310B below. These are AILERON_SET, ELEVATOR_SET, ELEVATOR_TRIM_SET, RUDDER_SET, THROTTLE_SET and the four THROTTLEn_SET controls. Allowing these through will let autopilot of FBW programs control the relevant values without writing direct to the appropriate offsets, but take care also that the THROTTLEn_SET controls aren't being calibrated in the user's 4-throttle option (page 3 in FSUIPC options). 2^7(128) is reserved for external applications to use as they wish. In order to protect the user from a broken or crashed application, the 2^1 flag is cleared 10 seconds after it has been set, so applications will need to repeat the setting every few seconds.",main
+0x310A,1,"Controls the joystick connection to the main flight controls. Normally all zero, set the following bits to actually disconnect the specific joystick axes (from least significant bit = 0): 0 Elevator 1 Aileron 2 Rudder 3 Throttles (all). 4 See below (throttle sync control) 5 Elevator trim 6 Throttle #1 7 Throttle #2 (see next byte for others) This feature is intended for use in protecting autopilot flight from interference from axis flutter. In order to protect the user from a broken or crashed application, all the flags are cleared 10 seconds after they have been set, so applications will need to repeat the setting every few seconds. If the user option is set to automatically disconnect the trim axis in FS A/P vertical modes, the disconnection of Elevator inputs via bit 0 above also disconnects Trim even if bit 5 is not also set. This allows existing A/P or fly-by-wire applications to work with those user implementations using a trim axis. Ok Ok Additionally, bit 2^4 is available to switch ""throttle sync"" on. In this mode all throttles are driven from the main throttle or throttle 1 inputs, and other throttle inputs are discarded. (The same option can also be used from an optional Hot Key). See also offset 3109 above, and also offsets 3328-3339, which provide the live axis values, post calibration. These would have been applied to FS if not prevented by the flags above. Applications can use these facilities to provide a responsive ""fly- by-wire"" control. Note: additional axes are covered in 310B and 341B.",main
+0x310B,1,"Controls the joystick connection to the slewing controls, and the other two separate throttle controls. Normally all zero, set the following bits to actually disconnect the specific axes (from least significant bit = 0): 0 Slew Ahead 1 Slew Side 2 Slew Heading 3 Slew Altitude 4 Slew Bank 5 Slew Pitch 6 Throttle #3 (see previous byte for #1, #2) 7 Throttle #4 In order to protect the user from a broken or crashed application, all the flags are cleared 10 seconds after they have been set, so applications will need to repeat the setting every few seconds. See also offset 3109 above.",main
+0x310C,4,"Reserved",main
+0x3110,8,"Operates a facility to send any `controls' to Flight simulator. This works with all versions of FS & CFS. Write all 8 bytes for controls which use a value (axes and all _SET controls), but just 4 will do for `button' types. This is really two 32-bit integers. The first contains the Control number (normally 65536 upwards), as seen in my FS Controls lists. The second integer is used for the parameter, such as the scaled axis value, where this is appropriate. Always write all 8 bytes in one IPC block if a parameter is used, as FSUIPC will fire the control when you write to 3110. Since version 3.40, FSUIPC-added controls (other than the offset ones) can be used via these offsets too. See the Advanced User's Guide for a current list.",main
+0x3118,2,"COM2 frequency (FS2002+ only), 4 digits in BCD format. A frequency of 123.45 is represented by 0x2345. The leading 1 is assumed.",main
+0x311A,2,"COM1 standby frequency (FS2002+ only), 4 digits in BCD format. A frequency of 123.45 is represented by 0x2345. The leading 1 is assumed.",main
+0x311C,2,"COM2 standby frequency (FS2002+ only), 4 digits in BCD format. A frequency of 123.45 is represented by 0x2345. The leading 1 is assumed.",main
+0x311E,2,"NAV1 standby frequency (FS2002+ only), 4 digits in BCD format. A frequency of 113.45 is represented by 0x1345. The leading 1 is assumed.",main
+0x3120,2,"NAV2 standby frequency (FS2002+ only), 4 digits in BCD format. A frequency of 113.45 is represented by 0x1345. The",main
+0x3122,1,"Radio audio switches (FS2002+ only). Read/write bit settings as follows: 2^7 COM1 transmit 2^6 COM2 transmit 2^5 COM receive both 2^4 NAV1 sound 2^3 NAV2 sound 2^2 Marker sound 2^1 DME sound 2^0 ADF1 sound For ADF2 sound, on FS2004, see offset 02FB.",main
+0x3123,1,"Radio Use/Standby swap toggles (FS2002+ only), Write bits to operate toggles. Don't bother to read it, there's no meaning to anything read. 2^3 COM1 swap 2^2 COM2 swap 2^1 NAV1 swap 2^0 NAV2 swap",main
+0x3124,1,"FS2002 only: ""electric always available"" flag: set if 1, clear if 0. Can be controlled by writing also.",main
+0x3125,1,"FS2000/FS2002 only: separate switches for up to 4 Fuel Pumps (one for each engine). Bit 2^0=Pump1, 2^1=Pump2, 2^2=Pump3, 2^4=Pump4. (see also offset 3104)",main
+0x3126,1,"Set view direction (write only, current view not detected). 0 = FORWARD 1-7 = FORWARD RIGHT and 45 degree views, clockwise 8 = DOWN 9 = UP 10-17 = FORWARD UP then 45 degree UP views, clockwise all other values = RESET",main
+0x3127,9,"FSUIPC weather option control area: see text section earlier in this document.",main
+0x3130,12,"ATC flight number string for currently loaded user aircraft, as declared in the AIRCRAFT.CFG file. This is limited to a maximum of 12 characters, including a zero terminator. [FS2002+ only]",main
+0x313C,12,"ATC identifier (tail number) string for currently loaded user aircraft, as declared in the AIRCRAFT.CFG file. This is limited to a maximum of 12 characters, including a zero terminator. [FS2002+ only]",main
+0x3148,24,"ATC airline name string for currently loaded user aircraft, as declared in the AIRCRAFT.CFG file. This is limited to a maximum of 24 characters, including a zero terminator. [FS2002+ only]",main
+0x3160,24,"ATC aircraft type string for currently loaded user aircraft, as declared in the AIRCRAFT.CFG file. This is limited to a maximum of 24 characters, including a zero terminator. [FS2002+ only]",main
+0x3178,8,"Z (longitudinal, or forward/backward) TAS-velocity in ft/sec relative to the body axes. This is in double floating point format (FLOAT64). [[FS2002+ only]]",main
+0x3180,8,"X (lateral, or left/right) TAS-velocity in ft/sec relative to the body axes (see Note at end of table). This is in double floating point format (FLOAT64). [[FS2002+ only]]",main
+0x3188,8,"Y (vertical, or up/down) TAS-velocity in ft/sec relative to the body axes (see Note at end of table). This is in double floating",main
+0x3190,8,"Z (longitudinal, or forward/backward) GS-velocity in ft/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+]",main
+0x3198,8,"X (lateral, or left/right) GS-velocity in ft/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+] N.B. The sign may be reversed in FS2002? Ok?",main
+0x31A0,8,"Y (vertical, or up/down) GS-velocity in ft/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+]",main
+0x31A8,8,"Pitch velocity in rads/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+]",main
+0x31B0,8,"Roll velocity in rads/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+] N.B. In FS2002 the sign may be reversed, and the units may be 16x Ok?",main
+0x31B8,8,"Yaw velocity in rads/sec relative to world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2000+] N.B. In FS2002 the sign may be reversed, and the units may be 16x Ok?",main
+0x31C0,8,"X (lateral, or left/right) acceleration in ft/sec/sec relative to the world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2002+]",main
+0x31C8,8,"Y (vertical, or up/down) acceleration in ft/sec/sec relative to the world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2002+]",main
+0x31D0,8,"Z (longitudinal, or forward/backward) acceleration in ft/sec/sec relative to the world axes (see Note at end of table). This is in double floating point format (FLOAT64). [FS2002+]",main
+0x31D8,2,"Slew mode longitudinal axis (i.e. forward/backward) input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31DA,2,"Slew mode lateral axis (i.e. left/right) input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31DC,2,"Slew mode yaw axis (i.e. heading) input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31DE,2,"Slew mode vertical axis (i.e. altitude) input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31E0,2,"Slew mode roll axis (i.e. bank) input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31E2,2,"Slew mode pitch axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310B)",main
+0x31E4,4,"Radio altitude in metres * 65536 (Calculated by FSUIPC from ground altitude and aircraft altitude)",main
+0x31E8,4,"Surface type as a 32-bit integer (FS2002+ only). I think this only applies when the aircraft is on the ground. The values probably correspond to the surface encoding in the scenery files, thus: CONCRETE 0 GRASS 1 SOFT, BUMPY GROUND (LANDABLE) WATER 2 GRASS BUMPY 3 VERY BUMPY GRASS & MUD (CRASHABLE) ASPHALT 4 Ok Ok SHORT GRASS 5 LONG GRASS 6 HARD TURF 7 SNOW 8 ICE 9 URBAN 10 FOREST 11 DIRT 12 CORAL 13 GRAVEL 14 OIL TREATED 15 TAR & CHIP STEEL MATS 16 STEEL MESH TEMPORARY RUNWAYS BITUMINUS 17 BRICK 18 MACADAM 19 PLANKS 20 SAND 21 SHALE 22 TARMAC 23 UNKNOWN 254",main
+0x31EC,4,"Surface condition as a 32-bit integer (FS2002+ only), probably as follows: NORMAL 0 WET 1 ICY 2 SNOW 3 SNOW ON A NON-SNOW SURFACE",main
+0x31F0,4,"Pushback status (FS2002+). 3=off, 0=pushing back, 1=pushing back, tail to swing to left (port), 2=pushing back, tail to swing to right (starboard)",main
+0x31F4,4,"Pushback control (FS2002+). Write 0-3 here to set pushback operation, as described for the status, above.",main
+0x31F8,4,"Tug Heading control, for gliders I assume (FS2002+ only). [write only]. The units appear to be the same as the aircraft heading usits (see offset 0580). Ok? Ok?",main
+0x31FC,4,"Tug Speed control, for gliders I assume (FS2002+ only). [write- only]. Units not confirmed, but possible ft/sec. Ok? Ok?",main
+0x3200,12,"These locations operate the FSUIPC facility to send keystrokes to FS. For this to operate correctly the PC must be using Windows 98, ME or 2000. The facilities used just do not exist in Windows 95 nor NT. 3200 message (WM_KEYDOWN or WM_KEYUP) 3204 wParam for the message 3208 lParam for the message All 12 bytes must be written in one IPC write. (This feature is used in WideClient version 3.998 and later, when the [User] parameter ""SendKeyPresses=Yes"" is included in its .ini file, to relay all non-system (i.e. no Alt key) key presses it receives to the WideServer host).",main
+0x320C,4,"Number of Hot Key slots available for Application Programs to use. Currently this is fixed at 56, representing the 56 DWORDs available in the following offsets:",main
+0x3210,224,"56 DWORDs containing zero (when free for use), or a Hot Key specification as detailed earlier in this document. See also 32FE below.",main
+0x32F0,4,"This DWORD controls some protected mode facilities in FSUIPC, designed to set known conditions in FSUIPC and prevent access to specific menus, whilst an application is running. The whole 32 bit DWORD should be written at once, but the use is divided into Bytes, as follows: Bits 0-7 (byte at 32F0): FSUIPC option settings 2^0 Sets FSUIPC ""normal defaults"" Ok Ok 2^1 Sets FSUIPC ""minimum weather defaults"" any non-zero value in this byte stops entry to FSUIPC options Bits 8-15 (byte at 32F1): Flight Sim menu restrictions 2^10 Disable World menu 2^11 Disable Aircraft menu 2^12 Disable Flights menu 2^13 Disable Options menu 2^14 Disable Flights, Aircraft and World menus 2^15 Disable ALL Menus Bits 16-23 (byte at 32F2): reserved Bits 24-31 (byte at 32F3): Timeout (in ticks or 55 mSecs units) The application must write this DWORD regularly for the restrictions to stay in place. The count in the high byte is decremented by 1 every 55 mSecs, so a maximum time of 14 seconds can be set. To be safe the application should be re- writing this with a count of FF (255) every 5 or so seconds, especially if it is likely to be running across WideFS. When the count expires, or the application whites a zero DWORD here, all the options and menus return to normal.",main
+0x32F4,2,"The 16-bit ID of the last menu command item accessed in FS can be read here. By ""access"" is not meant ""used""-that cannot be determined easily. Just having a menu command highlit will denote an access. To decode command Ids, use FSUIPC logging. First, before running FSUIPC set ""Debug=Please"" and ""LogExtras=64"" into the FSUIPC.INI file. Then run FS and select the menu items in which you are interested. Examine the FSUIPC Log afterwards to determine the ID.",main
+0x32F6,2,"FSUIPC selected technical option inhibits. Set bits here to turn off specific options and prevent the user turning them back on, for a limited time (max 14 seconds). To keep options turned off you need to write this mask at regular intervals (e.g. every 5 seconds). Note that this is not obeyed if the user has selected to option to disallow all external control of his options. If he has done this, you can detect it by reading this location back within the time limit. If it is zero, not the value written, then the user is preventing your control over his settings. Bits allocated so far are as follows (bit 0 = 2^0 bit): 0 Reverse elevator trim sense 1 Fix control accelerations 2 Rudder spike elimination 3 Elevator spike elimination 4 Aileron spike elimination 5 Autopilot altitude fix (enable V/S sign corrn.) 6 Extend battery life 7 FS clock seconds sync",main
+0x32F8,1,"This provides options to inhibit certain aircraft operations, for use in breakdown or precise control implementations. Set individual bits for individual subsystems. Currently the following are available, all related to hydraulic power: 2^0 Set to inhibit flap operation 2^1 Set to inhibit spoiler operation 2^2 Set to inhibit gear operation Yes Yes 2^3 reserved 2^4 Set to inhibit Engine #1 reverser 2^5 Set to inhibit Engine #2 reverser 2^6 Set to inhibit Engine #3 reverser 2^7 Set to inhibit Engine #4 reverser Note that these stop operation from axis and button controls very well, and also from key presses and mouse clicks--but in these latter two cases it is done by detecting a change in the system and changing it back. This works, but the device will sometimes try to move, and this can be noticeable, especially for some reason with the flaps--the indicator gives a little jump and the noise briefly starts. [ FS2002 and later only]",main
+0x32F9,1,"Brakes being used flag. This is non-zero if the user has pressed the brakes (left, right or both) recently. It stays non-zero for a second after the last brake control or significant axis increase seen. It does not stay set for continued constant brake pressure via the axis inputs. It operates also for increasing values written to offset 0C00 or 0C01. Note: this is only fully implemented for FS2004+. It will work for buttons and axes in earlier versions, but not keyboard braking.",main
+0x32FA,2,"Text display control word. You can display messages from an external program just like an Adventure. Write the message as a zero-terminated string to offset 3380 (see below), subject to the maximum of 128 characters including the zero terminator, then write a number to this offset, 32FA, as follows: 0 display till replaced +n display for n seconds, or until replaced -1 display and scroll, or until replaced -n display and scroll, or for n seconds, or until replaced In the last two cases, whether the message scrolls or not depends upon the setting of the ""Options--Settings--General--Text Display"" option. The time limit only applies when scrolling is off, otherwise the message simply expires when fully scrolled off the screen. See also offset 1274 above, and the ""white messages"" option in 3302 below.",main
+0x32FC,2,"AIR file change counter (incremented by FSUIPC whenever the AIR file as defined at offset 3C00 changes). This is also incremented when the FS2004 control to ""reload user aircraft"" is detected--assign it to a joystick button or to a Key in FSUIPC for this. FSUIPC cannot detect controls arising from key presses assigned in FS dialogues.",main
+0x32FE,1,"Hot Key change counter, incremented by FSUIPC whenever any of the Hot Keys defined in the table at offset 3210 occurs and therefore has its flag set by FSUIPC.",main
+0x32FF,1,"Hot Button change counter, incremented by FSUIPC whenever any of the Hot Buttons defined in the table at offset 2910 changes state in the right way, and therefore has its flag set by FSUIPC.",main
+0x3300,2,"[FS2k, CFS2 and FS98, as applicable] Additional radio and autopilot status indicators (read only access). Allocation by bits which are set when true. Bit 0 = least Ok Ok significant (value 1): 0 = reserved 1 = good NAV1 2 = good NAV2 3 = good ADF1 4 = NAV1 has DME 5 = NAV2 has DME 6 = NAV1 is ILS 7 = AP NAV1 radial acquired 8 = AP ILS LOC acquired (incl BC--see 10) 9 = AP ILS GS acquired 10=AP ILS LOC is BC 11=good ADF2 (FS2004) 12=NAV2 is ILS 13-15 reserved",main
+0x3302,2,"Assorted FSUIPC options, set by user parameters: read-only via the IPC. Those allocated so far (bits from least significant): 0 = Static (i.e. non-scrolling) messages sent to FS are to be displayed in white rather than the default red. (If AdvDisplay is installed it must be version 2.11 or later for this option). 1 = This is FS2004 (or later) but MakeItVersionFS2002 has been used in the INI to ""fiddle"" the reported value in 3308 to show FS2002.",main
+0x3304,4,"FSUIPC version number: The HIWORD (i.e. bytes 3306-7) gives the main version as BCD x 1000: e.g. 0x1998 for 1.998 The LOWORD (bytes 3304-5) gives the Interim build letter: 0=none, 1-26=a-z: e.g. 0x0005 = 'e'",main
+0x3308,2,"FS version, as determined by FSUIPC: Currently only one of these: 1 = FS98 2 = FS2000 3 = CFS2 4 = CFS1 5 = reserved 6 = FS2002 7 = FS2004 ""A Century of Flight"" 8 = FSX 9 = ESP 10=P3D (see also bit 1 in offset 3302 above)",main
+0x330A,2,"Fixed read-only pattern, set to 0xFADE. Use this to check that the values in 3304-3308 are valid (Note: the supplied LIB writes its version number here, but this has no effect and is only for assistance when viewing LOG files).",main
+0x330C,2,"Assorted status flags, the only ones which are of use to applications being: 2^1 When set this indicates that programs have full access to the IPC not. This can be read without triggering the message box to users which tells them of an unaccredited access attempt. Note that on WideClient it will always be set, assuming WideServer is registered on the FS PC. 2^2 Set if the user has fully registered FSUIPC 2^3 Set when FS is closing (EXIT event seen). This applies to FS2004 only, and isn't actually likely to be readable in time by applications. Variable, see text Ok 2^4 Set when the user Throttle Sync option (in the Hot Keys page of FSUIPC options) is enabled.",main
+0x330E,1,"Count of external IPC applications seen connecting since the session began. Keeps increasing till it gets to 255 then stays at that value.",main
+0x330F,17,"Reserved area for WideFS KeySend facility (version 4.23 and later)",main
+0x3320,2,"This word is used to activate a facility supported by WideFS to automatically shut down the PCs running WideServer (i.e. this one) and WideClient. The .ini files of each WideFS component which is to activate the shutdown needs the ""AllowShutdown=Yes"" parameter included. The application performing the shut down action must write 0xABCD to this offset. WideServer automatically resets this word to zero 5 seconds afterwards, before it initiates its own PC's shutdown if specified. This delay is to ensure the Clients get the message before the host dies, and the clearing to zero is done so that the survivors can continue. Since version 5.30, WideFS also provides the lesser option ""AllowShutdown=App"" which only closes down the WideClient or, in the case of WideServer, the FS session. Later still the ""AppOnly"" variation was added, which keeps WideClient running, ready to reload the applications when FS restarts. A hot key facility to invoke this WideFS shutdown from the FS keyboard is added in version 5.301 of WideServer. Since version 6.40 of WideFS the pattern 0xDCBA written here invokes a ""close application"" action. On all WideFS PCs with any form of shutdown allowed, this pattern closes only those applications loaded by WideFS and leaves WideClient running ready to reload them. On the Server, if it is allowed, it closes FS itself. A hot key facility is provided for this variant, too.",main
+0x3322,2,"WideServer version number, if running and if version 5.00 or later. Otherwise this is zero. This is a BCD value giving the version number x 1000, for example 0x5110 means version 5.110. See also offset 333C.",main
+0x3324,4,"This is the altimeter reading in feet (or metres, if the user is running with the preference for altitudes in metres), as a 32-bit signed integer. Please check offset 0C18 to determine when metres are used (0C18 contains `2'). The same value can be calculated from the actual altitude and the difference between the QNH and the altimeter ""Kollsman"" pressure setting, but this value ensures agreement.",main
+0x3328,2,"Elevator Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x332A,2,"Aileron Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x332C,2,"Rudder Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset",main
+0x332E,2,"Throttle Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A). This is the single throttle, applied to whichever engines are denoted by the bits in offset 0888.",main
+0x3330,2,"Throttle 1 Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x3332,2,"Throttle 2 Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x3334,2,"Throttle 3 Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x3336,2,"Throttle 4 Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x3338,2,"Elevator Trim Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 310A).",main
+0x333A,2,"Throttle lower limit (FS2002 and later only). This is normally 0 if no reverse is available, otherwise gives the reverse limit such as -4096 (for 25%). For earlier versions than FS2002 this location will be zero.",main
+0x333C,2,"WideFS flags: only set from version 5.50 or later of WideFS. Flags used so far are: 2^0 1 =if TCP is being used, 0 if SPX 2^1 1 if connected at all, 0 is waiting for connections See offset 3322 for WideFS version number, which also confirms that WideServer is installed and running.",main
+0x333E,2,"Weather clear count: This is incremented every time FS's ""clear weather"" routine is called, for whatever reason.",main
+0x3340,36,"This area is used for externally signalled ""joystick button"" control a set of 288 ""virtual buttons"". Each DWORD or 32 bits represents one ""joystick"" with 32 buttons. If an external program sets or clears a bit in any of these 9 DWORDS the ""Buttons"" page in FSUIPC will register the change as a button operation on one of Joystick numbers 64 to 73 (corresponding to the 9 DWORDs). So, FSUIPC can be used to program whatever actions the user wants. See also offset 29F0.",main
+0x3364,1,"FS2004 ""Ready to Fly"" indicator. This is non-zero when FS is loading, or reloading a flight or aircraft or scenery, and becomes zero when flight mode is enabled (even if the simulator is paused or in Slew mode).",main
+0x3365,1,"""In Menu or Dialog"" flag. This byte is non-zero when FS is effectively paused because the user accessed the Menu, or is in a dialogue resulting from menu or other selection activity. The non-zero values are: 1 = FS frozen because of menu activity 2 = FS frozen because of modal dialogue Both bits may be set in dialogues accessed through the menu. Note that the 2 bit may flicker a little on exit from the dialogue, due to the way it is detected. In FS2004 the byte at 3364 should also be considered when Ok Ok using this flag--there are some conditions, like reloading scenery or aircraft or flights, which effectively freeze the sim in ways not detectable except by the method used for the ""ready to fly"" indicator.",main
+0x3366,1,"This byte reflects the FS2004 ""Engine on Fire"" flags. I'm not sure if FS actually simulates such events, but it appears to have allocated Gauge-accessible variables to indicate them. This byte uses bits 2^0-2^3 as flags for fires in Engines 1 to 4, respectively.",main
+0x3367,1,"This byte shows doors that are open (FS2004 only). At present this only provides bit 2^0 for the main doors.",main
+0x3368,4,"Reserved for PFC.DLL events.",main
+0x336C,2,"Frame rate calling counter. This is simply a number that is incremented each time FSUIPC is entered from FS using the entry related to frame rates.",main
+0x336E,2,"Toe brake axes have been selected as ""Set"" in FSUIPC's joystick pages if this is non-zero. Byte 336E is non-zero for Left Brake, byte 336F for Right Brake. Note that this only means that the user has told FSUIPC to handle the toe braking, by pressing ""Set"". It will only actually do so if it sees brake messages.",main
+0x3370,4,"Four single byte PFC driver ""alive"" counters: 3370 = COM port read thread alive and running 3371 = Elevator trim motor action (0=off, 1=up, 2=dn) 3372 = COM port write thread alive 3373 = Main FS chain alive N.B. without the main FS chain running the other three aren't maintained in any case, so mean nothing.",main
+0x3374,4,"This is the ""live"" millisecond count as used in the FSUIPC Log. It is updated on each FS chained call to FSUIPC.",main
+0x3378,4,"This is the millisecond timestamp value of the most recent line in the current FSUIPC Log. It is updated when each line is logged.",main
+0x337C,1,"Propeller de-ice switch, (1 = on, 0 = off), read for state, write to control [FS2002+]. This should operate with aircraft defined to have the facility, but in fact it merely reflects the older Anti-Ice switch. The TOGGLE_PROP_DEICE control does nothing.",main
+0x337D,1,"Structural de-ice switch, (1 = on, 0 = off), read for state, write to control [FS2002+]. Although this is documented in both FS2002 and FS2004 panel SDKs, with a token value and an FS control, it appears to do nothing. Possibly it needs some action in the AIR file or Aircraft.CFG, but there's nothing in the official documentation.",main
+0x337E,2,"FSUIPC activity count. Simply a number that is incremented every time FSUIPC receives a call or message from Flight Simulator. This can be used through WideFS to check if FS is still active, for example. Note that when FS is loading aircraft or scenery/textures, this value may not change for many seconds as FSUIPC is then not getting any processor time at all.",main
+0x3380,128,"Message text area, where AdvDisplay.dll (if running) stores a copy of the ADVenture text display. This can be useful for programs wishing to display the adventure texts on a separate PC, via WideFS (the freeware ShowText.exe is an example). The text is truncated if longer than 127 characters, there always being a zero terminator provided. You can also write messages to this area, always zero terminated, for display on the FS windshield or via AdvDisplay if it is running. After placing the message text, you must write the 16- Ok Ok bit timer value to offset 32FA to make FSUIPC send the message through to FS (see 32FA above).",main
+0x3400,2,"FSUIPC logging options, reading and setting, bit-oriented with bits used as follows (bit numbers from bit 0 = least significant): 0 = logging enabled (ignored, as logging is always enabled nowadays) 1 = weather 2 = IPC writes 3 = IPC reads 4 = Extras 5 = Extended, technical button and key logging 6 = VRI comms 7 = com HID 8 = L:Vars 9 = Axes 10 = Events 11 = Button/key standard logging 12 = Lua logging separate",main
+0x3410,2,"Assorted indicator flags. These are the only ones currently set (bit numbers, bit 0 = 2^0): 4 Engine 1 Reverser is set but inhibited* 5 Engine 2 Reverser is set but inhibited* 6 Engine 3 Reverser is set but inhibited* 7 Engine 4 Reverser is set but inhibited* * Reverser inhibits are set in offset 32F8. Note that these flags will be cleared only when the inhibit is removed or the relevant throttle input goes positive (i.e. not just to idle).",main
+0x3412,2,"Spoiler Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 341A). Copy this to 0BD0 for normal spoiler action.",main
+0x3414,2,"Flaps Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 341A). Copy this to 0BDC for normal flaps action.",main
+0x3416,2,"Left Brake Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 341A). Copy this to 0BC4 for normal left brake action.",main
+0x3418,2,"Right Brake Axis input value, post calibration, just before being applied to the simulation (if allowed to by the byte at offset 341A). Copy this to 0BC6 for normal right brake action.",main
+0x341A,1,"Controls the joystick connection for ancillary axis controls, currently Left and Right brake, flaps and spoiler axes. Normally all zero, set the following bits to actually disconnect the specific joystick axes (from least significant bit = 0): 0 Left brake (""Axis Left Brake Set"") 1 Right Brake (""Axis Right Brake Set"") 2 Flaps 3 Spoilers This feature is intended for use in simulating relevant subsystem failures or partial failures. Programs can read the input axis values from offsets 3412-3418 above, and apply them, after appropriate modification, to the relevant FS axis offsets (at 0BC4 and 0BC6 for Brakes, 0BDC for Flaps or 0BD0 for Spoiler. In order to protect the user from a broken or crashed application, the flags are cleared 10 seconds after they have been set, so applications will need to repeat the setting every few seconds. Note that this byte is effectively ""write only"". Upon reading it will always appear to contain zero.",main
+0x3470,8,"Ambient wind X component, double float (FS2002+), m/sec",main
+0x3478,8,"Ambient wind Y component, double float (FS2002+)., m/sec Ok Ok (with In FS2004 (only), values written here are sustained by FSUIPC for up to 14 seconds, or until another value is written. This can be used by applications to provide things like lift for glider soaring, or fast variations to emulate vertical turbulence. The values written here are not subject to FSUIPC's smoothing, and won't be reflected in any normal weather read-outs like ATIS. extra facilities)",main
+0x3480,8,"Ambient wind Z component, double float (FS2002+), m/sec",main
+0x3488,8,"Ambient wind velocity, double float (FS2002+), m/sec",main
+0x3490,8,"Ambient wind direction, double float (FS2002+), True",main
+0x3498,8,"Ambient pressure, double float (FS2002+). This is accurate in FS2004, but suspicious in FS2002. See text",main
+0x34A0,8,"Sea level pressure (QNH), double float (FS2002+)",main
+0x34A8,8,"Ambient temperature, double float (FS2002+)",main
+0x34B0,8,"Pressure Altitude (metres), double float. This is the indicated altitude when the altimeter Kollsman setting is 1013.2 hPa (29.92"").",main
+0x34B8,8,"Standard ATM Temperature, degrees Rankine, double float. This is the expected temperature at the actual AMSL in the International Standard Atmosphere model.",main
+0x34C8,8,"Total velocity, ft/sec, double float. This is the resultant velocity of the three X,Y,Z orthogonal velocities given in offsets 3178, 3180 and 3188.",main
+0x3500,24,"ATC aircraft model string for currently loaded user aircraft, as declared in the AIRCRAFT.CFG file. This is limited to a maximum of 24 characters, including a zero terminator. [FS2002+ only]",main
+0x3518,8,"This double provides the FS-set ""Ambient Wind Y"" value within about one second of offset 3478 being written by an application, to control up and down drafts. This allows such a program to monitor FS/scenery arranged updrafts and adjust its actions accordingly. [FS2004 only]",main
+0x3520,2,"Earliest version number of connected WideClients (or clients which have been connected). Zero if no connections have been made, or if all connected clients have been version 6.441 or before.",main
+0x3541,1,"This operates the FSUIPC ""freeze flight position"" facility. This keeps the aircraft at the same latitude and longitude for as long as it is engaged. The altitude and attitude of the aircraft is free to change, and, in fact, the aircraft flies as normal except for not changing its position over the ground. This is apparently a very useful facility for training environments. For program control, write a non-zero values to this one byte offset. This acts as a timer. The freeze will last for as long as this byte is non-zero. It is used as a time, counting down 1 every timer tick of 55 mSecs or so. To retain the freeze for a good time, write 255 here and do so every 5-10 seconds. Allow for WideFS delays. Note that if FS is paused, then the freeze lasts until the pause is released and re-engaged. Ok, but not smooth, and FS jumps to ""real"" position when released",main
+0x3542,2,"Standby altimeter pressure setting (""Kollsman"" window). As millibars (hectoPascals) * 16. [This is used by FSUIPC to maintain offset 3544. It is not used by FS at all]",main
+0x3544,4,"This is the standby altimeter reading in feet (or metres, if the user is running with the preference for altitudes in metres), as a 32-bit signed integer. Please check offset 0C18 to determine when metres are used (0C18 contains `2'). Ok Ok This value is maintained by FSUIPC using the pressure setting supplied in offset 3542. It isn't used in FS itself, but is supplied for additional gauges and external altimeters so that the standby can be kept at the correct (or last notified) QNH whilst the main altimeter is used for Standard settings (for airliners flying Flight Levels).",main
+0x3548,8,"Horizon bars offset, as a percentage of maximum, in floating point double format. (-100.0 down to +100.0 up). On the default Cessnas the maximum offset is 10 degrees. [Read only on FS2004]",main
+0x3550,56,"Reserved for FSUIPC diagnostics related to Gauge Mousing",main
+0x3590,4,"Engine 1 Fuel Valve, 1 = open, 0 = closed. Can write to operate. [FS2002+]",main
+0x3594,4,"Engine 2 Fuel Valve, 1 = open, 0 = closed. Can write to operate. [FS2002+]",main
+0x3598,4,"Engine 3 Fuel Valve, 1 = open, 0 = closed. Can write to operate. [FS2002+]",main
+0x359C,4,"Engine 4 Fuel Valve, 1 = open, 0 = closed. Can write to operate. [FS2002+]",main
+0x35A0,8,"Airspeed Mach value, double float (FS2002+)",main
+0x35A8,8,"Reciprocating engine 4 manifold pressure, in lbs/sqft, as a double (FLOAT64). Divide by 70.7262 for inches Hg.",main
+0x35B0,8,"Engine 4 cowl flap position, as a double float: 0.0=fully closed, 1.0=fully open. Can be used to handle position and set it. . [FS2000-FS2004 only]",main
+0x35D0,4,"Reciprocating engine 4, left magneto select (1 = on, 0 = off)",main
+0x35D4,4,"Reciprocating engine 4, right magneto select (1 = on, 0 = off)",main
+0x35D8,8,"Reciprocating engine 4 fuel/air mass ratio, as a double (FLOAT64).",main
+0x35E0,8,"Reciprocating engine 4 brake power in ft-lbs, as a double (FLOAT64). Divide by 550 for HP.",main
+0x35E8,8,"Reciprocating engine 4 carburettor temperature, in degrees Rankine, as a double (FLOAT64).",main
+0x35FC,4,"Reciprocating engine 4 emergency boost active flag (32-bit BOOLEAN). On some aircraft this controls whether the supercharger is active or not.",main
+0x3600,8,"Reciprocating engine 4 emergency boost elapsed time in seconds, as a double (FLOAT64). This counts how long the boost has been engaged, when it is made active by an FS control. FS turns it off when reaching 312. You can keep it going by occasionally writing 0 here.",main
+0x3608,8,"Reciprocating engine 4 wastegate position (read-only, effectively)",main
+0x3628,8,"Reciprocating engine 4 fuel pressure (double or FLOAT64)",main
+0x3640,4,"Reciprocating engine 4 tank selector, using the same numbers as 0AF8.",main
+0x3648,4,"Reciprocating engine 4, number of fuel tanks supplying fuel.",main
+0x3654,4,"Reciprocating engine 4 fuel available flag (0 or 1).",main
+0x3668,8,"Reciprocating engine 3 manifold pressure, in lbs/sqft, as a double (FLOAT64). Divide by 70.7262 for inches Hg.",main
+0x3670,8,"Engine 3 cowl flap position, as a double float: 0.0=fully closed, 1.0=fully open. Can be used to handle position and set it. [FS2000-FS2004 only]",main
+0x3690,4,"Reciprocating engine 3, left magneto select (1 = on, 0 = off)",main
+0x3694,4,"Reciprocating engine 3, right magneto select (1 = on, 0 = off)",main
+0x3698,8,"Reciprocating engine 3 fuel/air mass ratio, as a double (FLOAT64).",main
+0x36A0,8,"Reciprocating engine 3 brake power in ft-lbs, as a double",main
+0x36A8,8,"Reciprocating engine 3 carburettor temperature, in degrees Rankine, as a double (FLOAT64). [FSUIPC version 3.401 or later]",main
+0x36BC,4,"Reciprocating engine 3 emergency boost active flag (32-bit BOOLEAN). On some aircraft this controls whether the supercharger is active or not.",main
+0x36C0,8,"Reciprocating engine 3 emergency boost elapsed time in seconds, as a double (FLOAT64). This counts how long the boost has been engaged, when it is made active by an FS control. FS turns it off when reaching 312. You can keep it going by occasionally writing 0 here.",main
+0x36C8,8,"Reciprocating engine 3 wastegate position (read-only, effectively)",main
+0x36E8,8,"Reciprocating engine 3 fuel pressure (double or FLOAT64)",main
+0x3700,4,"Reciprocating engine 3 tank selector, using the same numbers as 0AF8.",main
+0x3708,4,"Reciprocating engine 3, number of fuel tanks supplying fuel.",main
+0x3714,4,"Reciprocating engine 3, fuel available flag (0 or 1).",main
+0x3728,8,"Reciprocating engine 2 manifold pressure, in lbs/sqft, as a double (FLOAT64). Divide by 70.7262 for inches Hg.",main
+0x3730,8,"Engine 2 cowl flap position, as a double float: 0.0=fully closed, 1.0=fully open. Can be used to handle position and set it. . [FS2000-FS2004 only]",main
+0x3750,4,"Reciprocating engine 2, left magneto select (1 = on, 0 = off)",main
+0x3754,4,"Reciprocating engine 2, right magneto select (1 = on, 0 = off)",main
+0x3758,8,"Reciprocating engine 2 fuel/air mass ratio, as a double (FLOAT64).",main
+0x3760,8,"Reciprocating engine 2 brake power in ft-lbs, as a double (FLOAT64). Divide by 550 for HP.",main
+0x3768,8,"Reciprocating engine 2 carburettor temperature, in degrees Rankine, as a double (FLOAT64). [FSUIPC version 3.401 or later]",main
+0x377C,4,"Reciprocating engine 2 emergency boost active flag (32-bit BOOLEAN). On some aircraft this controls whether the supercharger is active or not.",main
+0x3780,8,"Reciprocating engine 2 emergency boost elapsed time in seconds, as a double (FLOAT64). This counts how long the boost has been engaged, when it is made active by an FS control. FS turns it off when reaching 312. You can keep it going by occasionally writing 0 here.",main
+0x3788,8,"Reciprocating engine 2 wastegate position (read-only, effectively)",main
+0x37A8,8,"Reciprocating engine 2 fuel pressure (double or FLOAT64)",main
+0x37C0,4,"Reciprocating engine 2 tank selector, using the same numbers as 0AF8.",main
+0x37C8,4,"Reciprocating engine 2, number of fuel tanks supplying fuel.",main
+0x37D4,4,"Reciprocating engine 2, fuel available flag (0 or 1).",main
+0x37E8,8,"Reciprocating engine 1 manifold pressure, in lbs/sqft, as a double (FLOAT64). Divide by 70.7262 for inches Hg.",main
+0x37F0,8,"Engine 1 cowl flap position, as a double float: 0.0=fully closed, 1.0=fully open. Can be used to handle position and set it. [FS2000-FS2004 only]",main
+0x3810,4,"Reciprocating engine 1, left magneto select (1 = on, 0 = off)",main
+0x3814,4,"Reciprocating engine 1, right magneto select (1 = on, 0 = off)",main
+0x3818,8,"Reciprocating engine 1 fuel/air mass ratio, as a double (FLOAT64).",main
+0x3820,8,"Reciprocating engine 1 brake power in ft-lbs, as a double (FLOAT64). Divide by 550 for HP.",main
+0x3828,8,"Reciprocating engine 1 carburettor temperature, in degrees Rankine, as a double (FLOAT64). [FSUIPC version 3.401 or later]",main
+0x383C,4,"Reciprocating engine 1 emergency boost active flag (32-bit BOOLEAN). On some aircraft this controls whether the supercharger is active or not.",main
+0x3840,8,"Reciprocating engine 1 emergency boost elapsed time in seconds, as a double (FLOAT64). This counts how long the boost has been engaged, when it is made active by an FS control. FS turns it off when reaching 312. You can keep it going by occasionally writing 0 here.",main
+0x3848,8,"Reciprocating engine 1 wastegate position (read-only, effectively)",main
+0x3868,8,"Reciprocating engine 1 fuel pressure (double or FLOAT64)",main
+0x3880,4,"Reciprocating engine 1 tank selector, using the same numbers as 0AF8.",main
+0x3888,4,"Reciprocating engine 1, number of fuel tanks supplying fuel.",main
+0x3894,4,"Reciprocating engine 1, fuel available flag (0 or 1).",main
+0x38A8,8,"General engine 4 throttle lever position, as a double (FLOAT64). 0.0=idle, 1.0=max",main
+0x38B0,8,"General engine 4 mixture lever position, as a double (FLOAT64). 0.0=cutoff, 1.0=full rich",main
+0x38B8,8,"General engine 4 propeller lever position, as a double (FLOAT64). 0-1",main
+0x3918,8,"General engine 4 oil temperature in degrees Rankine, as a double (FLOAT64).",main
+0x3920,8,"General engine 4 oil pressure in lbs/sqft, as a double (FLOAT64). Divide by 144 for PSI.",main
+0x3930,8,"General engine 4 EGT in degrees Rankine, as a double (FLOAT64). Convert to Fahrenheit by Rankine",main
+0x3938,4,"Engine 4 generator switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x393C,4,"Engine 4 generator active, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3958,4,"Engine 4 fuel pump switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3968,8,"General engine 3 throttle lever position, as a double (FLOAT64). 0.0=idle, 1.0=max",main
+0x3970,8,"General engine 3 mixture lever position, as a double (FLOAT64). 0.0=cutoff, 1.0=full rich",main
+0x3978,8,"General engine 3 propeller lever position, as a double (FLOAT64). 0-1",main
+0x39D8,8,"General engine 3 oil temperature in degrees Rankine, as a double (FLOAT64).",main
+0x39E0,8,"General engine 3 oil pressure in lbs/sqft, as a double (FLOAT64). Divide by 144 for PSI.",main
+0x39F0,8,"General engine 3 EGT in degrees Rankine, as a double (FLOAT64). Convert to Fahrenheit by Rankine",main
+0x39F8,4,"Engine 3 generator switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x39FC,4,"Engine 3 generator active, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3A18,4,"Engine 3 fuel pump switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3A28,8,"General engine 2 throttle lever position, as a double (FLOAT64). 0.0=idle, 1.0=max",main
+0x3A30,8,"General engine 2 mixture lever position, as a double",main
+0x3A38,8,"General engine 2 propeller lever position, as a double (FLOAT64). 0-1",main
+0x3A98,8,"General engine 2 oil temperature in degrees Rankine, as a double (FLOAT64).",main
+0x3AA0,8,"General engine 2 oil pressure in lbs/sqft, as a double (FLOAT64). Divide by 144 for PSI.",main
+0x3AB0,8,"General engine 2 EGT in degrees Rankine, as a double (FLOAT64). Convert to Fahrenheit by Rankine",main
+0x3AB8,4,"Engine 2 generator switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3ABC,4,"Engine 2 generator active, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3AD8,4,"Engine 2 fuel pump switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3AE8,8,"General engine 1 throttle lever position, as a double (FLOAT64). 0.0=idle, 1.0=max",main
+0x3AF0,8,"General engine 1 mixture lever position, as a double (FLOAT64). 0.0=cutoff, 1.0=full rich",main
+0x3AF8,8,"General engine 1 propeller lever position, as a double (FLOAT64). 0-1",main
+0x3B58,8,"General engine 1 oil temperature in degrees Rankine, as a double (FLOAT64).",main
+0x3B60,8,"General engine 1 oil pressure in lbs/sqft, as a double (FLOAT64). Divide by 144 for PSI.",main
+0x3B70,8,"General engine 1 EGT in degrees Rankine, as a double (FLOAT64). Convert to Fahrenheit by Rankine",main
+0x3B78,4,"Engine 1 generator switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3B7C,4,"Engine 1 generator active, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3B98,4,"Engine 1 fuel pump switch, a 32-bit BOOL (0 = off, 1= on) [FS2000-FS2004 only]",main
+0x3BA0,8,"The tailhook position, as a double floating point value (0.0=fully retracted, 1.0=fully lowered). [FS2002 and FS2004 only]",main
+0x3BA8,40,"Area used by PFC.DLL for axis input, for optional assignment and calibration in FSUIPC. When the PFC driver is not being used, other programs can make use of these offsets to input axis values directly to FSUIPC, which also can then be assigned in FSUIPC and thence calibrated. Note that by default FSUIPC assumes that the normal input here is in the range 0-127, and scales it accordingly. For applications supplying a greater range, possibly up to the maximum allowed for joysticks (-16383 to +16383) you can either use the ""RAW"" option, or, better, let FSUIPC adjust its scaling to suit the range being input. It will adjust this automatically upon seeing the extreme values, or you can preset the scaling using a parameter added to the axis assignments line in the INI file. When the PFC driver is running, application programs or modules can access the raw PFC axis values at these offsets, which are assigned to the hardware as listed below. One 16-bit word is allowed for each (although the PFC axes have a maximum range of 0 to 127). The axes are:",main
+0x3BA8,0,"Aileron",main
+0x3BAA,1,"Elevator",main
+0x3BAC,2,"Rudder",main
+0x3BAE,3,"Quadrant axis 5",main
+0x3BB0,4,"Quadrant axis 3",main
+0x3BB2,5,"Quadrant axis 1",main
+0x3BB4,6,"Left toe brake",main
+0x3BB6,7,"Quadrant axis 6",main
+0x3BB8,8,"Quadrant axis 4",main
+0x3BBA,9,"Quadrant axis 2",main
+0x3BBC,10,"Right toe brake",main
+0x3BBE,11,"Elevator trim",main
+0x3BC0,12,"Aileron trim",main
+0x3BC2,13,"Rudder trim",main
+0x3BC4,14,"Steering tiller",main
+0x3BC6,15,"not used There are control flags (to disconnect these axes) at offset 3BC8. Each bit, 2^0 to 2^15 can be set to disconnect the equivalent numbered axis above.",main
+0x3BD2,2,"This is a 16-bit counter that is incremented each time a FLT file is saved in FS. This applies to flights saved through FS Flights menu, the shortcut key (;), AutoSave, and via the FSUIPC flight saving facilities. The filenames of the saved flights can be read at offset 0400, or (historically) by using the path reading facility at offset 0FF0 and following.",main
+0x3BD6,18,"Panel failure modes (FS2002 and FS2004 only): one byte flag/control for each of the following ""partial panel"" modes: 3BD6 ADF (both on FS2004) 3BD7 ASI 3BD8 Altimeter 3BD9 Attitude Indicator 3BDA COMM1 3BDB COMM2 3BDC Compass 3BDD Avionics master 3BDE Engine (see 0B6B for separate engines) 3BDF Fuel Indicator 3BE0 Heading Indicator 3BE1 NAV1 3BE2 NAV2 3BE3 Pitot heat 3BE4 Transponder 3BE5 Turn Co-ordinator 3BE6 Vacuum 3BE7 VSI",main
+0x3BE8,8,"Attitude Indicator failure timer, as a double floating point value.",main
+0x3BF0,4,"Attitude indicator lock indicator, 32-bit integer but probable only Boolean (0 or 1) [FS2k/CFS2 only]",main
+0x3BF4,4,"Low vacuum indicator, 32-bit integer but probable only Boolean (0 or 1) [FS2k/CFS2 only]",main
+0x3BFA,2,"Flaps détente increment. The full range of flap movement is 0- 0x3FFF (16383). Each détente position or ""notch"" is spaced equally over this range, no matter what flap angle is represented--a table in the AIR file gives those. To obtain the number of détentes, divide this increment value into 16383 and add 1. For example 2047 (0x7FF) would be the increment for 9 positions as on the default FS2K 737.",main
+0x3BFC,4,"Zero Fuel Weight, lbs * 256. This is the aircraft weight plus the Ok Ok payload weight, minus fuel. In FS2004 this changes as the payload is adjusted.",main
+0x3C00,256,"Pathname of the current AIR file, excluding the FS main path (see 3E00), but including everything from ""Aircraft\..."" to the final ""...air"". This is zero padded to fill the 256 bytes available. When this changes the 16-bit counter at 32FC is incremented, so interested programs don't have to keep on reading the whole 256 bytes to check.",main
+0x3D00,256,"Name of the current aircraft (from the ""title"" parameter in the AIRCRAFT.CFG file). Valid for FS2K only.",main
+0x3E00,256,"Path of the Flight Simulator installation, down to and including the FS main folder and a following \ character. If the PC is on a Network and WideFS is in use then the full UNC (universal naming convention) path is given if possible. Examples are: D:\FS2000\ (non-Network) \\MyMainPC\drived\FS2000\ (Network, named PC and named shared drive)",main
+0x3F00,2,"To load or save a Flight (FS2000/2002/FS2004) or Situation (FS98) you first set up the pathname (and optional description) at offset 3F04 below, then write here. Write one of these values: 0 to simply load the specified flight/situation. 1 to save the flight/situation with an empty description 257 to save the flight/situation with a description as well This facility works on FS98 through to FS2004 but not CFS1 nor CFS2. Also note that excepting FS2004, for Loading you don't have to have the files in the ""Pilots"" or ""Situatio"" folder (or ""flights"" for FS2002)--any folder within the FS main folder can be used to load Flights/Situations. However, they can only be saved in ""Pilots"" (FS98/FS2000) or ""Flights\MyFlts"" (FS2002), and this folder is assumed by default. On FS2004 flights are saved in the ""My Documents"" FS folder. Flights are loaded by default from there too - you don't have to specify a path. If you are Loading a file, please allow time for the file to load before expecting any further meaningful response across the FSUIPC interface. FSUIPC will probably not be able to respond for several seconds even on the fastest machines.",main
+0x3F02,2,"FLT/STN file loading counter (incremented by FSUIPC whenever the FLT or STN file, as defined at offset 3F04 changes or is reloaded). This word is read only--attempting to write here will do no harm.",main
+0x3F04,252,"READ: (FS2000/2002/2004 only) Pathname of the currently loaded FLT file, excluding the FS main path (see 3E00) where applicable, but including everything from ""Pilots\..."" or ""Situatio\..."" (or ""Flights\"" in FS2002), or whatever, to the final "".flt"" or "".stn"". This is zero padded to fill the 252 bytes available, or truncated if longer. If the path is outside FS's own path then it is given in UNC format if possible when WideFS is in use. When this changes (or simply reloaded) the 16-bit counter at 3F02 is incremented, so interested programs don't have to keep on reading the whole 252 bytes to check. Ok Ok WRITE: (FS2000, FS2002, FS2004 and FS98) Write the file name for the FLT+WX (FS2000/FS2002) or STN (FS98) file you wish to Load or Save. The name can include the final "".flt"" or "".stn"" but this will be discarded in any case. You can specify a folder (existing within FS's main folder) such as ""Pilots\"" or ""Situatio\"" (""Flights\MyFlts\"" in FS2002) for Loading, but files can only be saved to ""Pilots\"" in FS98/2000, ""Flights\MyFlts\"" in FS2002 and in your documents folder in FS2004. If you give a path for saving, it is discarded. There must be a zero terminator. If you are writing the file, a description can also be specified, following the pathname and its zero terminator. Obviously this is limited by the space available. It must also be terminated by a zero byte, and indicated in the value written to 3F00 above. See 3F00 above for details of actually Loading or Saving the Flight or Situation so identified.",main
+0x4000,512,"Reserved",main
+0x4200,256,"FSUIPC's sound playing interface: see earlier section",main
+0x4300,7424,"Reserved",main
+0x6000,512,"FS2004 GPS data area--only known offsets listed below:",main
+0x6004,4,"FS2004 GPS flags (bits numbered from least significant): 0 ? 1 Active Plan 2 Active Way point 3 Arrived 4 ? 5 Direct To 6 ? 7 Active way point locked 8 Approach loaded 9 Approach Active",main
+0x6008,4,"FS2004 GPS: Unknown progress flags",main
+0x600C,4,"FS2004 GPS: Zulu time in seconds since midnight",main
+0x6010,8,"FS2004 GPS: aircraft latitude, floating point double, in degrees (+ve = N, -ve = S).",main
+0x6018,8,"FS2004 GPS: aircraft longitude, floating point double, in degrees (+ve = E, -ve = W).",main
+0x6020,8,"FS2004 GPS: aircraft altitude, floating point double, in metres.",main
+0x6028,8,"FS2004 GPS: magnetic variation at aircraft, floating point double, in radians (add to magnetic for true, subtract from true for magnetic).",main
+0x6030,8,"FS2004 GPS: aircraft ground speed, floating point double, metres per second.",main
+0x6038,8,"FS2004 GPS: aircraft true heading, floating point double, in radians.",main
+0x6040,8,"FS2004 GPS: aircraft magnetic track, floating point double, in radians.",main
+0x6048,8,"FS2004 GPS: distance to next waypoint, floating point double, in metres.",main
+0x6050,8,"FS2004 GPS: magnetic bearing to next waypoint, floating point double, in radians.",main
+0x6058,8,"FS2004 GPS: cross track error, floating point double, in metres.",main
+0x6060,8,"FS2004 GPS: required true heading, floating point double, in radians.",main
+0x6068,8,"FS2004 GPS: track error, floating point double, in radians.",main
+0x6078,8,"FS2004 GPS: aircraft vertical speed (Needs checking)",main
+0x6080,1,"FS2004 GPS: previous waypoint valid flag (=0 if not valid) No Yes 6081 6? FS2004 GPS: string ID of previous way point, zero terminated",main
+0x608C,8,"FS2004 GPS: previous waypoint latitude, floating point double, in degrees (+ve = N, -ve = S).",main
+0x6094,8,"FS2004 GPS: previous waypoint longitude, floating point double, in degrees (+ve = E, -ve = W).",main
+0x609C,8,"FS2004 GPS: previous waypoint aircraft altitude, floating point double, in metres. No Yes 60A4 6? FS2004 GPS: string ID of next waypoint, zero terminated",main
+0x60AC,8,"FS2004 GPS: next way point latitude, floating point double, in degrees (+ve = N, -ve = S).",main
+0x60B4,8,"FS2004 GPS: next waypoint longitude, floating point double, in degrees (+ve = E, -ve = W).",main
+0x60BC,8,"FS2004 GPS: next waypoint aircraft altitude, floating point double, in metres.",main
+0x60E4,4,"FS2004 GPS: Next waypoint ETE as 32-bit integer, in seconds",main
+0x60E8,4,"FS2004 GPS: Next waypoint ETA as 32-bit integer in seconds, local time",main
+0x60EC,8,"FS2004 GPS: Distance to next waypoint, floating point double, in metres",main
+0x60F4,8,"FS2004 GPS: Distance between previous and next waypoints, floating point double, in metres",main
+0x60FC,4,"FS2004 GPS: Approach mode, as 32-bit integer (needs checking)",main
+0x6100,4,"FS2004 GPS: Approach way point type, as 32-bit integer (needs checking)",main
+0x6104,4,"FS2004 GPS: Approach segment type, as 32-bit integer (needs checking)",main
+0x6108,1,"FS2004 GPS: Approach mode, flag indicating approach waypoint is the runway (needs checking)",main
+0x610C,8,"FS2004 GPS: Course to set (CTS), floating point double, in radians",main
+0x6120,4,"FS2004 GPS: Flight Plan, total number of waypoints, as 32-bit integer",main
+0x6128,4,"FS2004 GPS: Approach way point count, as 32-bit integer (needs checking)",main
+0x6137,5,"FS2004 GPS: Flight plan destination airport ID (This appears to have been optimistic. I can't find the destination ID)",main
+0x613C,4,"FS2004 GPS: Approach way point index, as 32-bit integer (needs checking)",main
+0x6140,8,"FS2004 GPS: Approach name",main
+0x6150,4,"FS2004 GPS: Approach transition index, as 32-bit integer (needs checking). -1 means not valid.",main
+0x6154,8,"FS2004 GPS: Approach transition name",main
+0x615C,1,"FS2004 GPS: Approach is missed flag (needs checking)",main
+0x6160,4,"FS2004 GPS: Approach type (needs checking)",main
+0x6168,4,"FS2004 GPS: Approach time zone deviation, as 32-bit integer (needs checking)",main
+0x616C,4,"FS2004 GPS: Current way point index, starting at 1, as 32-bit integer",main
+0x6170,4,"FS2004 GPS: Approach current way point index, as 32-bit integer (needs checking)",main
+0x6178,8,"FS2004 GPS: Unknown double floating point value",main
+0x6180,8,"FS2004 GPS: Unknown double floating point value",main
+0x6188,8,"FS2004 GPS: Unknown double floating point value",main
+0x6190,4,"FS2004 GPS: Time last waypoint was crossed, seconds since Zulu midnight",main
+0x6198,4,"FS2004 GPS: Destination ETE as 32-bit integer, in seconds",main
+0x619C,4,"FS2004 GPS: Destination ETA as 32-bit integer, in seconds, local time",main
+0x61A0,8,"FS2004 GPS: Route total distance, double floating point, in metres",main
+0x61A8,8,"FS2004 GPS: Estimated fuel burn, double floating point, in gallons",main
+0x61B0,4,"FS2004 GPS: Time of last update to 61B8 (seconds since Zulu midnight)",main
+0x61B8,4,"FS2004 GPS: Count updated every 5 seconds. (purpose as yet unknown)",main
+0x6200,1216,"Reserved",main
+0x66C0,64,"Free for general use, for example in button or keys programming.",main
+0x6700,1632,"Reserved",main
+0x6D60,32,"FSUIPC message window title--up to 32 characters including a zero terminator. (FS2004 only) The message window title can be set by the program using it, but as only one such Window is supported only one title is available. The first program writing it and then a multiline message wins! This only needs doing once, immediately before any multiline messages are sent to 3380.",main
+0x6D80,1408,"Reserved",main
+0x7300,112,"Available for applications: apply for allocations to Pete Dowson",main
+0x7370,1504,"Reserved",main
+0x7840,144,"Available for applications: apply for allocations to Pete Dowson",main
+0x78D0,1840,"Reserved",main
+0x8000,768,"Reserved for FSUIPC and WideFS internals",main
+0x8300,256,"Area in FS2002 and FS2004 reporting and controlling assorted views. Details of those values known follow. This information has been supplied by Matthias Neusinger.",main
+0x8320,1,"Byte value, the view mode in the currently selected window (read/write): FS2004: 1=cockpit, 2=virtual cockpit, 3=tower, 4=spot plane, 5=top down FS2002: 0=cockpit, 1=virtual cockpit, 2=tower, 4=spot plane, 7=top down",main
+0x832C,2,"Zoom setting for selected window in cockpit mode (64 = 1x), read/write",main
+0x832E,2,"Zoom setting for selected window in virtual cockpit mode (64 = 1x), read/write",main
+0x8330,2,"Zoom setting for selected window in tower mode (64 = 1x), read/write",main
+0x8334,2,"Zoom setting for selected window in spot plane mode (64 = 1x), read/write",main
+0x8336,2,"Zoom setting for selected window in top down mode (64 = 1x), read/write",main
+0x833C,2,"Relative direction of spot plane from user aircraft, read/write (in degrees in usual 360 = 65536 format).",main
+0x8340,4,"Distance of spot plane from user aircraft, read/write (in metres * 256).",main
+0x8345,1,"Spot plane transition: gradual is 0, instant if 1. (read/write)",main
+0x8348,4,"Relative altitude of spot plane from user aircraft, read/write (in metres * 256).",main
+0x83BC,24,"View point latitude/longitude/altitude, exactly as at offset 05B0. Read only, FS2004 only.",main
+0x83D4,12,"View point pitch, bank and heading, in same format as that for the user's aircraft at offset 0578. Read only, FS2004 only.",main
+0x8600,232,"Available for applications: apply for allocations to Pete Dowson",main
+0x86E8,2328,"Reserved",main
+0x9000,2048,"Reserved for future improvements",main
+0x9800,1024,"Used by Wideclient's Lua display control",main
+0x9C00,9216,"Reserved",main
+0xC000,4096,"FS2004 New Weather Interface areas, allowing both local and global weather data to be read and written. (details of the NWI are provided separately in the SDK)",main
+0xD000,2048,"FS2004 A.I. ground aircraft additional traffic data (see section on AI Traffic earlier)",main
+0xD800,2048,"FS2004 A.I. airborne aircraft additional traffic data (see section on AI Traffic earlier)",main
+0xE000,4096,"FS2002/4 A.I. ground aircraft traffic data (see section on AI Traffic earlier)",main
+0xF000,4096,"FS2002/4 A.I. airborne aircraft traffic data (see section on AI Traffic earlier) Ok Ok * The FS2004 column in the above table is a work-in-progress. In particular, those entries left blank are currently ""don't knows"", awaiting checking. NOTE on aircraft dynamic values: (thanks to Ian Donohoe) The aircraft linear velocity and acceleration values are, of course, related to specific references. In the cases of the values given these are the ""body axes"", and the ""world axes"". This can become more confusing because of the different ways of naming the axes. In the FS2000 .FLT files (the [SimVars] section), and in the table above, the names are different to those generally used in engineering and mathematics, as follows: Description FS notation Engineering Lateral, left-right X Y Vertical, up-down Y Z Longitudinal, forward-backward Z X Pitch P Q Roll, or bank B P Yaw, or heading H R Here are more specific definitions of the sets of linear reference axes themselves: World frame of reference: X-axis (Z-axis in FS) = True North-South Y-axis (X-axis in FS) = True East-West Z-axis (Y-axis in FS) = True Vertical",main
+0x2054,4,"Panels token TURB_ENGINE_1_TANK_SELECTOR (SINT32)",panels-token
+0x2058,4,"Panels token TURB_ENGINE_1_TANKS_USED (SINT32)",panels-token
+0x2068,4,"Panels token TURB_ENGINE_1_FUEL_AVAILABLE (BOOL)",panels-token
+0x2074,8,"Panels token TURB_ENGINE_1_PCT_AREA (FLOAT64)",panels-token
+0x2084,8,"Panels token TURB_ENGINE_1_VIBRATION (FLOAT64)",panels-token
+0x2154,4,"Panels token TURB_ENGINE_2_TANK_SELECTOR (SINT32)",panels-token
+0x2158,4,"Panels token TURB_ENGINE_2_TANKS_USED (SINT32)",panels-token
+0x2168,4,"Panels token TURB_ENGINE_2_FUEL_AVAILABLE (BOOL)",panels-token
+0x2174,8,"Panels token TURB_ENGINE_2_PCT_AREA (FLOAT64)",panels-token
+0x2184,8,"Panels token TURB_ENGINE_2_VIBRATION (FLOAT64)",panels-token
+0x2254,4,"Panels token TURB_ENGINE_3_TANK_SELECTOR (SINT32)",panels-token
+0x2258,4,"Panels token TURB_ENGINE_3_TANKS_USED (SINT32)",panels-token
+0x2268,4,"Panels token TURB_ENGINE_3_FUEL_AVAILABLE (BOOL)",panels-token
+0x2274,8,"Panels token TURB_ENGINE_3_PCT_AREA (FLOAT64)",panels-token
+0x2284,8,"Panels token TURB_ENGINE_3_VIBRATION (FLOAT64)",panels-token
+0x2354,4,"Panels token TURB_ENGINE_4_TANK_SELECTOR (SINT32)",panels-token
+0x2358,4,"Panels token TURB_ENGINE_4_TANKS_USED (SINT32)",panels-token
+0x2368,4,"Panels token TURB_ENGINE_4_FUEL_AVAILABLE (BOOL)",panels-token
+0x2374,8,"Panels token TURB_ENGINE_4_PCT_AREA (FLOAT64)",panels-token
+0x2384,8,"Panels token TURB_ENGINE_4_VIBRATION (FLOAT64)",panels-token
+0x2420,4,"Panels token PROPELLER_1_FEATHERING_INHIBIT (BOOL)",panels-token
+0x2424,4,"Panels token PROPELLER_1_FEATHERED (BOOL)",panels-token
+0x2428,8,"Panels token PROPELLER_1_SYNC_DELTA_LEVER (FLOAT64)",panels-token
+0x2430,4,"Panels token PROPELLER_1_AUTOFEATHER_ARMED (BOOL)",panels-token
+0x2520,4,"Panels token PROPELLER_2_FEATHERING_INHIBIT (BOOL)",panels-token
+0x2524,4,"Panels token PROPELLER_2_FEATHERED (BOOL)",panels-token
+0x2528,8,"Panels token PROPELLER_2_SYNC_DELTA_LEVER (FLOAT64)",panels-token
+0x2530,4,"Panels token PROPELLER_2_AUTOFEATHER_ARMED (BOOL)",panels-token
+0x2620,4,"Panels token PROPELLER_3_FEATHERING_INHIBIT (BOOL)",panels-token
+0x2624,4,"Panels token PROPELLER_3_FEATHERED (BOOL)",panels-token
+0x2628,8,"Panels token PROPELLER_3_SYNC_DELTA_LEVER (FLOAT64)",panels-token
+0x2630,4,"Panels token PROPELLER_3_AUTOFEATHER_ARMED (BOOL)",panels-token
+0x2720,4,"Panels token PROPELLER_4_FEATHERING_INHIBIT (BOOL)",panels-token
+0x2724,4,"Panels token PROPELLER_4_FEATHERED (BOOL)",panels-token
+0x2728,8,"Panels token PROPELLER_4_SYNC_DELTA_LEVER (FLOAT64)",panels-token
+0x2730,4,"Panels token PROPELLER_4_AUTOFEATHER_ARMED (BOOL)",panels-token
+0x2824,8,"Panels token TOTAL_LOAD_AMPS (FLOAT64)",panels-token
+0x282C,8,"Panels token BATTERY_LOAD (FLOAT64)",panels-token
+0x2834,8,"Panels token BATTERY_VOLTAGE (FLOAT64)",panels-token
+0x2840,8,"Panels token MAIN_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2848,8,"Panels token MAIN_BUS_AMPS (FLOAT64)",panels-token
+0x2850,8,"Panels token AVIONICS_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2858,8,"Panels token AVIONICS_BUS_AMPS (FLOAT64)",panels-token
+0x2860,8,"Panels token HOT_BATTERY_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2868,8,"Panels token HOT_BATTERY_BUS_AMPS (FLOAT64)",panels-token
+0x2870,8,"Panels token BATTERY_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2878,8,"Panels token BATTERY_BUS_AMPS (FLOAT64)",panels-token
+0x2880,8,"Panels token GENERATOR_ALTERNATOR_1_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2888,8,"Panels token GENERATOR_ALTERNATOR_1_BUS_AMPS (FLOAT64)",panels-token
+0x2890,8,"Panels token GENERATOR_ALTERNATOR_2_BUS_VOLTAGE (FLOAT64)",panels-token
+0x2898,8,"Panels token GENERATOR_ALTERNATOR_2_BUS_AMPS (FLOAT64)",panels-token
+0x28A0,8,"Panels token GENERATOR_ALTERNATOR_3_BUS_VOLTAGE (FLOAT64)",panels-token
+0x28A8,8,"Panels token GENERATOR_ALTERNATOR_3_BUS_AMPS (FLOAT64)",panels-token
+0x28B0,8,"Panels token GENERATOR_ALTERNATOR_4_BUS_VOLTAGE (FLOAT64)",panels-token
+0x28B8,8,"Panels token GENERATOR_ALTERNATOR_4_BUS_AMPS (FLOAT64)",panels-token
+0x2A00,8,"Panels token ELEVON_1_DEFLECTION (FLOAT64)",panels-token
+0x2A08,8,"Panels token ELEVON_2_DEFLECTION (FLOAT64)",panels-token
+0x2A10,8,"Panels token ELEVON_3_DEFLECTION (FLOAT64)",panels-token
+0x2A18,8,"Panels token ELEVON_4_DEFLECTION (FLOAT64)",panels-token
+0x2A20,8,"Panels token ELEVON_5_DEFLECTION (FLOAT64)",panels-token
+0x2A28,8,"Panels token ELEVON_6_DEFLECTION (FLOAT64)",panels-token
+0x2A30,8,"Panels token ELEVON_7_DEFLECTION (FLOAT64)",panels-token
+0x2A38,8,"Panels token ELEVON_8_DEFLECTION (FLOAT64)",panels-token
+0x2B08,8,"Panels token HYDRAULICS1_PRESSURE_PSF (FLOAT64)",panels-token
+0x2B1C,8,"Panels token HYDRAULICS1_RESERVOIR_PCT (FLOAT64)",panels-token
+0x2C08,8,"Panels token HYDRAULICS2_PRESSURE_PSF (FLOAT64)",panels-token
+0x2C1C,8,"Panels token HYDRAULICS2_RESERVOIR_PCT (FLOAT64)",panels-token
+0x2D08,8,"Panels token HYDRAULICS3_PRESSURE_PSF (FLOAT64)",panels-token
+0x2D1C,8,"Panels token HYDRAULICS3_RESERVOIR_PCT (FLOAT64)",panels-token
+0x2E08,8,"Panels token HYDRAULICS4_PRESSURE_PSF (FLOAT64)",panels-token
+0x2E1C,8,"Panels token HYDRAULICS4_RESERVOIR_PCT (FLOAT64)",panels-token
+0x2E90,4,"Panels token STANDBY_VACUUM_CIRCUIT_ON (BOOL)",panels-token
+0x2F00,8,"Panels token CG_AFT_LIMIT (FLOAT64)",panels-token
+0x2F08,8,"Panels token CG_FWD_LIMIT (FLOAT64)",panels-token
+0x2F10,8,"Panels token CG_MAX_MACH (FLOAT64)",panels-token
+0x2F18,8,"Panels token CG_MIN_MACH (FLOAT64)",panels-token
+0x2F20,4,"Panels token CONCORDE_VISOR_NOSE_HANDLE (SINT32)",panels-token
+0x2F28,8,"Panels token CONCORDE_VISOR_POS_PCT (FLOAT64)",panels-token
+0x2F30,8,"Panels token CONCORDE_NOSE_ANGLE (FLOAT64)",panels-token
+0x2F38,8,"Panels token GEAR_POS_TAIL (FLOAT64)",panels-token
+0x2F40,8,"Panels token AUTOPILOT_MAX_SPEED (FLOAT64)",panels-token
+0x2F48,8,"Panels token AUTOPILOT_CRUISE_SPEED (FLOAT64)",panels-token
+0x2F50,8,"Panels token BARBER_POLE_MACH (FLOAT64)",panels-token
+0x2F58,4,"Panels token SELECTED_FUEL_TRANSFER_MODE (SINT32)",panels-token
+0x2F60,8,"Panels token HYDRAULIC_SYSTEM_INTEGRITY (FLOAT64)",panels-token
+0x2F68,4,"Panels token ATTITUDE_CAGE_BUTTON (BOOL)",panels-token
+0x3420,4,"Panels token RAD_INS_SWITCH (BOOL32)",panels-token
+0x3424,4,"Panels token LOW_HEIGHT_WARNING (BOOL32)",panels-token
+0x3428,8,"Panels token DECISION_HEIGHT (FLOAT64)",panels-token
+0x3438,8,"Panels token ENGINE_1_FUELFLOW_BUG_POSITION (FLOAT64)",panels-token
+0x3440,8,"Panels token ENGINE_2_FUELFLOW_BUG_POSITION (FLOAT64)",panels-token
+0x3448,8,"Panels token ENGINE_3_FUELFLOW_BUG_POSITION (FLOAT64)",panels-token
+0x3450,8,"Panels token ENGINE_4_FUELFLOW_BUG_POSITION (FLOAT64)",panels-token
+0x3458,8,"Panels token PANEL_AUTOPILOT_SPEED_SETTING (FLOAT64)",panels-token
+0x3460,4,"Panels token AUTOPILOT_AIRSPEED_HOLD_CURRENT (BOOL)",panels-token
+0x34D0,8,"Panels token G_FORCE_MAXIMUM (FLOAT64)",panels-token
+0x34D8,8,"Panels token G_FORCE_MINIMUM (FLOAT64)",panels-token
+0x34E8,4,"Panels token ENGINE1_MAX_RPM (UINT32)",panels-token
+0x34EC,4,"Panels token ENGINE2_MAX_RPM (UINT32)",panels-token
+0x34F0,4,"Panels token ENGINE3_MAX_RPM (UINT32)",panels-token
+0x34F4,4,"Panels token ENGINE4_MAX_RPM (UINT32)",panels-token
+0x3550,2,"Panels token ENGINE4_THROTTLE_LEVER_POS (SINT16)",panels-token
+0x3552,2,"Panels token ENGINE4_PROPELLER_LEVER_POS (UINT16)",panels-token
+0x3554,2,"Panels token ENGINE4_MIXTURE_LEVER_POS (UINT16)",panels-token
+0x3556,2,"Panels token ENGINE4_STARTER_SWITCH_POS (ENUM16)",panels-token
+0x3558,2,"Panels token ENGINE4_MAGNETO_LEFT (BOOL16)",panels-token
+0x355A,2,"Panels token ENGINE4_MAGNETO_RIGHT (BOOL16)",panels-token
+0x3560,2,"Panels token ENGINE3_THROTTLE_LEVER_POS (SINT16)",panels-token
+0x3562,2,"Panels token ENGINE3_PROPELLER_LEVER_POS (UINT16)",panels-token
+0x3564,2,"Panels token ENGINE3_MIXTURE_LEVER_POS (UINT16)",panels-token
+0x3566,2,"Panels token ENGINE3_STARTER_SWITCH_POS (ENUM16)",panels-token
+0x3568,2,"Panels token ENGINE3_MAGNETO_LEFT (BOOL16)",panels-token
+0x356A,2,"Panels token ENGINE3_MAGNETO_RIGHT (BOOL16)",panels-token
+0x3570,2,"Panels token ENGINE2_THROTTLE_LEVER_POS (SINT16)",panels-token
+0x3572,2,"Panels token ENGINE2_PROPELLER_LEVER_POS (UINT16)",panels-token
+0x3574,2,"Panels token ENGINE2_MIXTURE_LEVER_POS (UINT16)",panels-token
+0x3576,2,"Panels token ENGINE2_STARTER_SWITCH_POS (ENUM16)",panels-token
+0x3578,2,"Panels token ENGINE2_MAGNETO_LEFT (BOOL16)",panels-token
+0x357A,2,"Panels token ENGINE2_MAGNETO_RIGHT (BOOL16)",panels-token
+0x3580,2,"Panels token ENGINE1_THROTTLE_LEVER_POS (SINT16)",panels-token
+0x3582,2,"Panels token ENGINE1_PROPELLER_LEVER_POS (UINT16)",panels-token
+0x3584,2,"Panels token ENGINE1_MIXTURE_LEVER_POS (UINT16)",panels-token
+0x3586,2,"Panels token ENGINE1_STARTER_SWITCH_POS (ENUM16)",panels-token
+0x3588,2,"Panels token ENGINE1_MAGNETO_LEFT (BOOL16)",panels-token
+0x358A,2,"Panels token ENGINE1_MAGNETO_RIGHT (BOOL16)",panels-token
+0x35B8,8,"Panels token RECIP_ENGINE4_CARB_HEAT_POS (FLOAT64)",panels-token
+0x35C0,8,"Panels token RECIP_ENGINE4_ALTERNATE_AIR_POS (FLOAT64)",panels-token
+0x35C8,8,"Panels token RECIP_ENGINE4_COOLANT_RESERVOIR_PCT (FLOAT64)",panels-token
+0x35F0,8,"Panels token RECIP_ENGINE4_STARTER_TORQUE (FLOAT64)",panels-token
+0x35F8,4,"Panels token RECIP_ENGINE4_TURBOCHARGER_FAILED (BOOL)",panels-token
+0x3618,8,"Panels token RECIP_ENGINE4_CHT_DEGR (FLOAT64)",panels-token
+0x3644,4,"Panels token RECIP_ENGINE4_TANKS_USED (FLAGS)",panels-token
+0x3678,8,"Panels token RECIP_ENGINE3_CARB_HEAT_POS (FLOAT64)",panels-token
+0x3680,8,"Panels token RECIP_ENGINE3_ALTERNATE_AIR_POS (FLOAT64)",panels-token
+0x3688,8,"Panels token RECIP_ENGINE3_COOLANT_RESERVOIR_PCT (FLOAT64)",panels-token
+0x36B0,8,"Panels token RECIP_ENGINE3_STARTER_TORQUE (FLOAT64)",panels-token
+0x36B8,4,"Panels token RECIP_ENGINE3_TURBOCHARGER_FAILED (BOOL)",panels-token
+0x36D8,8,"Panels token RECIP_ENGINE3_CHT_DEGR (FLOAT64)",panels-token
+0x3704,4,"Panels token RECIP_ENGINE3_TANKS_USED (FLAGS)",panels-token
+0x3738,8,"Panels token RECIP_ENGINE2_CARB_HEAT_POS (FLOAT64)",panels-token
+0x3740,8,"Panels token RECIP_ENGINE2_ALTERNATE_AIR_POS (FLOAT64)",panels-token
+0x3748,8,"Panels token RECIP_ENGINE2_COOLANT_RESERVOIR_PCT (FLOAT64)",panels-token
+0x3770,8,"Panels token RECIP_ENGINE2_STARTER_TORQUE (FLOAT64)",panels-token
+0x3778,4,"Panels token RECIP_ENGINE2_TURBOCHARGER_FAILED (BOOL)",panels-token
+0x3798,8,"Panels token RECIP_ENGINE2_CHT_DEGR (FLOAT64)",panels-token
+0x37C4,4,"Panels token RECIP_ENGINE2_TANKS_USED (FLAGS)",panels-token
+0x37F8,8,"Panels token RECIP_ENGINE1_CARB_HEAT_POS (FLOAT64)",panels-token
+0x3800,8,"Panels token RECIP_ENGINE1_ALTERNATE_AIR_POS (FLOAT64)",panels-token
+0x3808,8,"Panels token RECIP_ENGINE1_COOLANT_RESERVOIR_PCT (FLOAT64)",panels-token
+0x3830,8,"Panels token RECIP_ENGINE1_STARTER_TORQUE (FLOAT64)",panels-token
+0x3838,4,"Panels token RECIP_ENGINE1_TURBOCHARGER_FAILED (BOOL)",panels-token
+0x3858,8,"Panels token RECIP_ENGINE1_CHT_DEGR (FLOAT64)",panels-token
+0x3870,8,"Panels token ENGINE_PRIMER (FLOAT64)",panels-token
+0x3884,4,"Panels token RECIP_ENGINE1_TANKS_USED (FLAGS)",panels-token
+0x38A0,4,"Panels token GENERAL_ENGINE4_FAILURE (BOOL)",panels-token
+0x38A4,4,"Panels token RECIP_ENGINE4_COMBUSTION (BOOL)",panels-token
+0x38C0,4,"Panels token RECIP_ENGINE4_STARTER (BOOL)",panels-token
+0x38C0,8,"Panels token GENERAL_ENGINE4_STARTER (FLOAT64)",panels-token
+0x3928,8,"Panels token RECIP_ENGINE4_OIL_LEAK_PCT (FLOAT64)",panels-token
+0x3940,8,"Panels token RECIP_ENGINE4_DAMAGE_PERCENT (FLOAT64)",panels-token
+0x3948,8,"Panels token RECIP_ENGINE4_COMBUSTION_SOUND_PCT (FLOAT64)",panels-token
+0x3960,4,"Panels token GENERAL_ENGINE3_FAILURE (BOOL)",panels-token
+0x3964,4,"Panels token RECIP_ENGINE3_COMBUSTION (BOOL)",panels-token
+0x3980,4,"Panels token RECIP_ENGINE3_STARTER (BOOL)",panels-token
+0x3980,8,"Panels token GENERAL_ENGINE3_STARTER (FLOAT64)",panels-token
+0x39E8,8,"Panels token RECIP_ENGINE3_OIL_LEAK_PCT (FLOAT64)",panels-token
+0x3A00,8,"Panels token RECIP_ENGINE3_DAMAGE_PERCENT (FLOAT64)",panels-token
+0x3A08,8,"Panels token RECIP_ENGINE3_COMBUSTION_SOUND_PCT (FLOAT64)",panels-token
+0x3A20,4,"Panels token GENERAL_ENGINE2_FAILURE (BOOL)",panels-token
+0x3A24,4,"Panels token RECIP_ENGINE2_COMBUSTION (BOOL)",panels-token
+0x3A40,4,"Panels token RECIP_ENGINE2_STARTER (BOOL)",panels-token
+0x3A40,8,"Panels token GENERAL_ENGINE2_STARTER (FLOAT64)",panels-token
+0x3AA8,8,"Panels token RECIP_ENGINE2_OIL_LEAK_PCT (FLOAT64)",panels-token
+0x3AC0,8,"Panels token RECIP_ENGINE2_DAMAGE_PERCENT (FLOAT64)",panels-token
+0x3AC8,8,"Panels token RECIP_ENGINE2_COMBUSTION_SOUND_PCT (FLOAT64)",panels-token
+0x3AE0,4,"Panels token GENERAL_ENGINE1_FAILURE (BOOL)",panels-token
+0x3AE4,4,"Panels token RECIP_ENGINE1_COMBUSTION (BOOL)",panels-token
+0x3B00,4,"Panels token RECIP_ENGINE1_STARTER (BOOL)",panels-token
+0x3B00,8,"Panels token GENERAL_ENGINE1_STARTER (FLOAT64)",panels-token
+0x3B68,8,"Panels token RECIP_ENGINE1_OIL_LEAK_PCT (FLOAT64)",panels-token
+0x3B80,8,"Panels token RECIP_ENGINE1_DAMAGE_PERCENT (FLOAT64)",panels-token
+0x3B88,8,"Panels token RECIP_ENGINE1_COMBUSTION_SOUND_PCT (FLOAT64)",panels-token

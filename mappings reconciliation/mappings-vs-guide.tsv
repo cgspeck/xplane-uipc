@@ -1,0 +1,89 @@
+offset	type	width	doc_size	status	source	doc_description
+0x3500	string	24	24	ok	static	ATC aircraft model string for currently loaded user aircraft, as declared in the AIRCRAFT.
+0x3D00	string	256	256	ok	static	Name of the current aircraft (from the ""title"" parameter in the AIRCRAFT.CFG file). Vali
+0x313C	string	12	12	ok	static	ATC identifier (tail number) string for currently loaded user aircraft, as declared in the
+0x2480	string	128	-	NOT IN GUIDE	static	
+0x3160	string	24	24	ok	static	ATC aircraft type string for currently loaded user aircraft, as declared in the AIRCRAFT.C
+0x3148	string	24	24	ok	static	ATC airline name string for currently loaded user aircraft, as declared in the AIRCRAFT.CF
+0x3304	u32	4	4	ok	static	FSUIPC version number: The HIWORD (i.e. bytes 3306-7) gives the main version as BCD x 1000
+0x3306	u16	2	-	INSIDE FIELD	static	(inside 0x3304, 4 bytes) FSUIPC version number: The HIWORD (i.e. bytes 3306-7) gives the m
+0x3308	u32	4	2	SIZE DIFFERS	static	FS version, as determined by FSUIPC: Currently only one of these: 1 = FS98 2 = FS2000 3 = 
+0x320C	u32	4	4	ok	static	Number of Hot Key slots available for Application Programs to use. Currently this is fixed
+0x290C	u32	4	4	ok	static	Number of Hot Joystick Button slots available for Application Programs to use. Currently t
+0x3364	u8	1	1	ok	static	FS2004 ""Ready to Fly"" indicator. This is non-zero when FS is loading, or reloading a fli
+0x3365	u8	1	1	ok	static	""In Menu or Dialog"" flag. This byte is non-zero when FS is effectively paused because th
+0x0B52	u8	1	-	NOT IN GUIDE	sim/cockpit2/electrical/APU_generator_on	
+0x0B5C	f32	4	-	NOT IN GUIDE	sim/cockpit2/electrical/APU_generator_volts	
+0x0B54	f32	4	-	NOT IN GUIDE	sim/cockpit2/electrical/APU_N1_percent	
+0x0354	u16	2	2	ok	sim/cockpit2/radios/actuators/transponder_code	Transponder setting, 4 digits in BCD format: 0x1200 means 1200 on the dials.
+0x0C1A	u16	2	2	ok	sim/time/sim_speed (writable)	Simulation rate *256 (i.e. 256=1x)
+0x0E8C	i16	2	2	ok	sim/weather/aircraft/temperature_ambient_deg_c	Outside Air Temperature (OAT), degrees C * 256
+0x0264	u16	2	2	ok	sim/time/paused	Pause indicator (0=Not paused, 1=Paused)
+0x02BC	i32	4	4	ok	sim/flightmodel/position/indicated_airspeed	IAS: Indicated Air Speed, as knots * 128
+0x6010	f64	8	8	ok	sim/flightmodel/position/latitude	FS2004 GPS: aircraft latitude, floating point double, in degrees (+ve = N, -ve = S).
+0x6018	f64	8	8	ok	sim/flightmodel/position/longitude	FS2004 GPS: aircraft longitude, floating point double, in degrees (+ve = E, -ve = W).
+0x3324	i32	4	4	ok	expr	This is the altimeter reading in feet (or metres, if the user is running with the preferen
+0x0580	u32	4	4	ok	expr	Heading, *360/(65536*65536) for degrees TRUE. [Can be set in slew or pause states]
+0x0BD0	u32	4	4	ok	expr	Spoilers control, 0 off, 4800 arm, then 5620 (7%) to 16383 (100% fully deployed). The 4800
+0x2E80	u32	4	4	ok	sim/cockpit2/switches/avionics_power_on (writable)	Master avionics switch (0=Off, 1=On)
+0x281C	u32	4	4	ok	expr	Master battery switch (1=On, 0=Off)
+0x3102	u16	2	1	SIZE DIFFERS	expr	Battery (1 = on, 0 = off), read for state, write to control [FS2000+]
+0x0366	u16	2	2	ok	sim/flightmodel/failures/onground_any	Aircraft on ground flag (0=airborne, 1=on ground). Not updated in Slew mode.
+0x02C8	i32	4	4	ok	sim/flightmodel/position/vh_ind	Vertical speed, signed, as 256 * metres/sec. For the more usual ft/min you need to apply t
+0x030C	i32	4	4	ok	expr	Vertical speed, copy of offset 02C8 whilst airborne, not updated whilst the ""on ground"" 
+0x11BA	u16	2	2	ok	sim/flightmodel/forces/g_nrml	G Force: units unknown, but /625 seems to give quite sensible values.
+0x0D0C	u16	2	2	ok	expr	Lights (FS2k/CFS2), a switch for each one (bits from lo to hi): 0 Navigation 1 Beacon 2 La
+0x02B4	i32	4	4	ok	sim/flightmodel/position/groundspeed	GS: Ground Speed, as 65536*metres/sec. Not updated in Slew mode!
+0x2F70	f64	8	8	ok	sim/flightmodel/position/true_theta	Attitude indicator pitch value, in degrees. Double floating point format. This is the ATTI
+0x2F78	f64	8	8	ok	sim/flightmodel2/position/true_phi	Attitude indicator bank value, in degrees. Double floating point format. This is the ATTIT
+0x30A8	f64	8	8	ok	sim/flightmodel/position/Qrad	Pitch velocity in rads/sec relative to the body axes (see Note at Ok end of table). This i
+0x30B0	f64	8	8	ok	sim/flightmodel/position/Prad	Roll velocity in rads/sec relative to the body axes (see Note at end of table). This is in
+0x30B8	f64	8	8	ok	sim/flightmodel/position/Rrad	Yaw velocity in rads/sec relative to the body axes (see Note at end of table). This is in 
+0x3060	f64	8	8	ok	sim/flightmodel/forces/g_side	X (lateral, or left/right) acceleration in ft/sec/sec relative to the body axes (see Note 
+0x3068	f64	8	8	ok	expr	Y (vertical, or up/down) acceleration in ft/sec/sec relative to the body axes (see Note at
+0x3070	f64	8	8	ok	sim/flightmodel/forces/g_axil	Z (longitudinal, or forward/backward) acceleration in ft/sec/sec relative to the body axes
+0x3098	f64	8	8	ok	sim/flightmodel/position/local_vx	X (lateral, or left/right) GS-velocity in ft/sec relative to the body axes (see Note at en
+0x30A0	f64	8	8	ok	sim/flightmodel/position/local_vy	Y (vertical, or up/down) GS-velocity in ft/sec relative to the body axes (see Note at end 
+0x3090	f64	8	8	ok	sim/flightmodel/position/local_vz	Z (longitudinal, or forward/backward) GS-velocity in ft/sec relative to the body axes (see
+0x0330	u16	2	2	ok	sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot (writable)	Altimeter pressure setting (""Kollsman"" window). As millibars (hectoPascals) * 16
+0x126C	u32	4	-	NOT IN GUIDE	expr	
+0x0BC8	u16	2	2	ok	sim/cockpit2/controls/wheel_brake_ratio_applied (writable)	Parking brake: 0=off, 32767=on
+0x0BB2	i16	2	2	ok	sim/cockpit2/controls/total_pitch_ratio (writable)	Elevator control input: -16383 to +16383
+0x0BB6	i16	2	2	ok	sim/cockpit2/controls/total_roll_ratio	Aileron control input: -16383 to +16383
+0x0BBA	i16	2	2	ok	sim/cockpit2/controls/total_heading_ratio (writable)	Rudder control input: -16383 to +16383
+0x3328	i16	2	2	ok	sim/cockpit2/controls/yoke_pitch_ratio (writable)	Elevator Axis input value, post calibration, just before being applied to the simulation (
+0x332A	i16	2	2	ok	sim/cockpit2/controls/yoke_roll_ratio	Aileron Axis input value, post calibration, just before being applied to the simulation (i
+0x332C	i16	2	2	ok	sim/cockpit2/controls/yoke_heading_ratio (writable)	Rudder Axis input value, post calibration, just before being applied to the simulation (if
+0x0AEC	u16	2	2	ok	sim/aircraft/engine/acf_num_engines	Number of Engines
+0x0898	i16	2	2	ok	sim/flightmodel/engine/ENGN_N1_[0]	 Engine 1 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by
+0x0930	i16	2	2	ok	sim/flightmodel/engine/ENGN_N1_[1]	Engine 2 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by 
+0x09C8	i16	2	2	ok	sim/flightmodel/engine/ENGN_N1_[2]	Engine 3 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by 
+0x0A60	i16	2	2	ok	sim/flightmodel/engine/ENGN_N1_[3]	Engine 4 Jet N1 as 0 - 16384 (100%), or Prop RPM (derive RPM by multiplying this value by 
+0x3367	u8	1	1	ok	expr	This byte shows doors that are open (FS2004 only). At present this only provides bit 2^0 f
+0x341D	u8	1	-	NOT IN GUIDE	sim/cockpit2/switches/fasten_seat_belts	
+0x0840	u16	2	2	ok	sim/flightmodel2/misc/has_crashed	Crashed flag
+0x028C	u8	1	1	ok	sim/cockpit2/switches/landing_lights_on (writable)	Landing lights. (See also offset 0D0C on FS2000, and maybe CFS2).
+0x0BDC	u32	4	4	ok	sim/cockpit2/controls/flap_handle_request_ratio (writable)	Flaps control, 0=up, 16383=full. The ""notches"" for different aircraft are spaced equally
+0x0BE8	u32	4	4	ok	sim/cockpit/switches/gear_handle_status (writable)	Gear control: 0=Up, 16383=Down
+0x0238	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_hours	Hour of local time in FS (0-23)
+0x0239	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_minutes	Minute of local time in FS (0-59)
+0x023A	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_seconds	Second of time in FS (0-59)
+0x023B	u8	1	1	ok	sim/cockpit2/clock_timer/zulu_time_hours (writable)	Hour of Zulu time in FS (also known at UTC or GMT)
+0x023C	u8	1	1	ok	sim/cockpit2/clock_timer/zulu_time_minutes (writable)	Minute of Zulu time in FS2
+0x0246	i16	2	2	ok	xplane-uipc-helper/time/offset_minutes_negated	Local time offset from Zulu (minutes). +ve = behind Zulu, -ve = ahead
+0x115E	u8	1	1	ok	expr	Time of day indicator, 1=Day, 2=Dusk or Dawn, 4=Night. Set according to the local time, re
+0x0560	i64	8	8	ok	expr	Latitude of aircraft in FS units. To convert to Degrees: If your compiler supports long lo
+0x0568	i64	8	8	ok	expr	Longitude of aircraft in FS format. To convert to Degrees: If your compiler supports long 
+0x0574	i32	4	-	INSIDE FIELD	expr	(inside 0x0570, 8 bytes) Altitude, in metres and fractional metres. The units are in the h
+0x0570	i64	8	8	ok	expr	Altitude, in metres and fractional metres. The units are in the high 32-bit integer (at 05
+0x0578	i32	4	4	ok	expr	Pitch, *360/(65536*65536) for degrees. 0=level, -ve=pitch up, +ve=pitch down [Can be set i
+0x057C	i32	4	4	ok	expr	Bank, *360/(65536*65536) for degrees. 0=level, -ve=bank right, +ve=bank left [Can be set i
+0x31F0	u32	4	4	ok	expr	Pushback status (FS2002+). 3=off, 0=pushing back, 1=pushing back, tail to swing to left (p
+0x7B91	u8	1	-	INSIDE FIELD	expr	(inside 0x78D0, 1840 bytes) Reserved
+0x023E	u16	2	2	ok	expr	Day number in Year in FS (counting from 1)
+0x0245	u8	1	-	NOT IN GUIDE	xplane-uipc-helper/time/local_day_of_month	
+0x0244	u8	1	-	NOT IN GUIDE	xplane-uipc-helper/time/local_month	
+0x024A	u16	2	-	NOT IN GUIDE	xplane-uipc-helper/time/local_year	
+0x0240	u16	2	2	ok	xplane-uipc-helper/time/zulu_year	Year in FS
+0x023D	u8	1	-	NOT IN GUIDE	xplane-uipc-helper/time/zulu_day_of_month	
+0x0242	u8	1	-	NOT IN GUIDE	xplane-uipc-helper/time/zulu_month	

@@ -1,0 +1,106 @@
+offset	writable_mapping	dataref	status	xp_type	xp_writable	units	description
+0x0b52	no	sim/cockpit2/electrical/APU_generator_on	ok	int	y	boolean	APU generator is turned on, 0 or 1.
+0x0b5c	no	sim/cockpit2/electrical/APU_generator_volts	ok	float	n	volts	APU generator voltage it can produce, even if its external circuit isn't connect
+0x0b54	no	sim/cockpit2/electrical/APU_N1_percent	ok	float	n	percent	N1 of the APU
+0x0354	no	sim/cockpit2/radios/actuators/transponder_code	ok	int	y	transponder_code	Current Transponder code (0000-7777)
+0x0C1A	yes	sim/time/sim_speed	ok	int	y	ratio	The multiplier for real-time...1 = realtime, 2 = 2x, 0 = paused, etc.
+0x0E8C	no	sim/weather/aircraft/temperature_ambient_deg_c	ok	float	n	degreesC	The air temperature outside the aircraft (at altitude).
+0x0264	no	sim/time/paused	ok	int	n	boolean	Is the sim paused?  Use cmd keys to change this.
+0x02BC	no	sim/flightmodel/position/indicated_airspeed	ok	float	y	kias	Air speed indicated - this takes into account air density and wind direction
+0x6010	no	sim/flightmodel/position/latitude	ok	double	n	degrees	The latitude of the aircraft
+0x6018	no	sim/flightmodel/position/longitude	ok	double	n	degrees	The longitude of the aircraft
+0x3324	no	sim/cockpit2/gauges/indicators/altitude_ft_pilot	ok	float	y	feet	Indicated height, MSL, in feet, primary system, based on pilots barometric press
+0x3324	no	sim/cockpit2/gauges/indicators/altitude_ft_copilot	ok	float	y	feet	Indicated height, MSL, in feet, primary system, based on co-pilots barometric pr
+0x3324	no	sim/cockpit2/gauges/indicators/altitude_ft_stby	ok	float	y	feet	Indicated height, MSL, in feet, primary system, based on standby instrument baro
+0x0580	no	sim/flightmodel/position/true_psi	ok	float	n	degrees	The heading of the aircraft relative to the earth precisely below the aircraft -
+0x0BD0	no	sim/cockpit2/controls/speedbrake_ratio	ok	float	y	ratio	How much the speebrake HANDLE is deflected, in ratio, where 0.0 is fully retract
+0x2E80	yes	sim/cockpit2/switches/avionics_power_on	ok	int	y	boolean	Switch, 0 or 1.
+0x281C	no	sim/cockpit2/electrical/battery_on[1]	ok	int[8]	y	boolean	Battery turned on, 0 or 1.
+0x281C	no	sim/cockpit/electrical/battery_on	ok	int	y	boolean	Is the main battery on
+0x3102	no	sim/cockpit2/electrical/battery_on[1]	ok	int[8]	y	boolean	Battery turned on, 0 or 1.
+0x3102	no	sim/cockpit/electrical/battery_on	ok	int	y	boolean	Is the main battery on
+0x0366	no	sim/flightmodel/failures/onground_any	ok	int	y	???	User Aircraft is on the ground when this is set to 1
+0x02C8	no	sim/flightmodel/position/vh_ind	ok	float	n	meters/second	VVI (vertical velocity in meters per second)
+0x030c	no	sim/flightmodel/position/vh_ind	ok	float	n	meters/second	VVI (vertical velocity in meters per second)
+0x030c	no	sim/flightmodel/failures/onground_any	ok	int	y	???	User Aircraft is on the ground when this is set to 1
+0x11BA	no	sim/flightmodel/forces/g_nrml	ok	float	n	Gs	Total g-forces on the plane as a multiple, downward
+0x0D0C	no	sim/cockpit2/switches/navigation_lights_on	ok	int	y	boolean	Switch, 0 or 1.
+0x0D0C	no	sim/cockpit2/switches/beacon_on	ok	int	y	boolean	Switch, 0 or 1.
+0x0D0C	no	sim/cockpit2/switches/landing_lights_on	ok	int	y	boolean	Switch, 0 or 1.  This affects the first landing light.
+0x0D0C	no	sim/cockpit2/switches/taxi_light_on	ok	int	y	boolean	Switch, 0 or 1.
+0x0D0C	no	laminar/B738/toggle_switch/taxi_light_brightness_pos	third-party				
+0x0D0C	no	sim/cockpit2/switches/strobe_lights_on	ok	int	y	boolean	Switch, 0 or 1.
+0x0D0C	no	laminar/B738/toggle_switch/wing_light	third-party				
+0x0D0C	no	laminar/B738/toggle_switch/logo_light	third-party				
+0x02B4	no	sim/flightmodel/position/groundspeed	ok	float	n	m/s	The ground speed of the aircraft
+0x2F70	no	sim/flightmodel/position/true_theta	ok	float	n	degrees	The pitch of the aircraft relative to the earth precisely below the aircraft
+0x2F78	no	sim/flightmodel2/position/true_phi	ok	float	n	degrees	The roll of the aircraft relative to the earth precisely below the aircraft
+0x30A8	no	sim/flightmodel/position/Qrad	ok	float	y	rad/sec	The pitch rotation rates (relative to the flight)
+0x30B0	no	sim/flightmodel/position/Prad	ok	float	y	rad/sec	The roll rotation rates (relative to the flight)
+0x30B8	no	sim/flightmodel/position/Rrad	ok	float	y	rad/sec	The yaw rotation rates (relative to the flight)
+0x3060	no	sim/flightmodel/forces/g_side	ok	float	n	Gs	Total g-forces on the plane as a multiple, sideways
+0x3068	no	sim/flightmodel2/position/true_phi	ok	float	n	degrees	The roll of the aircraft relative to the earth precisely below the aircraft
+0x3068	no	sim/flightmodel/forces/g_nrml	ok	float	n	Gs	Total g-forces on the plane as a multiple, downward
+0x3068	no	sim/flightmodel/position/true_theta	ok	float	n	degrees	The pitch of the aircraft relative to the earth precisely below the aircraft
+0x3070	no	sim/flightmodel/forces/g_axil	ok	float	n	Gs	Total g-forces on the plane as a multiple, along the plane
+0x3098	no	sim/flightmodel/position/local_vx	ok	float	y	m/s	The velocity in local OGL coordinates
+0x30A0	no	sim/flightmodel/position/local_vy	ok	float	y	m/s	The velocity in local OGL coordinates
+0x3090	no	sim/flightmodel/position/local_vz	ok	float	y	m/s	The velocity in local OGL coordinates
+0x0330	yes	sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot	ok	float	y	inches_hg	Barometric pressure setting, inches HG.  Pilot side.
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[0]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[1]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[2]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[3]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[4]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[5]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[6]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[7]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[8]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x126C	no	sim/cockpit2/fuel/fuel_quantity[9]	ok	float[9]	n	kgs	Indicated fuel level per tank
+0x0BC8	yes	sim/cockpit2/controls/wheel_brake_ratio_applied	ok	float	y	ratio	The overall brake applied by the brake master cylinder. 0.0 is none, 1.0 is comp
+0x0BB2	yes	sim/cockpit2/controls/total_pitch_ratio	ok	float	y	[-1..1]	Total pitch control input (sum of user yoke plus autopilot servo plus artificial
+0x0BB6	no	sim/cockpit2/controls/total_roll_ratio	ok	float	y	[-1..1]	Total roll control input (sum of user yoke plus autopilot servo plus artificial 
+0x0BBA	yes	sim/cockpit2/controls/total_heading_ratio	ok	float	y	[-1..1]	Total rudder control input (sum of user pedal plus autopilot servo plus artifici
+0x3328	yes	sim/cockpit2/controls/yoke_pitch_ratio	ok	float	y	-1..1	How much the user input has deflected the yoke in the cockpit, in ratio, where -
+0x332A	no	sim/cockpit2/controls/yoke_roll_ratio	ok	float	y	-1..1	How much the user input has deflected the yoke in the cockpit, in ratio, where -
+0x332C	yes	sim/cockpit2/controls/yoke_heading_ratio	ok	float	y	-1..1	How much the user input has deflected the rudder in the cockpit, in ratio, where
+0x0AEC	no	sim/aircraft/engine/acf_num_engines	ok	int	y		
+0x0898	no	sim/flightmodel/engine/ENGN_N1_[0]	ok	float[16]	y	percent	N1 speed as percent of max (per engine)
+0x0930	no	sim/flightmodel/engine/ENGN_N1_[1]	ok	float[16]	y	percent	N1 speed as percent of max (per engine)
+0x09C8	no	sim/flightmodel/engine/ENGN_N1_[2]	ok	float[16]	y	percent	N1 speed as percent of max (per engine)
+0x0A60	no	sim/flightmodel/engine/ENGN_N1_[3]	ok	float[16]	y	percent	N1 speed as percent of max (per engine)
+0x3367	no	737u/doors/L1	third-party				
+0x3367	no	737u/doors/L2	third-party				
+0x3367	no	737u/doors/R1	third-party				
+0x3367	no	737u/doors/R2	third-party				
+0x3367	no	737u/doors/Fwd_Cargo	third-party				
+0x3367	no	737u/doors/aft_Cargo	third-party				
+0x341d	no	sim/cockpit2/switches/fasten_seat_belts	ok	int	y	boolean	Fasten Seat Belts
+0x0840	no	sim/flightmodel2/misc/has_crashed	ok	int	n	boolean	True if the aircraft is in a crashed state
+0x028C	yes	sim/cockpit2/switches/landing_lights_on	ok	int	y	boolean	Switch, 0 or 1.  This affects the first landing light.
+0x0BDC	yes	sim/cockpit2/controls/flap_handle_request_ratio	ok	float	y	ratio	The flap HANDLE location, in ratio, where 0.0 is handle fully retracted, and 1.0
+0x0BE8	yes	sim/cockpit/switches/gear_handle_status	ok	int	y	boolean	Gear handle is up or down?
+0x0238	no	sim/cockpit2/clock_timer/local_time_hours	ok	int	n	hours	Local time, hours, at the user's current location
+0x0239	no	sim/cockpit2/clock_timer/local_time_minutes	ok	int	n	minutes	Local time, minutes, at the user's current location
+0x023A	no	sim/cockpit2/clock_timer/local_time_seconds	ok	int	n	seconds	Local time, seconds, at the user's current location
+0x023B	yes	sim/cockpit2/clock_timer/zulu_time_hours	READ-ONLY BUT WRITABLE MAPPING	int	n	hours	Zulu time, hours
+0x023C	yes	sim/cockpit2/clock_timer/zulu_time_minutes	READ-ONLY BUT WRITABLE MAPPING	int	n	minutes	Zulu time, minutes
+0x0246	no	xplane-uipc-helper/time/offset_minutes_negated	third-party				
+0x115e	no	sim/graphics/scenery/sun_pitch_degrees	ok	float	n	degrees	Sun pitch from flat in OGL coordinates
+0x115e	no	sim/cockpit2/clock_timer/local_time_hours	ok	int	n	hours	Local time, hours, at the user's current location
+0x0560	no	sim/flightmodel/position/latitude	ok	double	n	degrees	The latitude of the aircraft
+0x0568	no	sim/flightmodel/position/longitude	ok	double	n	degrees	The longitude of the aircraft
+0x0574	no	sim/flightmodel/position/elevation	ok	double	n	meters	The elevation above MSL of the aircraft
+0x0570	no	sim/flightmodel/position/elevation	ok	double	n	meters	The elevation above MSL of the aircraft
+0x0578	no	sim/flightmodel/position/theta	ok	float	y	degrees	The pitch relative to the plane normal to the Y axis in degrees - OpenGL coordin
+0x057C	no	sim/flightmodel/position/phi	ok	float	y	degrees	The roll of the aircraft in degrees - OpenGL coordinates
+0x31F0	no	bp/started	third-party				
+0x31F0	no	sim/aircraft/overflow/pushback_attached	ok	int	n	boolean	Pushback tug is attached
+0x7b91	no	sim/cockpit2/radios/actuators/transponder_mode	ok	int	y	enum	Transponder mode (off=0, stdby=1, on (mode A)=2, alt (mode C)=3, test=4, GND (mo
+0x023e	no	sim/time/zulu_date_days	ok	int	y	days	Date in days since January 1st in the zulu timezone
+0x0245	no	xplane-uipc-helper/time/local_day_of_month	third-party				
+0x0244	no	xplane-uipc-helper/time/local_month	third-party				
+0x024a	no	xplane-uipc-helper/time/local_year	third-party				
+0x0240	no	xplane-uipc-helper/time/zulu_year	third-party				
+0x023d	no	xplane-uipc-helper/time/zulu_day_of_month	third-party				
+0x0242	no	xplane-uipc-helper/time/zulu_month	third-party				
