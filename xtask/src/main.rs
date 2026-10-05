@@ -61,8 +61,8 @@ fn mappings() -> Result<(), DynError> {
 }
 
 fn dist() -> Result<(), DynError> {
-    let _ = fs::remove_dir_all(&dist_dir());
-    fs::create_dir_all(&dist_dir())?;
+    let _ = fs::remove_dir_all(dist_dir());
+    fs::create_dir_all(dist_dir())?;
 
     dist_binary()?;
     // dist_manpage()?;
@@ -74,7 +74,7 @@ fn dist_binary() -> Result<(), DynError> {
     let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let status = Command::new(cargo)
         .current_dir(project_root())
-        .args(&["build", "--release"])
+        .args(["build", "--release"])
         .status()?;
 
     if !status.success() {
