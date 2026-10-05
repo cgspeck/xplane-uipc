@@ -107,13 +107,8 @@ unsafe extern "system" fn wnd_proc(
         .unwrap_or("<Invalid UTF-8 in atom name>");
     tracing::trace!("Received Atom Name: {}", atom_name_str);
     // open the file mapping and read the contents
-    let handle_res = unsafe {
-        OpenFileMappingA(
-            FILE_MAP_WRITE.0,
-            false,
-            PCSTR(atom_name_str.as_ptr() as *const u8),
-        )
-    };
+    let handle_res =
+        unsafe { OpenFileMappingA(FILE_MAP_WRITE.0, false, PCSTR(atom_name_str.as_ptr())) };
     if handle_res.is_err() {
         tracing::trace!(
             "Failed to open file mapping for atom name: {}",
@@ -348,39 +343,41 @@ pub unsafe fn create_ipc_window_and_run(
     let mut continue_loop = true;
 
     while continue_loop {
-        rx.try_recv().ok().map(|cmd| match cmd {
-            IpcCommands::ResetWarnings => {
-                tracing::info!("Resetting warnings...");
-                unsafe {
-                    let warned_set_ptr =
-                        GetWindowLongPtrW(HWND(hwnd), GWLP_USERDATA) as *mut WarnedSet;
-                    if !warned_set_ptr.is_null() {
-                        (&*warned_set_ptr).clear_all();
+        if let Ok(cmd) = rx.try_recv() {
+            match cmd {
+                IpcCommands::ResetWarnings => {
+                    tracing::info!("Resetting warnings...");
+                    unsafe {
+                        let warned_set_ptr =
+                            GetWindowLongPtrW(HWND(hwnd), GWLP_USERDATA) as *mut WarnedSet;
+                        if !warned_set_ptr.is_null() {
+                            (&*warned_set_ptr).clear_all();
+                        }
                     }
                 }
-            }
-            IpcCommands::StartCapture => {
-                tracing::info!("Starting capture...");
-                let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-                if let Some(state) = guard.as_mut() {
-                    state.enabled = true;
+                IpcCommands::StartCapture => {
+                    tracing::info!("Starting capture...");
+                    let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+                    if let Some(state) = guard.as_mut() {
+                        state.enabled = true;
+                    }
+                }
+                IpcCommands::StopCapture => {
+                    tracing::info!("Stopping capture...");
+                    let mut guard = capture::CAPTURE_STATE.lock().unwrap();
+                    if let Some(state) = guard.as_mut() {
+                        state.enabled = false;
+                    }
+                }
+                IpcCommands::Shutdown => {
+                    tracing::info!("Shutting down IPC window...");
+                    unsafe {
+                        DestroyWindow(HWND(hwnd)).ok();
+                    }
+                    continue_loop = false;
                 }
             }
-            IpcCommands::StopCapture => {
-                tracing::info!("Stopping capture...");
-                let mut guard = capture::CAPTURE_STATE.lock().unwrap();
-                if let Some(state) = guard.as_mut() {
-                    state.enabled = false;
-                }
-            }
-            IpcCommands::Shutdown => {
-                tracing::info!("Shutting down IPC window...");
-                unsafe {
-                    DestroyWindow(HWND(hwnd)).ok();
-                }
-                continue_loop = false;
-            }
-        });
+        }
 
         let ret = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
 
