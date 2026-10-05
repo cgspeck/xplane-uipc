@@ -40,3 +40,20 @@
 - [x] 5.1 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
 - [ ] 5.2 Sim check with FSInterrogate: write `0x023B` (Zulu hour, 1 byte), `0x0D0C` (lights bitfield, 2 bytes), `0x0BD0` (spoilers armed = 4800, 4 bytes) and confirm the effect in X-Plane; confirm no read-only-target warnings in `uipc.log`
 - [ ] 5.3 Sim check, unavailable dataref: write to an offset whose dataref belongs to an add-on that isn't loaded, twice. Confirm one warning and no "Wrote value" in `uipc.log`
+
+## 6. Write commands (after sim testing)
+
+- [ ] 6.1 Loader: add `write_commands: Option<HashMap<String, String>>` to `RawMapping` and `write_commands: BTreeMap<String, Expr>` to `MappingSource::Expr`. Validate it like `write_exprs`, but keys must be command paths containing `/`. A writable expression mapping needs `write_exprs` or `write_commands`
+- [ ] 6.2 Loader tests: commands only, both tables, a key that isn't a path, unknown variable, empty table, `write_commands` without `writable`, writable with neither table
+- [ ] 6.3 Replace `eval_write_exprs` with `eval_writes`, returning dataref values and command run counts (rounded, clamped to 0..=10) from one snapshot; a non-finite result anywhere is an error
+- [ ] 6.4 Evaluator tests: rounding and clamping, the bit-toggle example, a shared snapshot, a non-finite command result blocking dataref writes
+- [ ] 6.5 Add `XPLMFindCommand` and `XPLMCommandOnce` to the bindgen allowlist. Find each command when the mapping is resolved (load-time warning if not found). In `write_xplane`, write the datarefs, then run each command its count of times
+- [ ] 6.6 Report missing targets per target: an error the first time a dataref or command is skipped since mappings were loaded, debug after that. This replaces the once-per-mapping warning
+- [ ] 6.7 Test: two different missing targets give two errors, and repeats give none
+- [ ] 6.8 Time offsets `0x0238`–`0x023C`: also write `sim/time/use_system_time = 0`
+- [ ] 6.9 `0x2E80`: convert to an expression mapping with `write_exprs = { Av = "$value 0 !=" }`
+- [ ] 6.10 Add commented Zibo `write_commands` and state-dataref placeholders (TODO: confirm with DataRefTool) to `0x281C`, `0x3102`, `0x2E80` and `0x0D0C`
+- [ ] 6.11 Docs: `write_commands` in the `mappings.toml` header and `README-EXPR.md`; update the PR description
+- [ ] 6.12 `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`, `cargo xtask dist`
+- [ ] 6.13 Sim check: with "use system time" on, write `0x023B` and `0x023C`. Confirm the time sticks
+- [ ] 6.14 Sim check, Zibo: fill in the placeholders, then write battery, avionics and landing lights with the state matching and not matching. Confirm the command runs only when the state differs, and that a missing command logs one error while the other targets are still written

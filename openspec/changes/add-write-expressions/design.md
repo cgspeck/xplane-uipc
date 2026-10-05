@@ -13,13 +13,13 @@ Expression mappings (`ResolvedSource::Expr { refs, expr, update_if_expr }`) are 
 ## Goals / Non-Goals
 
 **Goals:**
-- Let an expression mapping turn one client write into writes to one or more of its datarefs.
+- Let an expression mapping turn one client write into writes to one or more of its datarefs, and into X-Plane commands.
 - Keep `uipc-expr` pure and unchanged.
 - Catch mistakes at load time rather than when a client writes.
 - Never apply a partial write because one expression produced garbage.
 
 **Non-Goals:**
-- Triggering X-Plane commands. Some add-ons, such as the Zibo 737, only react to commands. That's a separate feature.
+- Finding datarefs or commands after the aircraft has loaded. Resolution stays where it is: on the first flight-loop frame after an aircraft loads, and on "Reload Mappings". A dataref or command an add-on registers later is missing until the next load.
 - Write expressions for single-dataref (`dataref = ...`) mappings. Those keep their linear `scale`/`offset_add` reverse. Converting one to an expression mapping is the way to get a custom write.
 - String offsets. String mappings can't have `expr` today.
 - Moving the aircraft. Writing position offsets needs `XPLMWorldToLocal` and `local_x/y/z`, which an expression can't do.
@@ -68,6 +68,24 @@ Expression mappings (`ResolvedSource::Expr { refs, expr, update_if_expr }`) are 
 
    Clients can write the same offset every frame, so a repeated warning could flood the log. Each mapping warns about an unavailable dataref once per load. Later writes log at debug. The flag goes back to false on "Reload Mappings", because resolving builds fresh `ResolvedMapping`s.
 
+9. **Write commands (`write_commands`).** Sim testing showed that add-ons such as the Zibo 738 override their switch datarefs every frame. Writing those datarefs works for a split second, then reverts. These aircraft respond only to commands, and often only to toggles, so a write has to compare the requested state with the current one. A second table on expression mappings handles this:
+
+   ```toml
+   datarefs       = { Land = "sim/cockpit2/switches/landing_lights_on", ZLand = "laminar/B738/..." }
+   writable       = true
+   write_exprs    = { Land = "$value 4 & 0 !=" }
+   write_commands = { "laminar/B738/.../toggle" = "$value 4 & 0 != $ZLand 0 != !=" }
+   ```
+
+   - **The key is the command path**, and the value is an expression with the same variables as `write_exprs` (decision 2). Each expression picks out its own part of a compound value. In the example, it masks the landing-light bit, compares it with the Zibo state, and gives 1 (toggle once) only when they differ. A pair of separate on and off commands gets one expression each.
+   - **The result is a run count.** It is rounded and clamped to 0..=10: 0 means don't run, and n means run `XPLMCommandOnce` n times, which steps a multi-position switch. The cap stops a bad expression from firing a command thousands of times.
+   - **One snapshot, datarefs first.** Command expressions are evaluated together with the write expressions (decision 3). A non-finite result in either table means nothing is written and no command runs. Datarefs are written first, then commands run in sorted path order. That way a command handler that reads a dataref sees the new default state.
+   - **Lookup.** Commands are found with `XPLMFindCommand` when the mapping is resolved, alongside its datarefs, with a load-time warning for each one that isn't found.
+   - **Validation** matches `write_exprs`: it needs `expr` and `writable = true`, the table can't be empty, each key must contain `/`, each expression must parse, and variables must be `value` or `datarefs` names. A writable expression mapping needs `write_exprs`, `write_commands` or both.
+   - *Alternative:* a named `commands` table mirroring `datarefs`. Rejected: commands have no index or value, so an alias adds a level of indirection for nothing.
+
+10. **Missing targets: skip, error once per target.** This replaces the per-mapping warning in decision 8. A dataref or command that isn't available when a client writes is skipped, and the other targets still go ahead. The first skip of each target since mappings were loaded logs an error naming the offset and the dataref or command. Later skips of the same target log at debug. Availability only changes when mappings are re-resolved, which builds fresh `ResolvedMapping`s, so "once per load" is the same as "on change".
+
 ## Mapping updates
 
 These were checked with `expr-calculator`; writable targets were checked against X-Plane 12's `DataRefs.txt`.
@@ -82,14 +100,20 @@ These were checked with `expr-calculator`; writable targets were checked against
 | `0x0D0C` lights | nav, beacon, landing, taxi, strobe switches | `Nav = "$value 1 & 0 !="`, `Bcn = "$value 2 & 0 !="`, `Land = "$value 4 & 0 !="`, `Taxi = "$value 8 & 0 !="`, `Strb = "$value 16 & 0 !="` |
 | `0x0BD0` spoilers | `SB = speedbrake_ratio` | `SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?"` |
 | `0x3102`, `0x281C` battery | `Zibo738`, `Generic` | `Zibo738 = "$value"`, `Generic = "$value"` |
+| `0x2E80` avionics | `Av = avionics_power_on` | `Av = "$value 0 !="`. Converted from a single-dataref mapping so it can carry commands |
 | `0x7B91` transponder | `T_Mode = transponder_mode` | `T_Mode = "$value 0 != 1 $T_Mode 2 < 2 $T_Mode ? ?"` (1 → standby; 0 → on, keeping an existing on/alt mode) |
 
 The time offsets keep reading from the `clock_timer` datarefs, so their read expressions are just the matching variable. Only the writes go through `zulu_time_sec`. Local time is set by shifting Zulu time, because `sim/time/local_time_sec` is read-only.
 
+Every time write also sets `UseSys = sim/time/use_system_time` to `0`. A Zulu hour or minute write was seen to revert within a moment. When "use system time" is on, X-Plane keeps resetting the clock to the system time, and that is the likely cause. This is still to be confirmed in the sim.
+
+The Zibo battery, avionics and landing-light commands, and the Zibo state datarefs they compare against, go into `mappings.toml` as commented placeholders. `DataRefs.txt` lists neither `laminar/B738` datarefs nor commands, so their paths have to be confirmed in the sim with DataRefTool before they're enabled.
+
 ## Risks / Trade-offs
 
-- [Medium] **Add-on datarefs may ignore writes.** The Zibo battery and light switches are add-on datarefs that may only respond to commands. The writability warning catches read-only ones, but a writable dataref an add-on overrides every frame will look like a write that didn't stick. Document it, and leave commands to a later change.
-- [Medium] **New load errors break some user mapping files.** A user `mappings.toml` with a writable expression mapping, a writable `scale = 0` mapping, or `dataref` together with `expr` loses those mappings after upgrading. The shipped file is clean. The load error names the offset and says what to change, and the release notes call it out. The mapping was already doing nothing useful on write (or, for `dataref` + `expr`, not doing what it says).
+- [Medium] **Add-on datarefs may ignore writes.** A writable dataref that an add-on overrides every frame looks like a write that didn't stick. `write_commands` is the fix, but it needs each add-on's command and state-dataref paths, which only the sim can confirm.
+- [Medium] **Toggle commands depend on the state dataref.** A toggle runs when the requested state differs from the state dataref. If that dataref lags the switch by a frame, two quick writes could toggle twice. Clients write switch offsets on user actions, not every frame, so this is unlikely.
+- [Medium] **New load errors break some user mapping files.** A user `mappings.toml` with a writable expression mapping that has neither `write_exprs` nor `write_commands`, a writable `scale = 0` mapping, or `dataref` together with `expr` loses those mappings after upgrading. The shipped file is clean. The load error names the offset and says what to change, and the release notes call it out. The mapping was already doing nothing useful on write (or, for `dataref` + `expr`, not doing what it says).
 - [Low] **Several targets aren't one atomic step.** All values are computed before writing, but X-Plane sees them as separate writes within one flight loop callback. Nothing renders in between, so a client can't see a half-applied state.
 - [Low] **Rounding in the time maths.** Seconds writes drop the fractional second. That's acceptable for a time-of-day setting.
 

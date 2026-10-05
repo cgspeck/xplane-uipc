@@ -5,7 +5,7 @@
 The loader SHALL reject a mapping with `writable = true`, with a load error naming the offset, when:
 
 - it is a single-dataref mapping with `scale = 0`, because its read is the constant `offset_add`
-- it is an expression mapping without `write_exprs`
+- it is an expression mapping with neither `write_exprs` nor `write_commands`
 
 A read-only single-dataref mapping with `scale = 0` SHALL still load.
 
@@ -31,11 +31,11 @@ A write to a writable single-dataref mapping SHALL set the dataref to `(value - 
 
 ### Requirement: Writes that reach no dataref are reported
 
-A single-dataref write whose dataref is unavailable at runtime SHALL be skipped. The first such skip for a mapping since mappings were last loaded SHALL log a warning naming the offset and the dataref, and later skips SHALL be logged at debug level. The plugin SHALL log that a write succeeded only when at least one dataref was written.
+A single-dataref write whose dataref is unavailable at runtime SHALL be skipped. The first such skip of that dataref since mappings were last loaded SHALL log an error naming the offset and the dataref, and later skips SHALL be logged at debug level. The plugin SHALL log that a write succeeded only when at least one dataref was written or command run.
 
 #### Scenario: Missing add-on dataref
 
 - **GIVEN** a writable single-dataref mapping whose dataref belongs to an add-on that isn't loaded
 - **WHEN** a client writes the offset twice
-- **THEN** no dataref is written, one warning names the offset and the dataref, and the second skip is logged at debug level
+- **THEN** no dataref is written, one error names the offset and the dataref, and the second skip is logged at debug level
 - **AND** no "Wrote value" message is logged for either write
