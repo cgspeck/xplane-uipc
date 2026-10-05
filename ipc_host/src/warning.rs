@@ -77,12 +77,6 @@ impl WarnedSet {
         row[idx].fetch_and(!bit, Ordering::Relaxed);
     }
 
-    pub fn clear(&self, category: WarnCategory) {
-        self.bits[category as usize]
-            .iter()
-            .for_each(|cell| cell.store(0, Ordering::Relaxed));
-    }
-
     pub fn clear_all(&self) {
         for row in self.bits.iter() {
             for cell in row {
@@ -175,27 +169,6 @@ mod tests {
         assert_eq!(
             bit, 0x1000u64,
             "Bit should be 0x1000 for key 0x0290c (10508)"
-        );
-    }
-
-    #[test]
-    fn test_clear_clears_only_that_category() {
-        let warned = WarnedSet::new();
-        warned.check_and_set(0, WarnCategory::ReadNotExist);
-        warned.check_and_set(0, WarnCategory::WriteNotExist);
-        warned.check_and_set(0, WarnCategory::WriteNotWritable);
-        warned.clear(WarnCategory::ReadNotExist);
-        assert!(
-            warned.check_and_set(0, WarnCategory::ReadNotExist),
-            "ReadNotExist should be cleared - returns true (bit not set)"
-        );
-        assert!(
-            !warned.check_and_set(0, WarnCategory::WriteNotExist),
-            "WriteNotExist should still be set"
-        );
-        assert!(
-            !warned.check_and_set(0, WarnCategory::WriteNotWritable),
-            "WriteNotWritable should still be set"
         );
     }
 
