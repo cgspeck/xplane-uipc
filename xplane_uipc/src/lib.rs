@@ -421,6 +421,9 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
         xplane_log(&format!("Failed to load config: {}", e));
     }
 
+    // Plugin state is freed on disable, so it must be rebuilt on every enable.
+    DATAREF_RESOLUTION_REQUIRED.store(true, Ordering::Release);
+
     tracing::info!("Registering flight loop callback...");
     unsafe {
         XPLMRegisterFlightLoopCallback(
