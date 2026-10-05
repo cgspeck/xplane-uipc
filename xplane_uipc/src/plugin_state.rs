@@ -7,7 +7,7 @@ mod bindings {
 }
 use bindings::*;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::CString;
 use std::sync::{Arc, RwLock};
 
@@ -15,6 +15,7 @@ use ipc_host::USER_AREA;
 use ipc_host::value_table::{Table, Value, get_value_table};
 use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
+use uipc_mapping::eval_write_exprs;
 pub use uipc_mapping::{DatarefMapping, MappingSource};
 
 /// Bound a raw string read to `max_len` bytes, always ending in a NUL.
@@ -180,6 +181,8 @@ pub enum ResolvedSource {
         refs: HashMap<String, ResolvedRef>,
         expr: Expr,
         update_if_expr: Option<Expr>,
+        /// Target name (a key of `refs`) → expression for the value to write there.
+        write_exprs: BTreeMap<String, Expr>,
     },
 }
 
@@ -225,16 +228,30 @@ impl ResolvedMapping {
                 datarefs,
                 expr,
                 update_if_expr,
-                ..
+                write_exprs,
             } => {
-                let refs = datarefs
+                let refs: HashMap<String, ResolvedRef> = datarefs
                     .into_iter()
                     .map(|(name, (path, idx))| (name, ResolvedRef::resolve(&path, idx)))
                     .collect();
+                for target in write_exprs.keys() {
+                    if let Some(dr) = refs.get(target)
+                        && !dr.handle.is_null()
+                        && unsafe { XPLMCanWriteDataRef(dr.handle) } == 0
+                    {
+                        tracing::warn!(
+                            "Offset {:#06x} writes '{}' but dataref '{}' is read-only; writes to it will have no effect",
+                            mapping.offset,
+                            target,
+                            dr.path
+                        );
+                    }
+                }
                 ResolvedSource::Expr {
                     refs,
                     expr,
                     update_if_expr,
+                    write_exprs,
                 }
             }
             MappingSource::Static { static_value } => ResolvedSource::Static {
@@ -242,9 +259,14 @@ impl ResolvedMapping {
             },
             MappingSource::StaticStr { static_str } => ResolvedSource::StaticStr { static_str },
         };
-        if mapping.writable && !matches!(source, ResolvedSource::Simple { .. }) {
+        if mapping.writable
+            && matches!(
+                source,
+                ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. }
+            )
+        {
             tracing::warn!(
-                "Offset {:#06x} is marked writable but only single-dataref mappings can be written; writes to it will have no effect",
+                "Offset {:#06x} is marked writable but static values can't be written; writes to it will have no effect",
                 mapping.offset
             );
         }
@@ -289,11 +311,9 @@ impl ResolvedMapping {
                 refs,
                 expr,
                 update_if_expr,
+                ..
             } => {
-                let mut vars = HashMap::new();
-                for (name, dr) in refs {
-                    vars.insert(name.clone(), dr.read().unwrap_or(0.0));
-                }
+                let vars = read_vars(refs);
                 if update_if_expr
                     .as_ref()
                     .is_some_and(|c| c.eval(&vars) <= 0.0)
@@ -311,29 +331,58 @@ impl ResolvedMapping {
         }
     }
 
-    /// Write a client's value back to X-Plane (simple mappings only; expr
-    /// write-back is not yet supported). Returns whether any dataref was written.
+    /// Write a client's value back to X-Plane. Returns whether any dataref
+    /// was written.
+    ///
+    /// Simple mappings reverse `scale`/`offset_add`. Expression mappings
+    /// evaluate every write expression against one snapshot of their datarefs
+    /// (unavailable ones read as 0.0) and write nothing if any result isn't
+    /// finite.
     pub fn write_xplane(&mut self, fsuipc_value: f64) -> bool {
         if !self.writable {
             return false;
         }
         let mut written = false;
         let mut skipped = Vec::new();
-        if let ResolvedSource::Simple {
-            dr,
-            scale,
-            offset_add,
-        } = &self.source
-        {
-            debug_assert!(
-                *scale != 0.0,
-                "the loader rejects writable mappings with scale = 0"
-            );
-            if dr.write((fsuipc_value - offset_add) / scale) {
-                written = true;
-            } else {
-                skipped.push(dr.path.clone());
+        match &self.source {
+            ResolvedSource::Simple {
+                dr,
+                scale,
+                offset_add,
+            } => {
+                debug_assert!(
+                    *scale != 0.0,
+                    "the loader rejects writable mappings with scale = 0"
+                );
+                if dr.write((fsuipc_value - offset_add) / scale) {
+                    written = true;
+                } else {
+                    skipped.push(dr.path.clone());
+                }
             }
+            ResolvedSource::Expr {
+                refs, write_exprs, ..
+            } => {
+                let mut vars = read_vars(refs);
+                vars.insert("value".into(), fsuipc_value);
+                let results = match eval_write_exprs(write_exprs, &vars) {
+                    Ok(results) => results,
+                    Err(e) => {
+                        tracing::warn!("Offset {:#06x}: {}; nothing written", self.offset, e);
+                        return false;
+                    }
+                };
+                // The loader checks every target names a dataref.
+                for (target, v) in results {
+                    let Some(dr) = refs.get(target) else { continue };
+                    if dr.write(v) {
+                        written = true;
+                    } else {
+                        skipped.push(dr.path.clone());
+                    }
+                }
+            }
+            ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. } => {}
         }
         for path in skipped {
             self.report_unavailable(&path);
@@ -359,6 +408,13 @@ impl ResolvedMapping {
             self.unavailable_warned = true;
         }
     }
+}
+
+/// Current value of each named dataref; unavailable ones read as 0.0.
+fn read_vars(refs: &HashMap<String, ResolvedRef>) -> HashMap<String, f64> {
+    refs.iter()
+        .map(|(name, dr)| (name.clone(), dr.read().unwrap_or(0.0)))
+        .collect()
 }
 
 // ─── Built-in offsets ──────────────────────────────────────────────────────────
