@@ -220,7 +220,7 @@ expr = "$Zibo738 $Generic |"
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
-fsuipc_type = "u16"
+fsuipc_type = "u8"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
 
