@@ -258,7 +258,10 @@ impl ResolvedMapping {
                 for (name, dr) in refs {
                     vars.insert(name.clone(), dr.read().unwrap_or(0.0));
                 }
-                if update_if_expr.as_ref().is_some_and(|c| c.eval(&vars) <= 0.0) {
+                if update_if_expr
+                    .as_ref()
+                    .is_some_and(|c| c.eval(&vars) <= 0.0)
+                {
                     return Reading::Retain;
                 }
                 Some(expr.eval(&vars))
