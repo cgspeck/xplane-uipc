@@ -266,6 +266,101 @@ mod tests {
         assert!(!table.is_writable(10));
     }
 
+    #[test]
+    fn test_from_f64_rounds_instead_of_truncating() {
+        assert!(matches!(
+            Value::from_f64(1023.9999, FsuipcType::I32),
+            Some(Value::Integer32(1024))
+        ));
+        assert!(matches!(
+            Value::from_f64(-2.5, FsuipcType::I16),
+            Some(Value::Integer16(-3))
+        ));
+        assert!(matches!(
+            Value::from_f64(0.4999, FsuipcType::U8),
+            Some(Value::UnsignedInteger8(0))
+        ));
+    }
+
+    #[test]
+    fn test_from_f64_wraps_out_of_range() {
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U16),
+            Some(Value::UnsignedInteger16(0xFFFF))
+        ));
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U32),
+            Some(Value::UnsignedInteger32(u32::MAX))
+        ));
+        assert!(matches!(
+            Value::from_f64(256.0, FsuipcType::U8),
+            Some(Value::UnsignedInteger8(0))
+        ));
+        assert!(matches!(
+            Value::from_f64(40000.0, FsuipcType::I16),
+            Some(Value::Integer16(-25536))
+        ));
+        assert!(matches!(
+            Value::from_f64(-1.0, FsuipcType::U64),
+            Some(Value::UnsignedInteger64(u64::MAX))
+        ));
+        assert!(matches!(
+            Value::from_f64(1.8e19, FsuipcType::U64),
+            Some(Value::UnsignedInteger64(18_000_000_000_000_000_000))
+        ));
+    }
+
+    #[test]
+    fn test_from_f64_rejects_non_finite_and_string() {
+        assert!(Value::from_f64(f64::NAN, FsuipcType::I32).is_none());
+        assert!(Value::from_f64(f64::INFINITY, FsuipcType::F64).is_none());
+        assert!(Value::from_f64(1.0, FsuipcType::String).is_none());
+    }
+
+    #[test]
+    fn test_from_f64_floats_unrounded() {
+        assert!(matches!(
+            Value::from_f64(1.25, FsuipcType::F32),
+            Some(Value::Float32(v)) if v == 1.25
+        ));
+        assert!(matches!(
+            Value::from_f64(1.25, FsuipcType::F64),
+            Some(Value::Float64(v)) if v == 1.25
+        ));
+    }
+
+    #[test]
+    fn test_decode_le_uses_type() {
+        let v = Value::Integer16(0);
+        assert_eq!(v.decode_le(&[0xFF, 0xFF]), Some(-1.0));
+        let v = Value::UnsignedInteger16(0);
+        assert_eq!(v.decode_le(&[0xFF, 0xFF]), Some(65535.0));
+        let v = Value::Float32(0.0);
+        assert_eq!(v.decode_le(&1.5f32.to_le_bytes()), Some(1.5));
+        let v = Value::Integer64(0);
+        assert_eq!(v.decode_le(&(-5i64).to_le_bytes()), Some(-5.0));
+        let v = Value::Integer32(0);
+        assert_eq!(v.decode_le(&(-100_000i32).to_le_bytes()), Some(-100_000.0));
+    }
+
+    #[test]
+    fn test_decode_le_rejects_wrong_size_and_unwritable() {
+        assert_eq!(Value::UnsignedInteger32(0).decode_le(&[1, 2]), None);
+        assert_eq!(Value::Float64(0.0).decode_le(&[0; 4]), None);
+        assert_eq!(Value::String(vec![0]).decode_le(&[0]), None);
+        assert_eq!(Value::Bool(false).decode_le(&[1]), None);
+    }
+
+    #[test]
+    fn test_to_le_bytes() {
+        assert_eq!(
+            Value::UnsignedInteger32(0x12345678).to_le_bytes(),
+            vec![0x78, 0x56, 0x34, 0x12]
+        );
+        assert_eq!(Value::Integer16(-1).to_le_bytes(), vec![0xFF, 0xFF]);
+        assert_eq!(Value::Bool(true).to_le_bytes(), vec![1]);
+    }
+
     fn entry(value: Value) -> Entry {
         Entry {
             value,
