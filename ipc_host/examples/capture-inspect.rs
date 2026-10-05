@@ -1,7 +1,10 @@
 use std::env;
 use std::fs;
 
-use ipc_host::mapped_view::iterate_records;
+use ipc_host::mapped_view::{RecordKind, iterate_records};
+
+/// Write payloads longer than this are truncated in the listing.
+const MAX_WRITE_BYTES_SHOWN: usize = 16;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -27,26 +30,41 @@ fn main() {
         println!("{}", "-".repeat(line_len));
 
         let mut record_num = 0u32;
-        let error_count = unsafe {
+        let result = unsafe {
             iterate_records(data.as_ptr(), data.len(), |record| {
                 record_num += 1;
-                let op = if record.is_write { "WRITE" } else { "READ" };
-                let marker = if record.sentinel_ok { "✓" } else { "?" };
+                let detail = if record.kind == RecordKind::Write {
+                    let start = record.header_offset + record.kind.header_len();
+                    let shown = (record.n_bytes as usize).min(MAX_WRITE_BYTES_SHOWN);
+                    let mut hex: Vec<String> = data[start..start + shown]
+                        .iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect();
+                    if shown < record.n_bytes as usize {
+                        hex.push("…".to_string());
+                    }
+                    hex.join(" ")
+                } else {
+                    format!("pDest={:#010x}", record.p_dest)
+                };
                 println!(
-                    "#{:<4} reqID={:#010x}  offset={:#06x}  {}  {}B  {}",
-                    record_num, record.req_id, record.dw_offset, op, record.n_bytes, marker
+                    "#{:<4} @{:#06x}  {:<6}  offset={:#06x}  {}B  {}",
+                    record_num,
+                    record.header_offset,
+                    record.kind,
+                    record.dw_offset,
+                    record.n_bytes,
+                    detail
                 );
-                0
             })
         };
 
-        println!(
-            "── END OF DATA ── ({} records, {} errors)\n",
-            record_num, error_count
-        );
-
-        if error_count > 0 {
-            had_errors = true;
+        match result {
+            Ok(()) => println!("── END OF DATA ── ({} records)\n", record_num),
+            Err(malformed) => {
+                println!("── MALFORMED: {} ── ({} records)\n", malformed, record_num);
+                had_errors = true;
+            }
         }
     }
 

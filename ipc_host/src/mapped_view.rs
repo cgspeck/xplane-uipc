@@ -1,4 +1,22 @@
+//! Parsing and answering the FSUIPC request stream in a client's file mapping.
+//!
+//! The wire format follows the FSUIPC SDK client libraries (`IPCuser.c` for
+//! 32-bit clients, `FSUIPCuser64.c` for 64-bit ones). Records sit back to back,
+//! each a header followed by `nBytes` of payload, and the first DWORD of each
+//! header (`dwId`) gives its layout:
+//!
+//! | dwId | Kind   | Header                                | Payload at |
+//! |------|--------|---------------------------------------|------------|
+//! | 1    | Read32 | `[dwId][dwOffset][nBytes][pDest:4]`   | +16        |
+//! | 4    | Read64 | `[dwId][dwOffset][nBytes][pDest:8]`   | +20        |
+//! | 2    | Write  | `[dwId][dwOffset][nBytes]`            | +12        |
+//! | 0    | end of stream                                             |
+//!
+//! `pDest` is the client's own destination pointer: the client copies each
+//! read's payload there after the call, so it means nothing to the server.
+
 use byteorder::{ByteOrder, LittleEndian};
+use std::fmt;
 use std::slice;
 
 use crate::{
@@ -7,80 +25,117 @@ use crate::{
     warning::{WarnCategory, WarnedSet},
 };
 
-const SENTINEL: u32 = 0x5061_756C; // "luaP" LE
-const FSD_SENTINEL: u32 = 0x4453_463A; // ":FSD" LE
+/// `dwId` of a read from a 32-bit client.
+pub const FS6IPC_READSTATEDATA_ID: u32 = 1;
+/// `dwId` of a write, from either client.
+pub const FS6IPC_WRITESTATEDATA_ID: u32 = 2;
+/// `dwId` of a read from a 64-bit client.
+pub const F64IPC_READSTATEDATA_ID: u32 = 4;
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
     unsafe { LittleEndian::read_u32(slice::from_raw_parts(ptr, 4)) }
 }
 
-/// From a zero reqID, scan forward one byte at a time looking for a valid
-/// record header (sentinel at +12). If found within `max_gap` bytes, this
-/// is a padding gap and we return how many bytes to skip. Otherwise it's
-/// a true terminator and we return None.
-///
-/// `available` is the number of bytes accessible from `cur_ptr` onwards.
-/// The scan reads up to `offset + 15` so we stop when fewer than 16 bytes
-/// remain at the candidate position.
-unsafe fn find_next_record(cur_ptr: *const u8, max_gap: usize, available: usize) -> Option<usize> {
-    tracing::trace!(
-        "find_next_record: entry, cur_ptr: {:#?}, max_gap: {}, available: {}",
-        cur_ptr,
-        max_gap,
-        available
-    );
-    // Need at least 16 bytes from cur_ptr + offset to read the sentinel at +12..+15
-    let safe_limit = if available >= 16 {
-        max_gap.min(available - 16)
-    } else {
-        tracing::trace!("find_next_record: early return none");
-        return None;
-    };
-    for offset in 0..=safe_limit {
-        // SAFETY: bounds checked by safe_limit calculation above
-        unsafe {
-            let b0 = *cur_ptr.add(offset + 12);
-            if b0 != 0x6C {
-                continue;
-            }
-            let b1 = *cur_ptr.add(offset + 13);
-            if b1 != 0x75 {
-                continue;
-            }
-            let b2 = *cur_ptr.add(offset + 14);
-            if b2 != 0x61 {
-                continue;
-            }
-            let b3 = *cur_ptr.add(offset + 15);
-            if b3 != 0x50 {
-                continue;
-            }
+unsafe fn read_u64_at(ptr: *const u8) -> u64 {
+    unsafe { LittleEndian::read_u64(slice::from_raw_parts(ptr, 8)) }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordKind {
+    Read32,
+    Read64,
+    Write,
+}
+
+impl RecordKind {
+    fn from_id(id: u32) -> Option<Self> {
+        match id {
+            FS6IPC_READSTATEDATA_ID => Some(Self::Read32),
+            F64IPC_READSTATEDATA_ID => Some(Self::Read64),
+            FS6IPC_WRITESTATEDATA_ID => Some(Self::Write),
+            _ => None,
         }
-        tracing::trace!("find_next_record: returned offset {:#}", offset);
-        return Some(offset);
     }
-    tracing::trace!("find_next_record: full scan returned none");
-    None
+
+    /// Size of this kind's header; the payload follows it.
+    pub const fn header_len(self) -> usize {
+        match self {
+            Self::Read32 => 16,
+            Self::Read64 => 20,
+            Self::Write => 12,
+        }
+    }
+
+    pub const fn is_write(self) -> bool {
+        matches!(self, Self::Write)
+    }
+}
+
+impl fmt::Display for RecordKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Read32 => "READ32",
+            Self::Read64 => "READ64",
+            Self::Write => "WRITE",
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedRecord {
-    pub req_id: u32,
+    pub kind: RecordKind,
+    /// Byte offset of the record's header within the view.
+    pub header_offset: usize,
     pub dw_offset: u32,
-    pub raw_n: u32,
     pub n_bytes: u32,
-    pub is_write: bool,
-    pub sentinel_ok: bool,
-    pub sentinel_offset: usize,
-    /// If sentinel_ok is false and recovery was found, the byte offset of
-    /// the next valid record header. None if end of data.
-    pub recovery_next_offset: Option<usize>,
+    /// The client's destination pointer for a read; 0 for a write.
+    pub p_dest: u64,
     pub payload_ptr: *mut u8,
 }
 
-/// Iterate over records in a mapped view buffer, calling `on_record` for each.
-/// Returns the total number of errors encountered (bad sentinels, plus any
-/// additional errors returned by the callback).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MalformedReason {
+    UnknownId(u32),
+    HeaderOverrun(RecordKind),
+    PayloadOverrun { dw_offset: u32, n_bytes: u32 },
+    MissingTerminator,
+}
+
+/// Why and where parsing of a view stopped early.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Malformed {
+    /// Byte offset within the view of the record that could not be parsed.
+    pub at: usize,
+    pub reason: MalformedReason,
+}
+
+impl fmt::Display for Malformed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.reason {
+            MalformedReason::UnknownId(id) => {
+                write!(f, "unknown dwId {:#010x} at {:#06x}", id, self.at)
+            }
+            MalformedReason::HeaderOverrun(kind) => {
+                write!(f, "{} header at {:#06x} runs past the view", kind, self.at)
+            }
+            MalformedReason::PayloadOverrun { dw_offset, n_bytes } => write!(
+                f,
+                "record at {:#06x} (dwOffset={:#06x}, nBytes={}) runs past the view",
+                self.at, dw_offset, n_bytes
+            ),
+            MalformedReason::MissingTerminator => {
+                write!(f, "view ends at {:#06x} without a terminator", self.at)
+            }
+        }
+    }
+}
+
+/// Iterate over the records in a mapped view, calling `on_record` for each,
+/// until the zero `dwId` terminator.
+///
+/// Parsing stops at the first record that can't be framed: an unknown `dwId`,
+/// a header or payload past the end of the view, or no terminator. Records
+/// before it have already been passed to `on_record`.
 ///
 /// # Safety
 ///
@@ -91,150 +146,72 @@ pub unsafe fn iterate_records<F>(
     mapped_view_ptr: *const u8,
     view_size: usize,
     mut on_record: F,
-) -> usize
+) -> Result<(), Malformed>
 where
-    F: FnMut(ParsedRecord) -> usize,
+    F: FnMut(ParsedRecord),
 {
-    // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid and readable
-    unsafe {
-        let mut cur_ptr: *const u8 = mapped_view_ptr;
-        let mut error_count = 0;
-        let end_ptr = mapped_view_ptr.add(view_size);
-        let avail = |p: *const u8| -> usize { end_ptr.offset_from(p).max(0) as usize };
-
-        loop {
-            // ── 1. reqID ──────────────────────────────────────────────────
-            let req_id = read_u32_at(cur_ptr);
-            tracing::trace!("reqID: {:#010x} @ {:p}", req_id, cur_ptr);
-
-            if req_id == 0 {
-                tracing::trace!(
-                    "Zero reqID at {:p}, scanning for next record header",
-                    cur_ptr
-                );
-                match find_next_record(cur_ptr, 16, avail(cur_ptr)) {
-                    Some(0) => {
-                        tracing::trace!("reqID is legitimately zero, parsing as normal record");
-                    }
-                    Some(skip) => {
-                        tracing::trace!(
-                            "Padding gap of {} bytes at {:p}, advancing",
-                            skip,
-                            cur_ptr
-                        );
-                        cur_ptr = cur_ptr.add(skip);
-                        continue;
-                    }
-                    None => {
-                        tracing::trace!("Zero reqID at {:p} — true terminator, done", cur_ptr);
-                        break;
-                    }
-                }
-            }
-
-            cur_ptr = cur_ptr.add(4);
-
-            // ── 2. dwOffset ───────────────────────────────────────────────
-            let dw_offset = read_u32_at(cur_ptr);
-            tracing::trace!(
-                "dwOffset: {:#06x} ({}) @ {:p}",
-                dw_offset,
-                dw_offset,
-                cur_ptr
-            );
-            cur_ptr = cur_ptr.add(4);
-
-            // ── 3. nBytes ─────────────────────────────────────────────────
-            let raw_n = read_u32_at(cur_ptr);
-            let is_write = (raw_n & 0x8000_0000) != 0;
-            let n_bytes = raw_n & 0x7FFF_FFFF;
-            tracing::trace!(
-                "nBytes raw: {:#010x}, is_write: {}, n_bytes: {}",
-                raw_n,
-                is_write,
-                n_bytes
-            );
-            cur_ptr = cur_ptr.add(4);
-
-            // ── 4. Sentinel ───────────────────────────────────────────────
-            let sentinel_before_ptr = cur_ptr;
-            let sentinel = read_u32_at(cur_ptr);
-            let sentinel_ok = sentinel == SENTINEL;
-            let sentinel_offset = cur_ptr.offset_from(mapped_view_ptr) as usize;
-
-            if !sentinel_ok {
-                tracing::trace!(
-                    "Non-luaP sentinel: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, value {:#010x}",
-                    req_id,
-                    dw_offset,
-                    n_bytes,
-                    sentinel_offset,
-                    sentinel
-                );
-
-                // ── Detect ":FSD" trailing text for diagnostics ────────
-                if sentinel == FSD_SENTINEL {
-                    let mut text = String::new();
-                    for i in 0..255usize {
-                        let c = *sentinel_before_ptr.add(4 + i);
-                        if c == 0 || !(0x20..=0x7E).contains(&c) {
-                            break;
-                        }
-                        text.push(c as char);
-                    }
-                    if !text.is_empty() {
-                        tracing::trace!(
-                            "FSD sentinel at offset {:#x} followed by: \"{}\"",
-                            sentinel_offset,
-                            text
-                        );
-                    }
-                }
-            }
-            cur_ptr = cur_ptr.add(4);
-
-            // ── 5. Field validation ──────────────────────────────────────────
-            let remaining = avail(cur_ptr);
-            if dw_offset > 0xFFFF || n_bytes == 0 || n_bytes > remaining as u32 {
-                tracing::warn!(
-                    "Invalid record: reqID={:#010x}, dwOffset={:#06x}, nBytes={} at offset {:#x}, reason: {}",
-                    req_id,
-                    dw_offset,
-                    n_bytes,
-                    sentinel_offset,
-                    if dw_offset > 0xFFFF {
-                        "dwOffset > 0xFFFF"
-                    } else if n_bytes == 0 {
-                        "nBytes == 0"
-                    } else {
-                        "nBytes exceeds remaining buffer"
-                    },
-                );
-                break;
-            }
-
-            // ── 6. Payload ────────────────────────────────────────────────
-            let payload_ptr = cur_ptr as *mut u8;
-
-            let record = ParsedRecord {
-                req_id,
-                dw_offset,
-                raw_n,
-                n_bytes,
-                is_write,
-                sentinel_ok,
-                sentinel_offset,
-                recovery_next_offset: None,
-                payload_ptr,
-            };
-            error_count += on_record(record);
-
-            // ── 7. Advance past payload ───────────────────────────────────
-            cur_ptr = cur_ptr.add(n_bytes as usize);
+    let mut pos = 0usize;
+    loop {
+        let malformed = |reason| Err(Malformed { at: pos, reason });
+        let remaining = view_size - pos;
+        if remaining < 4 {
+            return malformed(MalformedReason::MissingTerminator);
         }
-
-        error_count
+        // SAFETY: pos + 4 <= view_size, and the caller guarantees the view is valid
+        let header = unsafe { mapped_view_ptr.add(pos) };
+        let id = unsafe { read_u32_at(header) };
+        if id == 0 {
+            return Ok(());
+        }
+        let Some(kind) = RecordKind::from_id(id) else {
+            return malformed(MalformedReason::UnknownId(id));
+        };
+        if remaining < kind.header_len() {
+            return malformed(MalformedReason::HeaderOverrun(kind));
+        }
+        // SAFETY: the whole header lies within the view (checked above)
+        let (dw_offset, n_bytes, p_dest) = unsafe {
+            (
+                read_u32_at(header.add(4)),
+                read_u32_at(header.add(8)),
+                match kind {
+                    RecordKind::Read32 => read_u32_at(header.add(12)) as u64,
+                    RecordKind::Read64 => read_u64_at(header.add(12)),
+                    RecordKind::Write => 0,
+                },
+            )
+        };
+        if n_bytes as usize > remaining - kind.header_len() {
+            return malformed(MalformedReason::PayloadOverrun { dw_offset, n_bytes });
+        }
+        tracing::trace!(
+            "{} record at {:#06x}: dwOffset={:#06x}, nBytes={}, pDest={:#x}",
+            kind,
+            pos,
+            dw_offset,
+            n_bytes,
+            p_dest
+        );
+        on_record(ParsedRecord {
+            kind,
+            header_offset: pos,
+            dw_offset,
+            n_bytes,
+            p_dest,
+            // SAFETY: the payload lies within the view (checked above)
+            payload_ptr: unsafe { header.add(kind.header_len()) } as *mut u8,
+        });
+        pos += kind.header_len() + n_bytes as usize;
     }
+}
+
+/// What happened while answering a view.
+#[derive(Debug, Default)]
+pub struct ProcessOutcome {
+    /// Set when parsing stopped early. Records before that point were handled.
+    pub malformed: Option<Malformed>,
+    /// Write requests that were refused because their size didn't fit the offset's type.
+    pub rejected_writes: usize,
 }
 
 /// Answer the read and write requests in a client's mapped view.
@@ -249,111 +226,129 @@ pub unsafe fn process_mapped_view(
     view_size: usize,
     table: &Table,
     warned_set: &mut WarnedSet,
-) -> usize {
-    // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid
-    unsafe {
+) -> ProcessOutcome {
+    let mut rejected_writes = 0;
+    // SAFETY: caller guarantees mapped_view_ptr..+view_size is valid and writable
+    let result = unsafe {
         iterate_records(mapped_view_ptr, view_size, |record| {
-            let mut record_errors = 0;
-
-            if !record.is_write {
-                if let Some(entry) = table.get(record.dw_offset as u16) {
-                    tracing::debug!("Offset {:#06x} found in table", record.dw_offset);
-                    warned_set.clear_key(record.dw_offset as u16, WarnCategory::ReadNotExist);
-                    match &entry.value {
-                        Value::String(bytes) => {
-                            tracing::trace!(
-                                "Writing String ({} bytes) -> offset {:#06x}",
-                                bytes.len(),
-                                record.dw_offset
-                            );
-                            let len = bytes.len().min(record.n_bytes as usize);
-                            std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
-                            for i in len..record.n_bytes as usize {
-                                *record.payload_ptr.add(i) = 0;
-                            }
-                        }
-                        value => {
-                            // Never write past the request's payload: a narrower read
-                            // gets the low-order (little-endian) bytes of the value.
-                            let bytes = value.to_le_bytes();
-                            let len = bytes.len().min(record.n_bytes as usize);
-                            tracing::trace!(
-                                "Writing {:?} ({} of {} bytes) -> offset {:#06x}",
-                                value,
-                                len,
-                                bytes.len(),
-                                record.dw_offset
-                            );
-                            std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
-                        }
-                    }
-                } else {
-                    tracing::debug!(
-                        "Offset {:#06x} (size {} bytes) not found in table",
-                        record.dw_offset,
-                        record.n_bytes
-                    );
-                    if warned_set.check_and_set(record.dw_offset as u16, WarnCategory::ReadNotExist)
-                    {
-                        tracing::warn!(
-                            "Read from offset {:#06x}, {} bytes not in table",
-                            record.dw_offset,
-                            record.n_bytes
-                        );
-                    }
+            // SAFETY: iterate_records only yields payloads that lie within the view
+            let payload = slice::from_raw_parts_mut(record.payload_ptr, record.n_bytes as usize);
+            if record.kind.is_write() {
+                if !apply_write(&record, payload, table, warned_set) {
+                    rejected_writes += 1;
                 }
             } else {
-                tracing::debug!(
-                    "Write operation: offset {:#06x}, n_bytes {}",
-                    record.dw_offset,
-                    record.n_bytes
-                );
-                let entry = table
-                    .get(record.dw_offset as u16)
-                    .filter(|_| table.is_writable(record.dw_offset as u16));
-                if let Some(entry) = entry {
-                    let payload =
-                        slice::from_raw_parts(record.payload_ptr, record.n_bytes as usize);
-                    match entry.value.decode_le(payload) {
-                        Some(value) => {
-                            tracing::info!(
-                                "Write request: offset {:#06x} = {}",
-                                record.dw_offset,
-                                value
-                            );
-                            try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
-                        }
-                        None => {
-                            tracing::warn!(
-                                "Rejected write to offset {:#06x}: {} bytes does not match {:?}",
-                                record.dw_offset,
-                                record.n_bytes,
-                                entry.value
-                            );
-                            record_errors += 1;
-                        }
-                    }
-                } else {
-                    if table.is_active(record.dw_offset as u16)
-                        && warned_set
-                            .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotWritable)
-                    {
-                        tracing::warn!(
-                            "Attempt to write non-writable offset {:#06x}",
-                            record.dw_offset
-                        );
-                    } else if warned_set
-                        .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotExist)
-                    {
-                        tracing::warn!(
-                            "Attempt to write non-active offset {:#06x}",
-                            record.dw_offset
-                        );
-                    }
-                }
+                answer_read(&record, payload, table, warned_set);
             }
-            record_errors
         })
+    };
+    if let Err(malformed) = &result {
+        tracing::warn!("Malformed request view: {}", malformed);
+    }
+    ProcessOutcome {
+        malformed: result.err(),
+        rejected_writes,
+    }
+}
+
+fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_set: &WarnedSet) {
+    let Ok(offset) = u16::try_from(record.dw_offset) else {
+        tracing::debug!(
+            "Ignoring read from out-of-range offset {:#x}",
+            record.dw_offset
+        );
+        return;
+    };
+    let Some(entry) = table.get(offset) else {
+        tracing::debug!(
+            "Offset {:#06x} (size {} bytes) not found in table",
+            offset,
+            record.n_bytes
+        );
+        if warned_set.check_and_set(offset, WarnCategory::ReadNotExist) {
+            tracing::warn!(
+                "Read from offset {:#06x}, {} bytes not in table",
+                offset,
+                record.n_bytes
+            );
+        }
+        return;
+    };
+    tracing::debug!("Offset {:#06x} found in table", offset);
+    warned_set.clear_key(offset, WarnCategory::ReadNotExist);
+    match &entry.value {
+        Value::String(bytes) => {
+            tracing::trace!(
+                "Writing String ({} bytes) -> offset {:#06x}",
+                bytes.len(),
+                offset
+            );
+            let len = bytes.len().min(payload.len());
+            payload[..len].copy_from_slice(&bytes[..len]);
+            payload[len..].fill(0);
+        }
+        value => {
+            // Never write past the request's payload: a narrower read
+            // gets the low-order (little-endian) bytes of the value.
+            let bytes = value.to_le_bytes();
+            let len = bytes.len().min(payload.len());
+            tracing::trace!(
+                "Writing {:?} ({} of {} bytes) -> offset {:#06x}",
+                value,
+                len,
+                bytes.len(),
+                offset
+            );
+            payload[..len].copy_from_slice(&bytes[..len]);
+        }
+    }
+}
+
+/// Forward a write request to the flight loop. Returns false if it was rejected.
+fn apply_write(
+    record: &ParsedRecord,
+    payload: &[u8],
+    table: &Table,
+    warned_set: &WarnedSet,
+) -> bool {
+    let Ok(offset) = u16::try_from(record.dw_offset) else {
+        tracing::debug!(
+            "Ignoring write to out-of-range offset {:#x}",
+            record.dw_offset
+        );
+        return true;
+    };
+    tracing::debug!(
+        "Write operation: offset {:#06x}, n_bytes {}",
+        offset,
+        record.n_bytes
+    );
+    let entry = table.get(offset).filter(|_| table.is_writable(offset));
+    let Some(entry) = entry else {
+        if table.is_active(offset)
+            && warned_set.check_and_set(offset, WarnCategory::WriteNotWritable)
+        {
+            tracing::warn!("Attempt to write non-writable offset {:#06x}", offset);
+        } else if warned_set.check_and_set(offset, WarnCategory::WriteNotExist) {
+            tracing::warn!("Attempt to write non-active offset {:#06x}", offset);
+        }
+        return true;
+    };
+    match entry.value.decode_le(payload) {
+        Some(value) => {
+            tracing::info!("Write request: offset {:#06x} = {}", offset, value);
+            try_send_write(offset, value, payload.len());
+            true
+        }
+        None => {
+            tracing::warn!(
+                "Rejected write to offset {:#06x}: {} bytes does not match {:?}",
+                offset,
+                record.n_bytes,
+                entry.value
+            );
+            false
+        }
     }
 }
 
@@ -362,49 +357,100 @@ mod tests {
     use super::*;
     use crate::value_table::Entry;
 
-    fn create_test_table() -> Table {
-        Table::new()
+    /// Builds a request view the way the SDK client libraries do.
+    #[derive(Default)]
+    struct View {
+        data: Vec<u8>,
+        /// Byte offset of each record's payload, in order.
+        payloads: Vec<usize>,
     }
 
-    /// Build a single-record view: header + payload, followed by a zero terminator.
-    fn single_record(offset: u16, n_bytes: u32, is_write: bool, payload: &[u8]) -> Vec<u8> {
-        let mut data = vec![0u8; 64];
-        data[0] = 1;
-        data[4..8].copy_from_slice(&(offset as u32).to_le_bytes());
-        let raw_n = if is_write {
-            n_bytes | 0x8000_0000
-        } else {
-            n_bytes
-        };
-        data[8..12].copy_from_slice(&raw_n.to_le_bytes());
-        data[12..16].copy_from_slice(&SENTINEL.to_le_bytes());
-        data[16..16 + payload.len()].copy_from_slice(payload);
-        data
+    impl View {
+        fn header(mut self, id: u32, offset: u32, n_bytes: u32) -> Self {
+            for v in [id, offset, n_bytes] {
+                self.data.extend_from_slice(&v.to_le_bytes());
+            }
+            self
+        }
+
+        fn payload(mut self, bytes: &[u8]) -> Self {
+            self.payloads.push(self.data.len());
+            self.data.extend_from_slice(bytes);
+            self
+        }
+
+        /// A 32-bit read; the client's payload buffer starts out as `0xAA`s.
+        fn read32(self, offset: u32, n_bytes: u32) -> Self {
+            let mut v = self.header(FS6IPC_READSTATEDATA_ID, offset, n_bytes);
+            v.data.extend_from_slice(&0x0105_FFF8u32.to_le_bytes());
+            v.payload(&vec![0xAA; n_bytes as usize])
+        }
+
+        fn write(self, offset: u32, bytes: &[u8]) -> Self {
+            self.header(FS6IPC_WRITESTATEDATA_ID, offset, bytes.len() as u32)
+                .payload(bytes)
+        }
+
+        /// Terminator, plus slack as in a real (page-sized) mapping.
+        fn end(mut self) -> Self {
+            self.data.extend_from_slice(&[0u8; 16]);
+            self
+        }
+
+        fn payload_at(&self, record: usize, len: usize) -> &[u8] {
+            let start = self.payloads[record];
+            &self.data[start..start + len]
+        }
+
+        fn records(&self) -> (Vec<ParsedRecord>, Result<(), Malformed>) {
+            let mut records = Vec::new();
+            let result = unsafe {
+                iterate_records(self.data.as_ptr(), self.data.len(), |r| records.push(r))
+            };
+            (records, result)
+        }
+
+        fn process(&mut self, table: &Table) -> ProcessOutcome {
+            let mut warned_set = WarnedSet::new();
+            unsafe {
+                process_mapped_view(
+                    self.data.as_mut_ptr(),
+                    self.data.len(),
+                    table,
+                    &mut warned_set,
+                )
+            }
+        }
+    }
+
+    fn table_with(entries: &[(u16, Value, bool)]) -> Table {
+        let mut table = Table::new();
+        for (offset, value, writable) in entries {
+            table.insert(
+                *offset,
+                Entry {
+                    value: value.clone(),
+                    source: 0,
+                    destination: 0,
+                    writable: *writable,
+                },
+            );
+        }
+        table
     }
 
     #[test]
     fn test_narrow_read_does_not_overrun_payload() {
-        let mut table = create_test_table();
-        table.insert(
-            0x300,
-            Entry {
-                value: Value::UnsignedInteger32(0x12345678),
-                source: 0,
-                destination: 0,
-                writable: false,
-            },
-        );
-        let mut data = single_record(0x300, 2, false, &[0xAA; 2]);
-        data[18] = 0xEE; // first byte after the 2-byte payload
-        data[19] = 0xEE;
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-        assert_eq!(&data[16..18], &[0x78, 0x56]);
-        assert_eq!(
-            &data[18..20],
-            &[0xEE, 0xEE],
-            "bytes past nBytes must be untouched"
-        );
+        let table = table_with(&[(0x300, Value::UnsignedInteger32(0x12345678), false)]);
+        let mut view = View::default().read32(0x300, 2).read32(0x300, 4).end();
+        let outcome = view.process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(view.payload_at(0, 2), &[0x78, 0x56]);
+        // The next record's header follows the 2-byte payload and must survive.
+        let (records, result) = view.records();
+        assert_eq!(result, Ok(()));
+        assert_eq!(records.len(), 2);
+        assert_eq!(view.payload_at(1, 4), &0x12345678u32.to_le_bytes());
     }
 
     /// All write-path checks share the global write channel, so keep them in one test.
@@ -413,37 +459,18 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
         crate::set_write_channel(tx);
 
-        let mut table = create_test_table();
-        for (offset, value) in [
-            (0x10, Value::Integer16(0)),
-            (0x20, Value::Float32(0.0)),
-            (0x30, Value::UnsignedInteger32(0)),
-            (0x40, Value::Integer64(0)),
-        ] {
-            table.insert(
-                offset,
-                Entry {
-                    value,
-                    source: 0,
-                    destination: 0,
-                    writable: true,
-                },
-            );
-        }
-        // Read-only built-in, like the 0x337E activity counter.
-        table.insert(
-            0x337E,
-            Entry {
-                value: Value::UnsignedInteger16(7),
-                source: 0,
-                destination: 0,
-                writable: false,
-            },
-        );
-        let mut warned_set = WarnedSet::new();
-        let mut run = |offset: u16, payload: &[u8]| {
-            let data = single_record(offset, payload.len() as u32, true, payload);
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) }
+        let table = table_with(&[
+            (0x10, Value::Integer16(0), true),
+            (0x20, Value::Float32(0.0), true),
+            (0x30, Value::UnsignedInteger32(0), true),
+            (0x40, Value::Integer64(0), true),
+            // Read-only built-in, like the 0x337E activity counter.
+            (0x337E, Value::UnsignedInteger16(7), false),
+        ]);
+        let run = |offset: u32, payload: &[u8]| {
+            let outcome = View::default().write(offset, payload).end().process(&table);
+            assert!(outcome.malformed.is_none());
+            outcome.rejected_writes
         };
 
         assert_eq!(run(0x10, &[0xFF, 0xFF]), 0);
@@ -463,401 +490,124 @@ mod tests {
         // Non-writable offset: not forwarded.
         assert_eq!(run(0x337E, &[1, 0]), 0);
         assert!(rx.try_recv().is_err());
+
+        // Out-of-range offset: ignored, not forwarded and not wrapped onto 0x0010.
+        assert_eq!(run(0x1_0010, &[1, 0]), 0);
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]
     fn test_process_empty_view() {
-        let mut table = create_test_table();
-        table.insert(
-            0,
-            Entry {
-                value: Value::Integer64(42),
-                source: 0,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut warned_set = WarnedSet::new();
-        let data = [0u8; 64];
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
+        let table = table_with(&[(0, Value::Integer64(42), false)]);
+        let mut view = View {
+            data: vec![0u8; 64],
+            payloads: vec![],
+        };
+        let outcome = view.process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(view.data, vec![0u8; 64]);
     }
 
     #[test]
     fn test_process_single_read_integer() {
-        let mut table = create_test_table();
-        table.insert(
-            100,
-            Entry {
-                value: Value::Integer64(12345),
-                source: 100,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 64];
-        // sequence id
-        data[0] = 1;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 0;
-        // dwOffset = 100 (little-endian)
-        data[4] = 100;
-        data[5] = 0;
-        data[6] = 0;
-        data[7] = 0;
-        // nBytes = 8 (read operation, high bit clear), little-endian
-        data[8] = 8;
-        data[9] = 0;
-        data[10] = 0;
-        data[11] = 0;
-        // sentinel (0x5061756c "luaP" in LE)
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50;
-        // inline data area
-        data[16] = 0;
-        data[17] = 0;
-        data[18] = 0;
-        data[19] = 0;
-        data[20] = 0;
-        data[21] = 0;
-        data[22] = 0;
-        data[23] = 0;
-
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        // Check that the value was written to the target location
-        let read_value = i64::from_le_bytes([
-            data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
-        ]);
-        assert_eq!(read_value, 12345);
+        let table = table_with(&[(100, Value::Integer64(12345), false)]);
+        let mut view = View::default().read32(100, 8).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 8), &12345i64.to_le_bytes());
     }
 
     #[test]
     fn test_process_single_read_float() {
-        let mut table = create_test_table();
-        table.insert(
-            200,
-            Entry {
-                value: Value::Float64(1.23456),
-                source: 200,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 64];
-        data[0] = 1;
-        data[4] = 200; // offset 200 (just lower byte for simplicity)
-        data[8] = 8; // nBytes = 8
-        // sentinel
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50;
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        // Check float was written
-        let read_value = f64::from_le_bytes([
-            data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
-        ]);
-        assert!((read_value - 1.23456).abs() < 0.0001);
+        let table = table_with(&[(200, Value::Float64(1.23456), false)]);
+        let mut view = View::default().read32(200, 8).end();
+        view.process(&table);
+        let read = f64::from_le_bytes(view.payload_at(0, 8).try_into().unwrap());
+        assert!((read - 1.23456).abs() < 0.0001);
     }
 
     #[test]
     fn test_process_single_read_bool() {
-        let mut table = create_test_table();
-        table.insert(
-            50,
-            Entry {
-                value: Value::Bool(true),
-                source: 50,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 64];
-        data[0] = 1;
-        data[4] = 50; // offset 50
-        data[8] = 1; // nBytes = 1
-        // sentinel
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50;
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        assert_eq!(data[16], 1u8);
+        let table = table_with(&[(50, Value::Bool(true), false)]);
+        let mut view = View::default().read32(50, 1).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 1), &[1]);
     }
 
     #[test]
     fn test_process_multiple_reads() {
-        let mut table = create_test_table();
-        table.insert(
-            100,
-            Entry {
-                value: Value::Integer64(1000),
-                source: 100,
-                destination: 0,
-                writable: false,
-            },
-        );
-        table.insert(
-            200,
-            Entry {
-                value: Value::Integer64(2000),
-                source: 200,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 128];
-        // First record
-        data[0] = 1;
-        data[4] = 100;
-        data[8] = 8;
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50;
-        // Second record
-        data[24] = 2;
-        data[28] = 200;
-        data[32] = 8;
-        data[36] = 0x6C;
-        data[37] = 0x75;
-        data[38] = 0x61;
-        data[39] = 0x50;
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        let val1 = i64::from_le_bytes([
-            data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
+        let table = table_with(&[
+            (100, Value::Integer64(1000), false),
+            (200, Value::Integer64(2000), false),
         ]);
-        let val2 = i64::from_le_bytes([
-            data[40], data[41], data[42], data[43], data[44], data[45], data[46], data[47],
-        ]);
-        assert_eq!(val1, 1000);
-        assert_eq!(val2, 2000);
+        let mut view = View::default().read32(100, 8).read32(200, 8).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 8), &1000i64.to_le_bytes());
+        assert_eq!(view.payload_at(1, 8), &2000i64.to_le_bytes());
     }
 
     #[test]
     fn test_offset_not_in_table() {
-        let table = create_test_table();
-
-        let mut data = [0u8; 64];
-        data[0] = 1;
-        data[4] = 100; // offset not in table
-        data[8] = 8;
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-    }
-
-    #[test]
-    fn test_fsd_sentinel_record_is_processed() {
-        // A record with ":FSD" sentinel should be processed normally
-        // (value written to payload, not treated as error).
-        let mut data = [0u8; 64];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
-        data[8..12].copy_from_slice(&8u32.to_le_bytes()); // nBytes=8 (read)
-        data[12] = b':';
-        data[13] = b'F';
-        data[14] = b'S';
-        data[15] = b'D'; // ":FSD" sentinel
-
-        let mut table = create_test_table();
-        table.insert(
-            50,
-            Entry {
-                value: Value::Integer64(7777),
-                source: 50,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        // No errors — record was processed despite FSD sentinel
-        assert_eq!(error_count, 0);
-        // Value was written to payload area (offset 16)
-        let read_val = i64::from_le_bytes(data[16..24].try_into().unwrap());
-        assert_eq!(read_val, 7777);
-    }
-
-    #[test]
-    fn test_non_luap_sentinel_accepted() {
-        // A record with a non-"luaP" sentinel (e.g. a pointer value like
-        // FSInterrogate writes) should be processed without error.
-        let mut data = [0u8; 64];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
-        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes=4 (read)
-        // Non-"luaP" value — like a writeback pointer
-        data[12..16].copy_from_slice(&0x0105FFF8u32.to_le_bytes());
-
-        let mut table = create_test_table();
-        table.insert(
-            50,
-            Entry {
-                value: Value::Integer32(42),
-                source: 50,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        assert_eq!(error_count, 0);
-        let read_val = i32::from_le_bytes(data[16..20].try_into().unwrap());
-        assert_eq!(read_val, 42);
+        let table = Table::new();
+        let mut view = View::default().read32(100, 8).end();
+        let outcome = view.process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(outcome.rejected_writes, 0);
     }
 
     #[test]
     fn test_view_size_too_small_safe() {
-        // Tiny buffer where view_size prevents over-scanning
-        let data = [0u8; 4];
-        let table = create_test_table();
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-        // Should handle safely — zero reqID at offset 0, scan forward finds nothing, break
-        assert_eq!(error_count, 0);
+        // Not even room for a dwId: no terminator, so the view is malformed.
+        let data = [0u8; 2];
+        let result = unsafe { iterate_records(data.as_ptr(), data.len(), |_| {}) };
+        assert_eq!(
+            result,
+            Err(Malformed {
+                at: 0,
+                reason: MalformedReason::MissingTerminator
+            })
+        );
     }
 
     #[test]
     fn test_process_read_string_value() {
-        let mut table = create_test_table();
-        let bytes: Vec<u8> = b"hello\0".to_vec();
-        table.insert(
-            300,
-            Entry {
-                value: Value::String(bytes),
-                source: 300,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 64];
-        data[0] = 1; // reqID
-        data[4] = 44; // offset 300 (0x012C), just low byte for simplicity
-        data[5] = 1; // high byte of offset
-        data[8] = 10; // nBytes = 10
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50; // sentinel luaP
-
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        // Payload starts at offset 16
-        let payload: Vec<u8> = data[16..26].to_vec();
-        assert_eq!(&payload[..6], b"hello\0");
-        // Remaining bytes should be zero-filled
-        assert_eq!(payload[6], 0);
-        assert_eq!(payload[7], 0);
-        assert_eq!(payload[8], 0);
-        assert_eq!(payload[9], 0);
+        let table = table_with(&[(300, Value::String(b"hello\0".to_vec()), false)]);
+        let mut view = View::default().read32(300, 10).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 10), b"hello\0\0\0\0\0");
     }
 
     #[test]
     fn test_process_read_string_truncated_to_n_bytes() {
-        let mut table = create_test_table();
-        // String longer than n_bytes
-        let bytes: Vec<u8> = b"hello world\0".to_vec();
-        table.insert(
-            400,
-            Entry {
-                value: Value::String(bytes),
-                source: 400,
-                destination: 0,
-                writable: false,
-            },
-        );
-
-        let mut data = [0u8; 64];
-        data[0] = 1;
-        data[4] = 144; // offset 400 (0x0190)
-        data[5] = 1;
-        data[8] = 5; // nBytes = 5 (smaller than string length)
-        data[12] = 0x6C;
-        data[13] = 0x75;
-        data[14] = 0x61;
-        data[15] = 0x50;
-
-        let mut warned_set = WarnedSet::new();
-        unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        let payload: Vec<u8> = data[16..21].to_vec();
-        assert_eq!(&payload[..], b"hello");
+        let table = table_with(&[(400, Value::String(b"hello world\0".to_vec()), false)]);
+        let mut view = View::default().read32(400, 5).end();
+        view.process(&table);
+        assert_eq!(view.payload_at(0, 5), b"hello");
     }
 
     #[test]
-    fn test_invalid_dw_offset_rejected() {
-        // dwOffset > 0xFFFF should be rejected (break processing)
-        let mut data = [0u8; 64];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&0x10000u32.to_le_bytes()); // dwOffset = 65536 > 0xFFFF
-        data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes = 4
-        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
-
-        let table = create_test_table();
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        assert_eq!(error_count, 0);
-        // Payload should NOT have been written (stays zero)
-        assert_eq!(data[16..20], [0u8; 4]);
-    }
-
-    #[test]
-    fn test_nbytes_zero_rejected() {
-        // nBytes = 0 should be rejected (would cause infinite loop)
-        let mut data = [0u8; 64];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
-        data[8..12].copy_from_slice(&0u32.to_le_bytes()); // nBytes = 0
-        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
-
-        let table = create_test_table();
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        assert_eq!(error_count, 0);
+    fn test_nbytes_zero_accepted() {
+        let view = View::default().read32(0x100, 0).read32(0x104, 4).end();
+        let (records, result) = view.records();
+        assert_eq!(result, Ok(()));
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[1].dw_offset, 0x104);
     }
 
     #[test]
     fn test_nbytes_exceeds_buffer_rejected() {
-        // nBytes larger than remaining buffer should be rejected
-        let mut data = [0u8; 32];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
-        data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
-        data[8..12].copy_from_slice(&100u32.to_le_bytes()); // nBytes = 100, only 16 bytes after header
-        data[12..16].copy_from_slice(&0x5061756Cu32.to_le_bytes()); // "luaP"
-
-        let table = create_test_table();
-        let mut warned_set = WarnedSet::new();
-        let error_count =
-            unsafe { process_mapped_view(data.as_ptr(), data.len(), &table, &mut warned_set) };
-
-        assert_eq!(error_count, 0);
+        let mut view = View::default().header(FS6IPC_READSTATEDATA_ID, 0x100, 100);
+        view.data.extend_from_slice(&[0u8; 20]);
+        let (records, result) = view.records();
+        assert!(records.is_empty());
+        assert_eq!(
+            result,
+            Err(Malformed {
+                at: 0,
+                reason: MalformedReason::PayloadOverrun {
+                    dw_offset: 0x100,
+                    n_bytes: 100
+                }
+            })
+        );
     }
 }

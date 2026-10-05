@@ -212,11 +212,11 @@ unsafe extern "system" fn wnd_proc(
     let table = table_arc.read().unwrap();
     tracing::trace!("Aquired table lock");
     tracing::trace!("Calling process_mapped_view");
-    let error_count =
+    let outcome =
         unsafe { process_mapped_view(mapped_view_ptr, view_size, &table, &mut *warned_set) };
 
-    if error_count > 0 {
-        tracing::error!("process_mapped_view returned {} errors", error_count);
+    if outcome.rejected_writes > 0 {
+        tracing::error!("Rejected {} write request(s)", outcome.rejected_writes);
     }
 
     tracing::trace!("Finished processing mapped view, unmapping and closing handle");

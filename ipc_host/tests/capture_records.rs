@@ -1,65 +1,53 @@
-use ipc_host::mapped_view::iterate_records;
+use ipc_host::mapped_view::{Malformed, ParsedRecord, RecordKind, iterate_records};
+
+fn parse(data: &[u8]) -> (Vec<ParsedRecord>, Result<(), Malformed>) {
+    let mut records = Vec::new();
+    let result = unsafe { iterate_records(data.as_ptr(), data.len(), |rec| records.push(rec)) };
+    (records, result)
+}
 
 #[test]
 fn test_working_slc_capture() {
-    let data = include_bytes!("fixtures/slc-3-reads.bin");
-    let mut records = Vec::new();
-    let errors = unsafe {
-        iterate_records(data.as_ptr(), data.len(), |rec| {
-            records.push(rec);
-            0
-        })
-    };
-    assert_eq!(errors, 0);
+    let (records, result) = parse(include_bytes!("fixtures/slc-3-reads.bin"));
+    assert_eq!(result, Ok(()));
     assert_eq!(records.len(), 3);
-    assert!(records.iter().all(|r| r.sentinel_ok));
+    assert!(records.iter().all(|r| r.kind == RecordKind::Read32));
+    // The .NET client puts "Paul" in the pDest slot.
+    assert!(records.iter().all(|r| r.p_dest == 0x5061_756C));
     assert_eq!(records[0].dw_offset, 0x3304);
     assert_eq!(records[0].n_bytes, 4);
-    assert!(!records[0].is_write);
     assert_eq!(records[1].dw_offset, 0x3308);
     assert_eq!(records[1].n_bytes, 4);
-    assert!(!records[1].is_write);
     assert_eq!(records[2].dw_offset, 0x3124);
     assert_eq!(records[2].n_bytes, 1);
-    assert!(!records[2].is_write);
 }
 
 #[test]
 fn test_fsinterrogate_capture() {
-    let data = include_bytes!("fixtures/fsinterrogate-2-reads.bin");
-    let mut records = Vec::new();
-    let errors = unsafe {
-        iterate_records(data.as_ptr(), data.len(), |rec| {
-            records.push(rec);
-            0
-        })
-    };
-    assert_eq!(errors, 0);
+    let (records, result) = parse(include_bytes!("fixtures/fsinterrogate-2-reads.bin"));
+    assert_eq!(result, Ok(()));
     assert_eq!(records.len(), 2);
-    assert!(records.iter().all(|r| !r.sentinel_ok));
+    assert!(records.iter().all(|r| r.kind == RecordKind::Read32));
     assert_eq!(records[0].dw_offset, 0x3304);
     assert_eq!(records[0].n_bytes, 4);
-    assert!(!records[0].is_write);
+    assert_eq!(records[0].p_dest, 0x0105_FFF8);
     assert_eq!(records[1].dw_offset, 0x3308);
     assert_eq!(records[1].n_bytes, 4);
-    assert!(!records[1].is_write);
+    assert_eq!(records[1].p_dest, 0x0105_FFFC);
 }
 
 #[test]
-fn test_8001_dump_does_not_crash() {
-    // This dump contains a request for offset 0x8001, which is in a completely different shape to the
-    // previously seen requests
+fn test_fsinterrogate_app_key_write() {
+    // FSInterrogate registers its application key with a 13-byte write to 0x8001.
     let data = include_bytes!("fixtures/fsinterrogate-offset-8001.bin");
-    let mut records = Vec::new();
-    let errors = unsafe {
-        iterate_records(data.as_ptr(), data.len(), |rec| {
-            records.push(rec);
-            0
-        })
-    };
-    assert_eq!(errors, 0);
-    // The pseudo-record passes validation (reqID=2, offset=0x8001, nBytes=13)
-    // before following bytes break field-validation. At least 0 records
-    // is guaranteed — what matters is that we didn't crash.
-    assert!(records.len() <= 1);
+    let (records, result) = parse(data);
+    assert_eq!(result, Ok(()));
+    assert_eq!(records.len(), 1);
+    let key = &records[0];
+    assert_eq!(key.kind, RecordKind::Write);
+    assert_eq!(key.header_offset, 0);
+    assert_eq!(key.dw_offset, 0x8001);
+    assert_eq!(key.n_bytes, 13);
+    assert_eq!(key.payload_ptr as *const u8, data[0x0C..].as_ptr());
+    assert_eq!(&data[0x0C..0x19], b"6PETEXPDRVW3\0");
 }
