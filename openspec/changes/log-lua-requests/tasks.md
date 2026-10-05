@@ -12,6 +12,7 @@
 
 - [x] 3.1 In the write path, ahead of the table lookup: `0x0D6C` stores the parameter (up to 4 bytes, little-endian, zero-extended); `0x0D70` logs the request text (up to NUL, max 40 bytes, escaped) with the stored parameter or "no param", marked not supported
 - [x] 3.2 Neither offset is forwarded, warned about, or counted as a rejected write
+- [x] 3.3 Log each distinct request text and parameter once (repeats at trace); `ResetWarnings` forgets logged requests but keeps the parameter
 
 ## 4. Configuration
 
@@ -25,6 +26,7 @@
 - [x] 5.1 `mapped_view` tests: parameter stored from 1-, 2- and 4-byte writes; request text cut at NUL and at 40 bytes; neither offset forwarded or counted as rejected; parameter persists across `process_mapped_view` calls; reads of both offsets are zero-filled
 - [x] 5.2 Config tests: `[log_levels]` values parsed; old key used when the new one is missing; new key wins when both are set
 - [x] 5.3 `RuntimeLevel` round-trip test (replaces the existing key-write level test)
+- [x] 5.4 Deduplication tests: a repeated request is recorded once, a new parameter or text is recorded again, and `reset_warnings` empties the set but keeps the parameter
 
 ## 6. Verification
 

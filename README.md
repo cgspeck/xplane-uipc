@@ -41,7 +41,7 @@ Some client requests are logged at their own level, set in the `[log_levels]` ta
 | Setting | Logs |
 |---|---|
 | `key_write` | Application keys that clients such as FSInterrogate write to offset `0x8001` when they connect. |
-| `lua_request` | Requests for FSUIPC to run a macro or Lua control, written to `0x0D70` (with a parameter at `0x0D6C`). The plugin can't run these; the log shows what a client asked for. |
+| `lua_request` | Requests for FSUIPC to run a macro or Lua control, written to `0x0D70` (with a parameter at `0x0D6C`). The plugin can't run these; the log shows what a client asked for. Each distinct request and parameter is logged once, and again after **Clear Trace Log**. |
 
 The older `[settings] key_write_log_level` still works, but `[log_levels] key_write` takes precedence when both are set.
 

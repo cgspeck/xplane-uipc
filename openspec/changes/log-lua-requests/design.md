@@ -32,7 +32,9 @@ Per-message state today: the window's `GWLP_USERDATA` holds a `*mut WarnedSet`, 
 
    The text is cut at the first NUL, and unprintable bytes are escaped, as for the key write. The parameter isn't cleared after use, matching the guide's "whatever was last written there". Neither write is forwarded, counted as rejected, or warned about as unmapped. Writes larger than the documented sizes are handled the same, using only the documented bytes.
 
-2. **State lives in `IpcState`, owned by the IPC window.** `struct IpcState { warned: WarnedSet, lua_param: Option<u32> }` replaces the `WarnedSet` box in `GWLP_USERDATA`. The window procedure is the only thing that uses it, on the IPC thread, so it needs no locking. `ResetWarnings` clears `warned` only. The planned `add-user-area` change will put its 64-byte buffer in the same struct.
+   Each distinct text and parameter pair is logged once, like the `WarnedSet` warnings, so a client that repeats a request on every poll doesn't flood the log. Repeats are logged at trace. "Clear Trace Log" (`ResetWarnings`) forgets which requests were logged, so they are logged again.
+
+2. **State lives in `IpcState`, owned by the IPC window.** `struct IpcState { warned: WarnedSet, lua_param: Option<u32>, logged_lua_requests: HashSet<(String, Option<u32>)> }` replaces the `WarnedSet` box in `GWLP_USERDATA`. The window procedure is the only thing that uses it, on the IPC thread, so it needs no locking. `ResetWarnings` clears `warned` and `logged_lua_requests`, and keeps `lua_param`. The planned `add-user-area` change will put its 64-byte buffer in the same struct.
    - *Alternative:* another static atomic, like the key-write level. Rejected: it's message state, not configuration, and the user area needs a home anyway.
 
 3. **`[log_levels]` table.**
@@ -49,7 +51,7 @@ Per-message state today: the window's `GWLP_USERDATA` holds a `*mut WarnedSet`, 
 
 ## Risks / Trade-offs
 
-- [Low] **Repeated requests could fill the log at `info`.** A client that sends the same request on every poll would log every time. Set `lua_request = "debug"` or `"off"` if that's noisy. Rate limiting isn't worth adding until it's seen.
+- [Low] **The set of logged requests grows with each distinct request.** Texts are at most 40 bytes and clients send a handful of distinct requests, so it stays small. It is emptied by "Clear Trace Log".
 - [Low] **Changing the window state type** touches `create_ipc_window`, the window procedure, the reset handler and teardown. Together that's mechanical and covered by the existing IPC tests.
 
 ## Open Questions

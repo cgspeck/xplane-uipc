@@ -10,7 +10,7 @@ A write to `0x0D6C` SHALL be stored as the macro/Lua parameter: its first four b
 
 ### Requirement: Lua and macro request at 0x0D70
 
-A write to `0x0D70` SHALL be treated as a request for FSUIPC to run a macro or Lua control. The server SHALL log the request text (printable ASCII up to the first NUL, limited to `nBytes` and to 40 bytes, with other bytes escaped) together with the stored parameter, or "no param" if none has been written, and SHALL say the request is not supported. The line SHALL be logged at the level set by `[log_levels] lua_request` in `config.toml`, which accepts the same values and defaults as `[log_levels] key_write`. The write SHALL NOT be forwarded, SHALL NOT produce non-active/non-writable warnings, and SHALL NOT count as an error.
+A write to `0x0D70` SHALL be treated as a request for FSUIPC to run a macro or Lua control. The server SHALL log the request text (printable ASCII up to the first NUL, limited to `nBytes` and to 40 bytes, with other bytes escaped) together with the stored parameter, or "no param" if none has been written, and SHALL say the request is not supported. A request with the same text and parameter as one already logged SHALL NOT be logged again at that level until warnings are reset by "Clear Trace Log". The line SHALL be logged at the level set by `[log_levels] lua_request` in `config.toml`, which accepts the same values and defaults as `[log_levels] key_write`. The write SHALL NOT be forwarded, SHALL NOT produce non-active/non-writable warnings, and SHALL NOT count as an error.
 
 #### Scenario: Request with a parameter
 - **WHEN** a client writes `3` to `0x0D6C` and then `"LuaSet slc_doors\0"` to `0x0D70`, with `lua_request = "info"`
@@ -21,8 +21,20 @@ A write to `0x0D70` SHALL be treated as a request for FSUIPC to run a macro or L
 - **THEN** the log line contains `LuaKill slc_doors` and `no param`
 
 #### Scenario: Parameter reused
-- **WHEN** a client writes `5` to `0x0D6C`, then writes two requests to `0x0D70` in later messages
+- **WHEN** a client writes `5` to `0x0D6C`, then writes two different requests to `0x0D70` in later messages
 - **THEN** both log lines contain `param 5`
+
+#### Scenario: Repeated request logged once
+- **WHEN** a client writes `"LuaSet slc_doors\0"` to `0x0D70` in several messages without changing the parameter
+- **THEN** only one log line is written at the `lua_request` level
+
+#### Scenario: Same text with a new parameter
+- **WHEN** a client writes `"LuaSet slc_doors\0"` to `0x0D70` with parameter `3`, then writes `5` to `0x0D6C` and the same request again
+- **THEN** two log lines are written, one with `param 3` and one with `param 5`
+
+#### Scenario: Logged again after reset
+- **WHEN** a request has been logged and the user selects "Clear Trace Log"
+- **THEN** the next write of the same request is logged again
 
 #### Scenario: Requests silenced
 - **WHEN** `[log_levels] lua_request = "off"`
