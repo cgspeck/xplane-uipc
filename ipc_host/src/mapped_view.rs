@@ -81,6 +81,12 @@ pub struct ParsedRecord {
 /// Iterate over records in a mapped view buffer, calling `on_record` for each.
 /// Returns the total number of errors encountered (bad sentinels, plus any
 /// additional errors returned by the callback).
+///
+/// # Safety
+///
+/// `mapped_view_ptr` must point to `view_size` bytes that stay valid for the
+/// whole call. Each record's `payload_ptr` points into that buffer, so the
+/// buffer must also be writable if `on_record` writes through it.
 pub unsafe fn iterate_records<F>(
     mapped_view_ptr: *const u8,
     view_size: usize,
@@ -231,6 +237,13 @@ where
     }
 }
 
+/// Answer the read and write requests in a client's mapped view.
+///
+/// # Safety
+///
+/// `mapped_view_ptr` must point to `view_size` readable and writable bytes
+/// that stay valid for the whole call: read requests are answered by writing
+/// into the record payloads in place.
 pub unsafe fn process_mapped_view(
     mapped_view_ptr: *const u8,
     view_size: usize,

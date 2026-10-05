@@ -289,6 +289,14 @@ pub fn create_ipc_window(warned_set_ptr: *mut WarnedSet) -> anyhow::Result<HWND>
     }
 }
 
+/// Create the `UIPCMAIN` IPC window and run its message loop until
+/// `IpcCommands::Shutdown` is received.
+///
+/// # Safety
+///
+/// Call this from a dedicated thread, and run only one instance at a time.
+/// The window belongs to the calling thread, and its window procedure uses a
+/// `WarnedSet` that this function frees when the loop exits.
 #[tracing::instrument(skip(config))]
 pub unsafe fn create_ipc_window_and_run(
     rx: Receiver<IpcCommands>,
