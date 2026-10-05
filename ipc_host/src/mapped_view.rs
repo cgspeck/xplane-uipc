@@ -247,91 +247,6 @@ pub unsafe fn process_mapped_view(
                     tracing::debug!("Offset {:#06x} found in table", record.dw_offset);
                     warned_set.clear_key(record.dw_offset as u16, WarnCategory::ReadNotExist);
                     match &entry.value {
-                        Value::Bool(v) => {
-                            tracing::trace!(
-                                "Writing bool {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut u8, *v as u8);
-                        }
-                        Value::Float32(v) => {
-                            tracing::trace!(
-                                "Writing f32 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut f32, *v)
-                        }
-                        Value::Float64(v) => {
-                            tracing::trace!(
-                                "Writing f64 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(
-                                record.payload_ptr as *mut f64,
-                                f64::from_bits(v.to_bits().to_le()),
-                            )
-                        }
-                        Value::Integer8(v) => {
-                            tracing::trace!("Writing i8 {} -> offset {:#06x}", v, record.dw_offset);
-                            std::ptr::write_unaligned(record.payload_ptr as *mut i8, v.to_le());
-                        }
-                        Value::Integer16(v) => {
-                            tracing::trace!(
-                                "Writing i16 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut i16, v.to_le());
-                        }
-                        Value::Integer32(v) => {
-                            tracing::trace!(
-                                "Writing i32 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut i32, v.to_le());
-                        }
-                        Value::Integer64(v) => {
-                            tracing::trace!(
-                                "Writing i64 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut i64, v.to_le());
-                        }
-                        Value::UnsignedInteger8(v) => {
-                            tracing::trace!("Writing u8 {} -> offset {:#06x}", v, record.dw_offset);
-                            std::ptr::write_unaligned(record.payload_ptr as *mut u8, v.to_le());
-                        }
-                        Value::UnsignedInteger16(v) => {
-                            tracing::trace!(
-                                "Writing u16 {} -> offset {:#06x} ({:#?}, {} bytes)",
-                                v,
-                                record.dw_offset,
-                                record.payload_ptr,
-                                std::mem::size_of::<u16>()
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut u16, v.to_le());
-                        }
-                        Value::UnsignedInteger32(v) => {
-                            tracing::trace!(
-                                "Writing u32 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut u32, v.to_le());
-                        }
-                        Value::UnsignedInteger64(v) => {
-                            tracing::trace!(
-                                "Writing u64 {} -> offset {:#06x}",
-                                v,
-                                record.dw_offset
-                            );
-                            std::ptr::write_unaligned(record.payload_ptr as *mut u64, v.to_le());
-                        }
                         Value::String(bytes) => {
                             tracing::trace!(
                                 "Writing String ({} bytes) -> offset {:#06x}",
@@ -343,6 +258,20 @@ pub unsafe fn process_mapped_view(
                             for i in len..record.n_bytes as usize {
                                 *record.payload_ptr.add(i) = 0;
                             }
+                        }
+                        value => {
+                            // Never write past the request's payload: a narrower read
+                            // gets the low-order (little-endian) bytes of the value.
+                            let bytes = value.to_le_bytes();
+                            let len = bytes.len().min(record.n_bytes as usize);
+                            tracing::trace!(
+                                "Writing {:?} ({} of {} bytes) -> offset {:#06x}",
+                                value,
+                                len,
+                                bytes.len(),
+                                record.dw_offset
+                            );
+                            std::ptr::copy_nonoverlapping(bytes.as_ptr(), record.payload_ptr, len);
                         }
                     }
                 } else {
@@ -366,29 +295,31 @@ pub unsafe fn process_mapped_view(
                     record.dw_offset,
                     record.n_bytes
                 );
-                if table.is_writable(record.dw_offset as u16) {
-                    let value = match record.n_bytes {
-                        1 => (*record.payload_ptr) as f64,
-                        2 => LittleEndian::read_u16(&*slice::from_raw_parts(record.payload_ptr, 2))
-                            as f64,
-                        4 => LittleEndian::read_u32(&*slice::from_raw_parts(record.payload_ptr, 4))
-                            as f64,
-                        8 => LittleEndian::read_f64(&*slice::from_raw_parts(record.payload_ptr, 8)),
-                        _ => {
+                let entry = table
+                    .get(record.dw_offset as u16)
+                    .filter(|_| table.is_writable(record.dw_offset as u16));
+                if let Some(entry) = entry {
+                    let payload =
+                        slice::from_raw_parts(record.payload_ptr, record.n_bytes as usize);
+                    match entry.value.decode_le(payload) {
+                        Some(value) => {
+                            tracing::info!(
+                                "Write request: offset {:#06x} = {}",
+                                record.dw_offset,
+                                value
+                            );
+                            try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
+                        }
+                        None => {
                             tracing::warn!(
-                                "Unsupported write size: {}, incrementing error count",
-                                record.n_bytes
+                                "Rejected write to offset {:#06x}: {} bytes does not match {:?}",
+                                record.dw_offset,
+                                record.n_bytes,
+                                entry.value
                             );
                             record_errors += 1;
-                            0.0
                         }
-                    };
-                    tracing::info!(
-                        "Write request: offset {:#06x} = {}",
-                        record.dw_offset,
-                        value
-                    );
-                    try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
+                    }
                 } else {
                     if table.is_active(record.dw_offset as u16)
                         && warned_set
