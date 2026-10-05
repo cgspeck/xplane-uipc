@@ -18,6 +18,8 @@
 use byteorder::{ByteOrder, LittleEndian};
 use std::fmt;
 use std::slice;
+use std::sync::atomic::{AtomicU8, Ordering};
+use tracing::{Level, level_filters::LevelFilter};
 
 use crate::{
     try_send_write,
@@ -31,6 +33,61 @@ pub const FS6IPC_READSTATEDATA_ID: u32 = 1;
 pub const FS6IPC_WRITESTATEDATA_ID: u32 = 2;
 /// `dwId` of a read from a 64-bit client.
 pub const F64IPC_READSTATEDATA_ID: u32 = 4;
+
+/// Offset clients such as FSInterrogate write their application key to when
+/// connecting (FSUIPC's access registration). It is accepted and logged, never
+/// forwarded to the flight loop.
+pub const APP_KEY_OFFSET: u16 = 0x8001;
+
+/// Levels selectable for key-write logging, indexed by `KEY_WRITE_LOG_LEVEL`.
+const KEY_WRITE_LEVELS: [LevelFilter; 6] = [
+    LevelFilter::OFF,
+    LevelFilter::ERROR,
+    LevelFilter::WARN,
+    LevelFilter::INFO,
+    LevelFilter::DEBUG,
+    LevelFilter::TRACE,
+];
+
+/// Index into `KEY_WRITE_LEVELS`; defaults to INFO.
+static KEY_WRITE_LOG_LEVEL: AtomicU8 = AtomicU8::new(3);
+
+/// Set the level application key writes to `APP_KEY_OFFSET` are logged at.
+/// `LevelFilter::OFF` silences them.
+pub fn set_key_write_log_level(level: LevelFilter) {
+    let index = KEY_WRITE_LEVELS
+        .iter()
+        .position(|l| *l == level)
+        .unwrap_or(3);
+    KEY_WRITE_LOG_LEVEL.store(index as u8, Ordering::Relaxed);
+}
+
+pub fn key_write_log_level() -> LevelFilter {
+    KEY_WRITE_LEVELS[KEY_WRITE_LOG_LEVEL.load(Ordering::Relaxed) as usize]
+}
+
+/// The key text: bytes up to the first NUL, with anything unprintable escaped.
+fn key_text(payload: &[u8]) -> String {
+    let end = payload
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(payload.len());
+    payload[..end].escape_ascii().to_string()
+}
+
+fn log_key_write(payload: &[u8]) {
+    let Some(level) = key_write_log_level().into_level() else {
+        return;
+    };
+    let text = key_text(payload);
+    match level {
+        Level::ERROR => tracing::error!("Application key write: \"{}\"", text),
+        Level::WARN => tracing::warn!("Application key write: \"{}\"", text),
+        Level::INFO => tracing::info!("Application key write: \"{}\"", text),
+        Level::DEBUG => tracing::debug!("Application key write: \"{}\"", text),
+        _ => tracing::trace!("Application key write: \"{}\"", text),
+    }
+}
 
 unsafe fn read_u32_at(ptr: *const u8) -> u32 {
     unsafe { LittleEndian::read_u32(slice::from_raw_parts(ptr, 4)) }
@@ -325,6 +382,10 @@ fn apply_write(
         offset,
         record.n_bytes
     );
+    if offset == APP_KEY_OFFSET {
+        log_key_write(payload);
+        return true;
+    }
     let entry = table.get(offset).filter(|_| table.is_writable(offset));
     let Some(entry) = entry else {
         if table.is_active(offset)

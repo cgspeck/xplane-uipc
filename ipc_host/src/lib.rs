@@ -25,6 +25,7 @@ use crate::mapped_view::process_mapped_view;
 use crate::value_table::get_value_table;
 use crate::warning::WarnedSet;
 pub use capture::CaptureConfig;
+pub use mapped_view::set_key_write_log_level;
 
 pub enum IpcCommands {
     ResetWarnings,
