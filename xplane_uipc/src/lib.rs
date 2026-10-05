@@ -566,3 +566,21 @@ pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn level_setting_parses_valid_values() {
+        assert_eq!(parse_level_setting("x", Some("off")), LevelFilter::OFF);
+        assert_eq!(parse_level_setting("x", Some("debug")), LevelFilter::DEBUG);
+        assert_eq!(parse_level_setting("x", Some("WARN")), LevelFilter::WARN);
+    }
+
+    #[test]
+    fn level_setting_defaults_to_info() {
+        assert_eq!(parse_level_setting("x", None), LevelFilter::INFO);
+        assert_eq!(parse_level_setting("x", Some("loud")), LevelFilter::INFO);
+    }
+}
