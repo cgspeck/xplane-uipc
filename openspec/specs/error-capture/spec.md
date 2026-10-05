@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Error Capture Specification
+
+## Purpose
+
+Capturing the raw bytes of FSUIPC request views to disk, controlled from the plugin menu, so protocol problems can be studied offline.
+
+## Requirements
 
 ### Requirement: Capture configuration at startup
 

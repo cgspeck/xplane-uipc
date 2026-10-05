@@ -1,3 +1,11 @@
+# Built-in Offsets Specification
+
+## Purpose
+
+Offsets whose values the plugin generates itself rather than reading from `mappings.toml`, starting with the `0x337E` activity counter.
+
+## Requirements
+
 ### Requirement: Activity counter at 0x337E
 
 The plugin SHALL serve offset `0x337E` as an unsigned 16-bit value that increments by one on every update cycle and wraps from `0xFFFF` to `0`. It SHALL be served without any `mappings.toml` entry.

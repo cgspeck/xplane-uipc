@@ -1,3 +1,11 @@
+# Static Value Mapping Specification
+
+## Purpose
+
+Mappings that serve a fixed constant from `mappings.toml` instead of reading a dataref or evaluating an expression.
+
+## Requirements
+
 ### Requirement: Mapping can specify a static constant value
 
 A mapping in `mappings.toml` SHALL support a `static_value` field that specifies a fixed `f64` constant, requiring no dataref or expression evaluation.

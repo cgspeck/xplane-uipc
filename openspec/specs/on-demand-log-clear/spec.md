@@ -1,4 +1,10 @@
-## ADDED Requirements
+# On-Demand Log Clear Specification
+
+## Purpose
+
+Clearing the plugin's trace log from the plugin menu without interrupting logging.
+
+## Requirements
 
 ### Requirement: User can clear the trace log from the plugin menu
 

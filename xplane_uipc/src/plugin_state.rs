@@ -340,6 +340,35 @@ pub fn drop_builtin_offsets(mappings: Vec<DatarefMapping>) -> Vec<DatarefMapping
         .collect()
 }
 
+/// Put one mapping's reading for this update cycle into the value table.
+///
+/// `Retain` keeps the previous value. If there is none yet, e.g. an
+/// `update_if_expr` mapping that has been false since the plugin started, the
+/// offset is served as zero, as FSUIPC does at startup.
+fn apply_reading(table: &mut Table, mapping: &ResolvedMapping, reading: Reading) {
+    let value = match reading {
+        Reading::Value(value) => value,
+        Reading::Retain if table.get(mapping.offset).is_some() => {
+            table.keep(mapping.offset);
+            return;
+        }
+        Reading::Retain => match Value::from_f64(0.0, mapping.fsuipc_type) {
+            Some(zero) => zero,
+            None => return,
+        },
+        Reading::Missing => return,
+    };
+    table.insert(
+        mapping.offset,
+        ipc_host::value_table::Entry {
+            value,
+            source: 0,
+            destination: 0,
+            writable: mapping.writable,
+        },
+    );
+}
+
 // ─── Plugin state ──────────────────────────────────────────────────────────────
 
 pub struct PluginState {
@@ -375,19 +404,7 @@ impl PluginState {
         if let Ok(mut table) = table.write() {
             let previous = table.begin_update();
             for m in &self.mappings {
-                match m.read_xplane_value() {
-                    Reading::Value(value) => table.insert(
-                        m.offset,
-                        ipc_host::value_table::Entry {
-                            value,
-                            source: 0,
-                            destination: 0,
-                            writable: m.writable,
-                        },
-                    ),
-                    Reading::Retain => table.keep(m.offset),
-                    Reading::Missing => {}
-                }
+                apply_reading(&mut table, m, m.read_xplane_value());
             }
             self.update_builtins(&mut table);
             // Offsets that produced no value this cycle stop being served.
@@ -489,5 +506,56 @@ mod tests {
     fn terminate_string_empty_read_is_empty_string() {
         assert_eq!(terminate_string(Vec::new(), 8), vec![0]);
         assert_eq!(terminate_string(b"x".to_vec(), 0), Vec::<u8>::new());
+    }
+
+    /// A mapping shaped like 0x030C (touchdown vertical speed, `i32`).
+    fn touchdown_vs_mapping() -> ResolvedMapping {
+        ResolvedMapping {
+            offset: 0x030C,
+            fsuipc_type: FsuipcType::I32,
+            size: 4,
+            source: ResolvedSource::Static { static_value: None },
+            writable: false,
+        }
+    }
+
+    /// Apply one reading inside an update cycle, as `PluginState::update` does.
+    fn run_cycle(table: &mut Table, mapping: &ResolvedMapping, reading: Reading) {
+        let previous = table.begin_update();
+        apply_reading(table, mapping, reading);
+        table.end_update(previous);
+    }
+
+    #[test]
+    fn retain_without_previous_value_serves_zero() {
+        let mapping = touchdown_vs_mapping();
+        let mut table = Table::new();
+        run_cycle(&mut table, &mapping, Reading::Retain);
+        assert!(matches!(
+            table.get(0x030C).map(|e| &e.value),
+            Some(Value::Integer32(0))
+        ));
+        assert!(table.is_active(0x030C));
+    }
+
+    #[test]
+    fn retain_keeps_previous_value() {
+        let mapping = touchdown_vs_mapping();
+        let mut table = Table::new();
+        run_cycle(&mut table, &mapping, Reading::Value(Value::Integer32(-512)));
+        run_cycle(&mut table, &mapping, Reading::Retain);
+        run_cycle(&mut table, &mapping, Reading::Retain);
+        assert!(matches!(
+            table.get(0x030C).map(|e| &e.value),
+            Some(Value::Integer32(-512))
+        ));
+    }
+
+    #[test]
+    fn missing_is_not_served() {
+        let mapping = touchdown_vs_mapping();
+        let mut table = Table::new();
+        run_cycle(&mut table, &mapping, Reading::Missing);
+        assert!(table.get(0x030C).is_none());
     }
 }

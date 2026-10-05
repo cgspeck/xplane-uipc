@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Dataref Index Notation Specification
+
+## Purpose
+
+How a mapping addresses one element of an array dataref, using `path[N]` notation in the `dataref` field.
+
+## Requirements
 
 ### Requirement: Bracket notation for array index in simple mappings
 

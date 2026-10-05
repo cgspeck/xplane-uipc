@@ -1,3 +1,11 @@
+# Offset Value Semantics Specification
+
+## Purpose
+
+How mapped values are converted to and from FSUIPC types, when an offset is served, and how client reads and writes are bounded and decoded.
+
+## Requirements
+
 ### Requirement: Offsets without a current value are not served
 
 Each update cycle, the value table SHALL contain an entry for an offset only if its mapping produced a value in that cycle, or deliberately retained its previous value. All other entries SHALL be removed.
@@ -16,6 +24,11 @@ Each update cycle, the value table SHALL contain an entry for an offset only if 
 
 - **WHEN** a mapping with `update_if_expr` has been served with value `V`, and on a later cycle `update_if_expr` evaluates to `<= 0`
 - **THEN** the offset continues to be served with value `V` and remains active (and writable if configured)
+
+#### Scenario: update_if_expr false before any value serves zero
+
+- **WHEN** a mapping with `update_if_expr` has never produced a value since the plugin started (e.g. `0x030C` touchdown vertical speed after starting on the ground) and `update_if_expr` evaluates to `<= 0`
+- **THEN** the offset is served as zero of its declared type and is active, as FSUIPC does at startup
 
 ### Requirement: Float to integer conversion rounds and wraps
 

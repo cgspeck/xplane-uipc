@@ -220,7 +220,7 @@ expr = "$Zibo738 $Generic |"
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
-fsuipc_type = "u16"
+fsuipc_type = "u8"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
 
@@ -344,8 +344,8 @@ expr = "$Tank0 $Tank1 + $Tank2 + $Tank3 + $Tank4 + $Tank5 + $Tank6 + $Tank7 + $T
 [[mapping]]
 offset      = 0x0BC8  # parking brake
 fsuipc_type = "u16"
-dataref    = "sim/cockpit2/controls/wheel_brake_ratio_applied"
-scale        = 32767
+dataref    = "sim/flightmodel/controls/parkbrake"
+scale       = 32767
 writable    = true
 
 [[mapping]]
@@ -491,13 +491,11 @@ dataref     = "sim/cockpit2/clock_timer/local_time_seconds"
 offset      = 0x023B
 fsuipc_type = "u8"
 dataref     = "sim/cockpit2/clock_timer/zulu_time_hours"
-writable    = true
 
 [[mapping]]
 offset      = 0x023C
 fsuipc_type = "u8"
 dataref     = "sim/cockpit2/clock_timer/zulu_time_minutes"
-writable    = true
 
 # 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
 [[mapping]]

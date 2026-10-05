@@ -1,0 +1,23 @@
+Log file cleared
+2026-10-05T08:05:09.554864Z  INFO ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}: ipc_host: Resetting warnings...
+2026-10-05T08:05:32.508209Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x3124, 1 bytes not in table
+2026-10-05T08:05:33.864207Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x0c18, 2 bytes not in table
+2026-10-05T08:05:33.864235Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x0272, 2 bytes not in table
+2026-10-05T08:05:33.864240Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x0273, 2 bytes not in table
+2026-10-05T08:05:33.864244Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x030c, 4 bytes not in table
+2026-10-05T08:05:33.864251Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x0658, 4 bytes not in table
+2026-10-05T08:05:33.864255Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x8320, 1 bytes not in table
+2026-10-05T08:05:33.864259Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x3126, 1 bytes not in table
+2026-10-05T08:05:33.864263Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x31e8, 4 bytes not in table
+2026-10-05T08:05:33.864267Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x3c00, 256 bytes not in table
+2026-10-05T08:05:33.864273Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x31f4, 4 bytes not in table
+2026-10-05T08:07:27.522703Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Attempt to write non-active offset 0x0d6c
+2026-10-05T08:07:27.522731Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Attempt to write non-active offset 0x0d70
+2026-10-05T08:07:27.522738Z  WARN ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}:wnd_proc{hwnd=HWND(0x110c0c) msg=49739 wparam=WPARAM(49334) lparam=LPARAM(0)}: ipc_host::mapped_view: Read from offset 0x66f8, 8 bytes not in table
+2026-10-05T08:08:20.152681Z  INFO ThreadId(01) XPluginDisable: xplane_uipc: Disabling plugin...
+2026-10-05T08:08:20.152709Z  INFO ThreadId(01) XPluginDisable: xplane_uipc: Unregistering flight loop callback...
+2026-10-05T08:08:20.152821Z  INFO ThreadId(01) XPluginDisable: xplane_uipc: Shutting down IPC thread...
+2026-10-05T08:08:20.195834Z  INFO ThreadId(02) create_ipc_window_and_run{rx=Receiver { .. }}: ipc_host: Shutting down IPC window...
+2026-10-05T08:08:20.247298Z  INFO ThreadId(01) XPluginDisable: xplane_uipc: IPC thread joined
+2026-10-05T08:08:20.247326Z  INFO ThreadId(01) XPluginDisable: xplane_uipc: Cleaning up plugin state...
+2026-10-05T08:08:20.523614Z  INFO ThreadId(01) XPluginStop: xplane_uipc: Stopping plugin...

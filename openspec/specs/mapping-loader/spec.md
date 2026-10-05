@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Mapping Loader Specification
+
+## Purpose
+
+How the plugin loads and resolves `mappings.toml`, at startup and when the user reloads mappings from the menu.
+
+## Requirements
 
 ### Requirement: Shared mapping loader
 The system SHALL provide a single shared function to load and resolve mappings from the plugin directory's `mappings.toml` file, used both at startup and when the user triggers a reload.

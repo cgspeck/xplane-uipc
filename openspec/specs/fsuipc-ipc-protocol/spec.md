@@ -1,3 +1,11 @@
+# FSUIPC IPC Protocol Specification
+
+## Purpose
+
+How `ipc_host` parses and answers the FSUIPC shared-memory request stream, following the FSUIPC SDK client libraries: record framing by `dwId`, reads, writes, the `0x8001` key write and the message result.
+
+## Requirements
+
 ### Requirement: Record framing by dwId
 
 The parser SHALL read records back to back from the start of the mapped view, choosing the header layout from the first DWORD (`dwId`, little-endian):

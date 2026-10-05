@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Capture Inspect Specification
+
+## Purpose
+
+The `capture-inspect` tool, which decodes captured FSUIPC request views (`.bin` files) into a readable list of records.
+
+## Requirements
 
 ### Requirement: CLI reads capture files
 
