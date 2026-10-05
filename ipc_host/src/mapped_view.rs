@@ -366,7 +366,7 @@ pub unsafe fn process_mapped_view(
                     record.dw_offset,
                     record.n_bytes
                 );
-                if table.writable.contains(&(record.dw_offset as u16)) {
+                if table.is_writable(record.dw_offset as u16) {
                     let value = match record.n_bytes {
                         1 => (*record.payload_ptr) as f64,
                         2 => LittleEndian::read_u16(&*slice::from_raw_parts(record.payload_ptr, 2))
@@ -390,7 +390,7 @@ pub unsafe fn process_mapped_view(
                     );
                     try_send_write(record.dw_offset as u16, value, record.n_bytes as usize);
                 } else {
-                    if table.active.contains(&(record.dw_offset as u16))
+                    if table.is_active(record.dw_offset as u16)
                         && warned_set
                             .check_and_set(record.dw_offset as u16, WarnCategory::WriteNotWritable)
                     {

@@ -25,8 +25,13 @@ pub struct Entry {
 #[derive(Debug)]
 pub struct Table {
     pub entries: Box<[Option<Entry>; 65536]>,
+    /// Offsets inserted since the last `clear_active_and_writable()`, in insertion order.
     pub active: Vec<u16>,
+    /// Writable offsets inserted since the last `clear_active_and_writable()`.
     pub writable: Vec<u16>,
+    // O(1) membership flags mirroring `active` / `writable`.
+    active_mask: Box<[bool]>,
+    writable_mask: Box<[bool]>,
 }
 
 impl Table {
@@ -37,24 +42,41 @@ impl Table {
             entries,
             active: Vec::new(),
             writable: Vec::new(),
+            active_mask: vec![false; 65536].into_boxed_slice(),
+            writable_mask: vec![false; 65536].into_boxed_slice(),
         }
     }
 
     pub fn insert(&mut self, index: u16, entry: Entry) {
-        let is_new = self.entries[index as usize].is_none();
-        if is_new {
+        let i = index as usize;
+        if !self.active_mask[i] {
+            self.active_mask[i] = true;
             self.active.push(index);
         }
-        let writable = entry.writable;
-        self.entries[index as usize] = Some(entry);
-        if writable && is_new {
+        if entry.writable && !self.writable_mask[i] {
+            self.writable_mask[i] = true;
             self.writable.push(index);
         }
+        self.entries[i] = Some(entry);
     }
 
     pub fn clear_active_and_writable(&mut self) {
+        for &i in &self.active {
+            self.active_mask[i as usize] = false;
+        }
+        for &i in &self.writable {
+            self.writable_mask[i as usize] = false;
+        }
         self.active.clear();
         self.writable.clear();
+    }
+
+    pub fn is_active(&self, index: u16) -> bool {
+        self.active_mask[index as usize]
+    }
+
+    pub fn is_writable(&self, index: u16) -> bool {
+        self.writable_mask[index as usize]
     }
 
     pub fn get(&self, index: u16) -> Option<&Entry> {
