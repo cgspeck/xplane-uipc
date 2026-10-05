@@ -5,7 +5,8 @@ Usage:
 
 Status per dataref: "ok", "NOT FOUND" (a sim/ dataref X-Plane doesn't have),
 "third-party" (an add-on or plugin dataref, not listed in DataRefs.txt) or
-"READ-ONLY BUT WRITABLE MAPPING".
+"READ-ONLY BUT WRITABLE MAPPING". In an expression mapping with write_exprs,
+only the write targets need to be writable.
 """
 
 import io
@@ -47,6 +48,17 @@ def referenced_datarefs(block: str) -> list[str]:
     return refs
 
 
+def write_targets(block: str) -> set[str] | None:
+    """Dataref paths an expression mapping writes, or None without write_exprs."""
+    m = re.search(r"^\s*write_exprs\s*=\s*\{([^}]*)\}", block, re.M)
+    if not m:
+        return None
+    targets = set(re.findall(r'"?(\w+)"?\s*=\s*"', m[1]))
+    names = re.search(r"^\s*datarefs\s*=\s*\{([^}]*)\}", block, re.M)
+    pairs = re.findall(r'"?(\w+)"?\s*=\s*"([^"]+)"', names[1]) if names else []
+    return {path for name, path in pairs if name in targets}
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         sys.exit(__doc__)
@@ -57,12 +69,13 @@ def main() -> None:
     print("offset\twritable_mapping\tdataref\tstatus\txp_type\txp_writable\tunits\tdescription")
     for offset_text, block in mapping_blocks(sys.argv[2]):
         writable = "yes" if re.search(r"^\s*writable\s*=\s*true", block, re.M) else "no"
+        targets = write_targets(block)
         for ref in referenced_datarefs(block):
             base = re.sub(r"\[\d+\]$", "", ref)  # dataref[N] → dataref
             entry = datarefs.get(base)
             if not entry:
                 status = "NOT FOUND" if base.startswith("sim/") else "third-party"
-            elif writable == "yes" and entry["writable"] != "y":
+            elif writable == "yes" and (targets is None or ref in targets) and entry["writable"] != "y":
                 status = "READ-ONLY BUT WRITABLE MAPPING"
             else:
                 status = "ok"
