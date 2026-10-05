@@ -15,10 +15,10 @@
 - [x] 2.3 Factor the evaluate step into a pure function (variables in, ordered `(name, value)` results or an error out) so it can be unit tested without X-Plane
 - [ ] 2.4 Extend the load-time writability check to warn for each write target X-Plane reports as read-only. Remove the "only single-dataref mappings can be written" warning, which is now a load error (1.3)
 - [x] 2.5 Unit tests for the pure evaluate step: fan-out, current-value use, snapshot semantics (`A = $B`, `B = $A`), non-finite result blocks everything
-- [ ] 2.6 Make `ResolvedRef::write` return whether it wrote: `false` for a null handle or a dataref type it can't write
+- [x] 2.6 Make `ResolvedRef::write` return whether it wrote: `false` for a null handle or a dataref type it can't write
 - [ ] 2.7 Make `write_xplane` return whether any dataref was written. Add a once-per-load "unavailable dataref" flag to `ResolvedMapping`: the first skip logs a warning naming the offset and the dataref, and later skips log at debug. This covers both single-dataref writes and write-expression targets
-- [ ] 2.8 In `write_offset`, log "Wrote value…" only when `write_xplane` returns `true`
-- [ ] 2.9 Drop the `scale.abs() < 1e-12` fallback in `write_xplane` now that the loader rejects writable `scale = 0` (keep a debug assertion)
+- [x] 2.8 In `write_offset`, log "Wrote value…" only when `write_xplane` returns `true`
+- [x] 2.9 Drop the `scale.abs() < 1e-12` fallback in `write_xplane` now that the loader rejects writable `scale = 0` (keep a debug assertion)
 
 ## 3. Mappings
 

@@ -46,6 +46,8 @@ pub enum Reading {
 pub struct ResolvedRef {
     pub handle: XPLMDataRef,
     pub array_index: Option<i32>,
+    /// Dataref path, without any `[N]` index, for log messages.
+    pub path: String,
 }
 
 impl ResolvedRef {
@@ -60,6 +62,7 @@ impl ResolvedRef {
         Self {
             handle,
             array_index,
+            path: path.to_string(),
         }
     }
 
@@ -122,9 +125,11 @@ impl ResolvedRef {
         memo
     }
 
-    pub fn write(&self, xplane_value: f64) {
+    /// Write a value to the dataref. Returns false if the handle is invalid or
+    /// the dataref's type can't be written as a number.
+    pub fn write(&self, xplane_value: f64) -> bool {
         if self.handle.is_null() {
-            return;
+            return false;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
         if let Some(array_index) = self.array_index {
@@ -134,6 +139,8 @@ impl ResolvedRef {
             } else if ty & xplmType_FloatArray != 0 {
                 let mut v = xplane_value as f32;
                 unsafe { XPLMSetDatavf(self.handle, &mut v, array_index, 1) };
+            } else {
+                return false;
             }
         } else if ty & xplmType_Double != 0 {
             unsafe {
@@ -147,7 +154,10 @@ impl ResolvedRef {
             unsafe {
                 XPLMSetDatai(self.handle, xplane_value.round() as i32);
             }
+        } else {
+            return false;
         }
+        true
     }
 }
 
@@ -179,6 +189,9 @@ pub struct ResolvedMapping {
     pub size: usize,
     pub source: ResolvedSource,
     pub writable: bool,
+    /// Set once a write has skipped an unavailable dataref, so later skips log
+    /// at debug instead of flooding the log. Reset by reloading mappings.
+    unavailable_warned: bool,
 }
 
 impl ResolvedMapping {
@@ -241,6 +254,7 @@ impl ResolvedMapping {
             size: mapping.size,
             source,
             writable: mapping.writable,
+            unavailable_warned: false,
         }
     }
 
@@ -297,21 +311,52 @@ impl ResolvedMapping {
         }
     }
 
-    /// Write a value back to X-Plane (simple mappings only; expr write-back
-    /// requires knowledge of which dataref to write and the inverse expression,
-    /// which is not yet supported).
-    pub fn write_xplane(&self, fsuipc_value: f64) {
+    /// Write a client's value back to X-Plane (simple mappings only; expr
+    /// write-back is not yet supported). Returns whether any dataref was written.
+    pub fn write_xplane(&mut self, fsuipc_value: f64) -> bool {
         if !self.writable {
-            return;
+            return false;
         }
+        let mut written = false;
+        let mut skipped = Vec::new();
         if let ResolvedSource::Simple {
             dr,
             scale,
             offset_add,
         } = &self.source
         {
-            let s = if scale.abs() < 1e-12 { 1.0 } else { *scale };
-            dr.write((fsuipc_value - offset_add) / s);
+            debug_assert!(
+                *scale != 0.0,
+                "the loader rejects writable mappings with scale = 0"
+            );
+            if dr.write((fsuipc_value - offset_add) / scale) {
+                written = true;
+            } else {
+                skipped.push(dr.path.clone());
+            }
+        }
+        for path in skipped {
+            self.report_unavailable(&path);
+        }
+        written
+    }
+
+    /// Log a write skipped because its dataref is unavailable: a warning the
+    /// first time for this mapping since mappings were loaded, debug after.
+    fn report_unavailable(&mut self, path: &str) {
+        if self.unavailable_warned {
+            tracing::debug!(
+                "Offset {:#06x}: dataref '{}' is unavailable; not written",
+                self.offset,
+                path
+            );
+        } else {
+            tracing::warn!(
+                "Offset {:#06x}: dataref '{}' is unavailable; not written (further skips for this offset are logged at debug level)",
+                self.offset,
+                path
+            );
+            self.unavailable_warned = true;
         }
     }
 }
@@ -435,10 +480,11 @@ impl PluginState {
     }
 
     pub fn write_offset(&mut self, offset: u16, value: f64, _size: usize) {
-        for m in &self.mappings {
+        for m in &mut self.mappings {
             if m.offset == offset && m.writable {
-                m.write_xplane(value);
-                tracing::debug!("Wrote value {} to offset {:#06x}", value, offset);
+                if m.write_xplane(value) {
+                    tracing::debug!("Wrote value {} to offset {:#06x}", value, offset);
+                }
                 return;
             }
         }
@@ -551,6 +597,7 @@ mod tests {
             size: 4,
             source: ResolvedSource::Static { static_value: None },
             writable: false,
+            unavailable_warned: false,
         }
     }
 
