@@ -171,7 +171,7 @@ where
                     let mut text = String::new();
                     for i in 0..255usize {
                         let c = *sentinel_before_ptr.add(4 + i);
-                        if c == 0 || c < 0x20 || c > 0x7E {
+                        if c == 0 || !(0x20..=0x7E).contains(&c) {
                             break;
                         }
                         text.push(c as char);
@@ -483,7 +483,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         // sequence id
         data[0] = 1;
         data[1] = 0;
@@ -537,7 +537,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0] = 1;
         data[4] = 200; // offset 200 (just lower byte for simplicity)
         data[8] = 8; // nBytes = 8
@@ -569,7 +569,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0] = 1;
         data[4] = 50; // offset 50
         data[8] = 1; // nBytes = 1
@@ -606,7 +606,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 128];
+        let mut data = [0u8; 128];
         // First record
         data[0] = 1;
         data[4] = 100;
@@ -640,7 +640,7 @@ mod tests {
     fn test_offset_not_in_table() {
         let table = create_test_table();
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0] = 1;
         data[4] = 100; // offset not in table
         data[8] = 8;
@@ -652,7 +652,7 @@ mod tests {
     fn test_fsd_sentinel_record_is_processed() {
         // A record with ":FSD" sentinel should be processed normally
         // (value written to payload, not treated as error).
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
         data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
         data[8..12].copy_from_slice(&8u32.to_le_bytes()); // nBytes=8 (read)
@@ -687,7 +687,7 @@ mod tests {
     fn test_non_luap_sentinel_accepted() {
         // A record with a non-"luaP" sentinel (e.g. a pointer value like
         // FSInterrogate writes) should be processed without error.
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
         data[4..8].copy_from_slice(&50u32.to_le_bytes()); // offset
         data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes=4 (read)
@@ -740,7 +740,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0] = 1; // reqID
         data[4] = 44; // offset 300 (0x012C), just low byte for simplicity
         data[5] = 1; // high byte of offset
@@ -778,7 +778,7 @@ mod tests {
             },
         );
 
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0] = 1;
         data[4] = 144; // offset 400 (0x0190)
         data[5] = 1;
@@ -798,7 +798,7 @@ mod tests {
     #[test]
     fn test_invalid_dw_offset_rejected() {
         // dwOffset > 0xFFFF should be rejected (break processing)
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
         data[4..8].copy_from_slice(&0x10000u32.to_le_bytes()); // dwOffset = 65536 > 0xFFFF
         data[8..12].copy_from_slice(&4u32.to_le_bytes()); // nBytes = 4
@@ -817,7 +817,7 @@ mod tests {
     #[test]
     fn test_nbytes_zero_rejected() {
         // nBytes = 0 should be rejected (would cause infinite loop)
-        let mut data = vec![0u8; 64];
+        let mut data = [0u8; 64];
         data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
         data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
         data[8..12].copy_from_slice(&0u32.to_le_bytes()); // nBytes = 0
@@ -834,7 +834,7 @@ mod tests {
     #[test]
     fn test_nbytes_exceeds_buffer_rejected() {
         // nBytes larger than remaining buffer should be rejected
-        let mut data = vec![0u8; 32];
+        let mut data = [0u8; 32];
         data[0..4].copy_from_slice(&1u32.to_le_bytes()); // reqID
         data[4..8].copy_from_slice(&0x100u32.to_le_bytes()); // dwOffset = 256
         data[8..12].copy_from_slice(&100u32.to_le_bytes()); // nBytes = 100, only 16 bytes after header

@@ -3,7 +3,6 @@ use std::thread;
 use std::time::Duration;
 
 use tracing::Level;
-use tracing_subscriber;
 
 use ipc_host::value_table::{Entry, Value, create_table_with_entries, set_value_table};
 
