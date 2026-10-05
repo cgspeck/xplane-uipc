@@ -62,7 +62,7 @@ fn plugin_version() -> String {
     // TODO: replace cargo_version with VERGEN_GIT_DESCRIBE once release-please is running
     let cargo_version = env!("CARGO_PKG_VERSION");
     let git_short_sha = match option_env!("VERGEN_GIT_SHA") {
-        Some(sha) => &sha[..7],
+        Some(sha) => sha.get(..7).unwrap_or(sha),
         None => "unknown",
     };
     let build_date = match option_env!("VERGEN_BUILD_DATE") {
@@ -139,12 +139,17 @@ pub unsafe extern "C" fn XPluginStart(
     let log_path = format!("{}uipc.log", system_path);
     xplane_log(&format!("Log path: {}", log_path));
 
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&log_path)
-        .expect("Failed to open log file");
+    // A missing log file must not take down the simulator; log to nowhere instead.
+    let file = match open_truncated(&log_path) {
+        Ok(f) => Some(f),
+        Err(e) => {
+            xplane_log(&format!(
+                "Failed to open log file {}: {}; file logging disabled",
+                log_path, e
+            ));
+            None
+        }
+    };
     let file_arc = std::sync::Arc::new(std::sync::Mutex::new(file));
     let file_writer = SharedFileWriter {
         inner: file_arc.clone(),
@@ -175,9 +180,19 @@ pub unsafe extern "C" fn XPluginStart(
     1
 }
 
+fn open_truncated(path: &str) -> std::io::Result<std::fs::File> {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+}
+
+type SharedLogFile = std::sync::Arc<std::sync::Mutex<Option<std::fs::File>>>;
+
 #[derive(Clone)]
 struct SharedFileWriter {
-    inner: std::sync::Arc<std::sync::Mutex<std::fs::File>>,
+    inner: SharedLogFile,
 }
 
 impl<'a> tracing_subscriber::fmt::writer::MakeWriter<'a> for SharedFileWriter {
@@ -191,36 +206,46 @@ impl<'a> tracing_subscriber::fmt::writer::MakeWriter<'a> for SharedFileWriter {
 }
 
 struct SharedFileGuard {
-    inner: std::sync::Arc<std::sync::Mutex<std::fs::File>>,
+    inner: SharedLogFile,
 }
 
 impl std::io::Write for SharedFileGuard {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.inner.lock().unwrap().write(buf)
+        match self.inner.lock().unwrap().as_mut() {
+            Some(f) => f.write(buf),
+            None => Ok(buf.len()),
+        }
     }
     fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.lock().unwrap().flush()
+        match self.inner.lock().unwrap().as_mut() {
+            Some(f) => f.flush(),
+            None => Ok(()),
+        }
     }
 }
 
 struct LogController {
-    file: std::sync::Arc<std::sync::Mutex<std::fs::File>>,
+    file: SharedLogFile,
     log_path: String,
 }
 
 pub fn clear_log_file() {
     if let Some(controller) = LOG_CONTROLLER.get() {
-        let mut file = controller.file.lock().unwrap();
-        let _ = file.flush();
-        let new_file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&controller.log_path)
-            .expect("Failed to reopen log file for clearing");
-        *file = new_file;
         use std::io::Write;
-        let _ = writeln!(file, "Log file cleared");
+        let mut file = controller.file.lock().unwrap();
+        if let Some(f) = file.as_mut() {
+            let _ = f.flush();
+        }
+        match open_truncated(&controller.log_path) {
+            Ok(mut new_file) => {
+                let _ = writeln!(new_file, "Log file cleared");
+                *file = Some(new_file);
+            }
+            Err(e) => xplane_log(&format!(
+                "Failed to reopen log file {} for clearing: {}",
+                controller.log_path, e
+            )),
+        }
     }
     if let Some(tx) = IPC_COMMAND_CHANNEL.lock().unwrap().as_ref() {
         let _ = tx.send(ipc_host::IpcCommands::ResetWarnings);
@@ -423,15 +448,20 @@ pub unsafe extern "C" fn XPluginEnable() -> c_int {
     let capture_path = format!("{}Resources/plugins/xplane-uipc/capture", get_system_path());
 
     tracing::info!("Spawning IPC thread");
-    let thread_handle = thread::spawn(|| unsafe {
-        create_ipc_window_and_run(
-            ipc_rx,
-            ipc_host::CaptureConfig {
-                max: Some(100),
-                path: Some(capture_path.into()),
-            },
-        )
-        .expect("Failed to create/run IPC window");
+    let thread_handle = thread::spawn(|| {
+        let result = unsafe {
+            create_ipc_window_and_run(
+                ipc_rx,
+                ipc_host::CaptureConfig {
+                    max: Some(100),
+                    path: Some(capture_path.into()),
+                },
+            )
+        };
+        // Panicking here would abort X-Plane (panic = "abort"); report and exit the thread.
+        if let Err(e) = result {
+            tracing::error!("IPC window failed, FSUIPC clients will not connect: {}", e);
+        }
     });
 
     {
@@ -456,10 +486,9 @@ pub unsafe extern "C" fn XPluginDisable() {
 
     tracing::info!("Shutting down IPC thread...");
     {
-        let guard = IPC_COMMAND_CHANNEL.lock().unwrap();
-        if let Some(tx) = guard.as_ref() {
-            tx.send(IpcCommands::Shutdown)
-                .expect("Failed to send shutdown command");
+        // The receiver is gone if the IPC thread already exited; nothing to shut down then.
+        if let Some(tx) = IPC_COMMAND_CHANNEL.lock().unwrap().take() {
+            let _ = tx.send(IpcCommands::Shutdown);
         }
     }
     {
