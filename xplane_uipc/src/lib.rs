@@ -23,7 +23,7 @@ pub mod about_window;
 pub mod menu;
 mod plugin_state;
 
-use plugin_state::{PluginState, ResolvedMapping};
+use plugin_state::{PluginState, ResolvedMapping, drop_builtin_offsets};
 
 pub struct PluginStatePtr(*mut std::ffi::c_void);
 
@@ -379,8 +379,7 @@ pub fn find_load_and_resolve_mappings() -> Result<(), String> {
             mappings_path
         );
     }
-    let resolved_mappings: Vec<ResolvedMapping> = mapping_config
-        .mappings
+    let resolved_mappings: Vec<ResolvedMapping> = drop_builtin_offsets(mapping_config.mappings)
         .into_iter()
         .map(ResolvedMapping::new)
         .collect();
