@@ -18,6 +18,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use std::collections::HashSet;
 use std::fmt;
+use std::ops::RangeInclusive;
 use std::slice;
 use tracing::level_filters::LevelFilter;
 
@@ -50,6 +51,13 @@ pub const LUA_REQUEST_OFFSET: u16 = 0x0D70;
 
 /// Size of the request text area at `LUA_REQUEST_OFFSET`.
 const LUA_REQUEST_LEN: usize = 40;
+
+/// FSUIPC's 64 bytes "free for general use". Clients store their own data
+/// here and read it back, so it is held as plain memory rather than mapped.
+pub const USER_AREA: RangeInclusive<u16> = 0x66C0..=0x66FF;
+
+/// Size of `USER_AREA` in bytes.
+const USER_AREA_LEN: usize = 64;
 
 /// Level application key writes to `APP_KEY_OFFSET` are logged at.
 static KEY_WRITE_LOG_LEVEL: RuntimeLevel = RuntimeLevel::new();
@@ -322,6 +330,9 @@ pub struct IpcState {
     /// Lua/macro requests (text and parameter) already logged, so each is
     /// logged once.
     pub(crate) logged_lua_requests: HashSet<(String, Option<u32>)>,
+    /// Contents of `USER_AREA`, shared by all clients. Zero at startup and
+    /// never reset.
+    pub(crate) user_area: [u8; USER_AREA_LEN],
 }
 
 impl IpcState {
@@ -330,6 +341,7 @@ impl IpcState {
             warned: WarnedSet::new(),
             lua_param: None,
             logged_lua_requests: HashSet::new(),
+            user_area: [0; USER_AREA_LEN],
         }
     }
 
@@ -371,7 +383,7 @@ pub unsafe fn process_mapped_view(
                     rejected_writes += 1;
                 }
             } else {
-                answer_read(&record, payload, table, &state.warned);
+                answer_read(&record, payload, table, state);
             }
         })
     };
@@ -384,7 +396,14 @@ pub unsafe fn process_mapped_view(
     }
 }
 
-fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_set: &WarnedSet) {
+/// The index into `IpcState::user_area` of an offset inside `USER_AREA`.
+fn user_area_index(offset: u16) -> Option<usize> {
+    USER_AREA
+        .contains(&offset)
+        .then(|| (offset - USER_AREA.start()) as usize)
+}
+
+fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, state: &IpcState) {
     // Like FSUIPC, always answer with bytes: whatever we don't serve reads as
     // zero rather than whatever the client last left in its buffer.
     payload.fill(0);
@@ -395,6 +414,14 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
         );
         return;
     };
+    if let Some(start) = user_area_index(offset) {
+        // Bytes past the end of the area stay zero.
+        let stored = &state.user_area[start..];
+        let len = stored.len().min(payload.len());
+        payload[..len].copy_from_slice(&stored[..len]);
+        return;
+    }
+    let warned_set = &state.warned;
     let Some(entry) = table.get(offset) else {
         tracing::debug!(
             "Offset {:#06x} (size {} bytes) not found in table",
@@ -439,6 +466,29 @@ fn answer_read(record: &ParsedRecord, payload: &mut [u8], table: &Table, warned_
     }
 }
 
+/// Store a write to `USER_AREA`, starting at byte `start` of the area. Bytes
+/// past the end of the area are dropped.
+fn store_user_area(start: usize, payload: &[u8], state: &mut IpcState) {
+    let offset = *USER_AREA.start() as usize + start;
+    let area = &mut state.user_area[start..];
+    let len = area.len().min(payload.len());
+    area[..len].copy_from_slice(&payload[..len]);
+    tracing::debug!(
+        "User area write: offset {:#06x}, {} bytes {:02x?}",
+        offset,
+        payload.len(),
+        payload
+    );
+    if len < payload.len() {
+        tracing::debug!(
+            "User area write at {:#06x}: dropped {} bytes past {:#06x}",
+            offset,
+            payload.len() - len,
+            USER_AREA.end()
+        );
+    }
+}
+
 /// Forward a write request to the flight loop. Returns false if it was rejected.
 fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut IpcState) -> bool {
     let Ok(offset) = u16::try_from(record.dw_offset) else {
@@ -453,6 +503,10 @@ fn apply_write(record: &ParsedRecord, payload: &[u8], table: &Table, state: &mut
         offset,
         record.n_bytes
     );
+    if let Some(start) = user_area_index(offset) {
+        store_user_area(start, payload, state);
+        return true;
+    }
     match offset {
         APP_KEY_OFFSET => {
             log_key_write(payload);
@@ -687,6 +741,26 @@ mod tests {
         assert!(outcome.malformed.is_none());
         assert_eq!(outcome.rejected_writes, 0);
         assert!(rx.try_recv().is_err());
+
+        // User area: stored, not forwarded or rejected, even if mapped and writable.
+        table.insert(
+            0x66D0,
+            Entry {
+                value: Value::UnsignedInteger16(0),
+                source: 0,
+                destination: 0,
+                writable: true,
+            },
+        );
+        let outcome = View::default()
+            .write(0x66D0, &[1, 0])
+            .write(0x66F8, &[0; 8])
+            .write(0x66FC, &[0; 8])
+            .end()
+            .process(&table);
+        assert!(outcome.malformed.is_none());
+        assert_eq!(outcome.rejected_writes, 0);
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]
@@ -808,6 +882,98 @@ mod tests {
         }
         assert_eq!(view.payload_at(2, 4), &[0; 4]);
         assert_eq!(view.payload_at(3, 40), &[0; 40]);
+    }
+
+    /// True if `offset` hasn't been warned about in any category.
+    fn never_warned(state: &IpcState, offset: u16) -> bool {
+        [
+            WarnCategory::ReadNotExist,
+            WarnCategory::WriteNotExist,
+            WarnCategory::WriteNotWritable,
+        ]
+        .into_iter()
+        .all(|category| state.warned.check_and_set(offset, category))
+    }
+
+    #[test]
+    fn test_user_area_write_read_back_later() {
+        let mut state = IpcState::new();
+        let table = Table::new();
+        let bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        let outcome = View::default()
+            .write(0x66F8, &bytes)
+            .end()
+            .process_with(&table, &mut state);
+        assert_eq!(outcome.rejected_writes, 0);
+        assert_eq!(&state.user_area[0x38..], &bytes);
+
+        // A later message (the same or another client) reads it back.
+        let mut view = View::default().read32(0x66F8, 8).read64(0x66FA, 2).end();
+        view.process_with(&table, &mut state);
+        assert_eq!(view.payload_at(0, 8), &bytes);
+        assert_eq!(view.payload_at(1, 2), &[3, 4]);
+        assert!(never_warned(&state, 0x66F8));
+    }
+
+    #[test]
+    fn test_user_area_unwritten_reads_zero_without_warning() {
+        let mut state = IpcState::new();
+        let mut view = View::default().read32(0x66F8, 8).end();
+        view.process_with(&Table::new(), &mut state);
+        assert_eq!(view.payload_at(0, 8), &[0; 8]);
+        assert!(never_warned(&state, 0x66F8));
+    }
+
+    #[test]
+    fn test_user_area_write_clipped_at_end() {
+        let mut state = IpcState::new();
+        View::default()
+            .write(0x66FC, &[0xAA, 0xBB, 0xCC, 0xDD, 1, 2, 3, 4])
+            .end()
+            .process_with(&Table::new(), &mut state);
+        assert_eq!(&state.user_area[0x3C..], &[0xAA, 0xBB, 0xCC, 0xDD]);
+        assert_eq!(&state.user_area[..0x3C], &[0; 0x3C]);
+    }
+
+    #[test]
+    fn test_user_area_read_past_end_zero_filled() {
+        let mut state = IpcState::new();
+        let mut view = View::default()
+            .write(0x66FC, &[0xAA, 0xBB, 0xCC, 0xDD])
+            .read32(0x66FC, 8)
+            .end();
+        view.process_with(&Table::new(), &mut state);
+        // A write earlier in the same view is visible to the read.
+        assert_eq!(view.payload_at(1, 8), &[0xAA, 0xBB, 0xCC, 0xDD, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_user_area_survives_reset_warnings() {
+        let mut state = IpcState::new();
+        View::default()
+            .write(0x66C0, &[0x2A, 0])
+            .end()
+            .process_with(&Table::new(), &mut state);
+        state.reset_warnings();
+        let mut view = View::default().read32(0x66C0, 2).end();
+        view.process_with(&Table::new(), &mut state);
+        assert_eq!(view.payload_at(0, 2), &[0x2A, 0]);
+    }
+
+    /// Forwarding is checked in `test_writes_decoded_by_entry_type`, which owns
+    /// the global write channel.
+    #[test]
+    fn test_user_area_takes_precedence_over_table() {
+        let mut state = IpcState::new();
+        // Even if the offset were in the table, the area answers.
+        let table = table_with(&[(0x66D0, Value::UnsignedInteger16(0x1234), true)]);
+        let mut view = View::default()
+            .write(0x66D0, &[9, 0])
+            .read32(0x66D0, 2)
+            .end();
+        let outcome = view.process_with(&table, &mut state);
+        assert_eq!(outcome.rejected_writes, 0);
+        assert_eq!(view.payload_at(1, 2), &[9, 0]);
     }
 
     #[test]
