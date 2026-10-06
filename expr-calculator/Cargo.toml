@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 uipc-expr = { path = "../uipc-expr" }
 anyhow = "1.0"
-reedline = "0.48.0"
+reedline = "0.52"
