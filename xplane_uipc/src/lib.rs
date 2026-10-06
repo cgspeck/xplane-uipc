@@ -600,6 +600,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn plugin_version_includes_build_info() {
+        // The build script emits these with vergen; a wrong name shows as "unknown".
+        let version = plugin_version();
+        assert!(
+            version.ends_with(", clean)") || version.ends_with(", dirty)"),
+            "{}",
+            version
+        );
+        assert!(!version.contains("unknown"), "{}", version);
+    }
+
+    #[test]
     fn level_setting_parses_valid_values() {
         assert_eq!(parse_level_setting("x", Some("off")), LevelFilter::OFF);
         assert_eq!(parse_level_setting("x", Some("debug")), LevelFilter::DEBUG);
