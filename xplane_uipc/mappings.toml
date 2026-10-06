@@ -254,15 +254,10 @@ write_exprs = { SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?" }  # 48
 [[mapping]]
 offset      = 0x2E80  # Avionics master switch; an expression mapping so it can also run add-on commands
 fsuipc_type = "u32"
-datarefs    = { Av = "sim/cockpit2/switches/avionics_power_on" }
+datarefs    = { Av = "sim/cockpit2/switches/avionics_power_on", CitXAv = "laminar/CitX/electrical/avionics" }
 expr        = "$Av"
 writable    = true
-write_exprs = { Av = "$value 0 !=" }
-# TODO Zibo 738: the avionics datarefs are overridden every frame, so writes revert
-# and only commands work. Find the paths with DataRefTool, then add
-#   ZAv = "<Zibo avionics switch state dataref>"   to datarefs, and
-#   write_commands = { "<Zibo avionics toggle command>" = "$value 0 != $ZAv 0 != !=" }
-# The toggle runs once, only when the requested state differs from $ZAv.
+write_commands = { "sim/systems/avionics_toggle" = "$value $Av !=", "laminar/CitX/electrical/cmd_avionics_toggle" = "$value $CitXAv !=" }
 
 [[mapping]]
 offset      = 0x281C  # Battery master on, problematic, because generic always seems to be on
@@ -270,12 +265,8 @@ fsuipc_type = "u32"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
 writable    = true
-write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
-# TODO Zibo 738: the battery datarefs are overridden every frame, so writes revert
-# and only commands work. Find the paths with DataRefTool, then add
-#   ZBat = "<Zibo battery switch state dataref>"   to datarefs, and
-#   write_commands = { "<Zibo battery toggle command>" = "$value 0 != $ZBat 0 != !=" }
 # The toggle runs once, only when the requested state differs from $ZBat.
+write_commands = { "sim/electrical/battery_all_toggle" = "$value $Generic !=", "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=" , "laminar/B738/switch/battery_dn" = "$value 1 ==", "laminar/B738/switch/battery_up" = "$value 0 ==" }
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
@@ -283,12 +274,8 @@ fsuipc_type = "u8"
 datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
 expr = "$Zibo738 $Generic |"
 writable    = true
-write_exprs = { "Zibo738" = "$value", "Generic" = "$value" }
-# TODO Zibo 738: the battery datarefs are overridden every frame, so writes revert
-# and only commands work. Find the paths with DataRefTool, then add
-#   ZBat = "<Zibo battery switch state dataref>"   to datarefs, and
-#   write_commands = { "<Zibo battery toggle command>" = "$value 0 != $ZBat 0 != !=" }
 # The toggle runs once, only when the requested state differs from $ZBat.
+write_commands = { "sim/electrical/battery_all_toggle" = "$value $Generic !=", "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=" , "laminar/B738/switch/battery_dn" = "$value 1 ==", "laminar/B738/switch/battery_up" = "$value 0 ==" }
 
 [[mapping]]
 offset      = 0x0366  # SIM ON GROUND
@@ -327,14 +314,10 @@ fsuipc_type = "u16"
 datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on", Wing = "laminar/B738/toggle_switch/wing_light", Logo = "laminar/B738/toggle_switch/logo_light"}
 expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * + $Wing 128 * + $Logo 256 * +"
 writable    = true
+# NOTE: the write_commands are only partially implemented
 write_exprs = { Nav = "$value 1 & 0 !=", Bcn = "$value 2 & 0 !=", Land = "$value 4 & 0 !=", Taxi = "$value 8 & 0 !=", Strb = "$value 16 & 0 !=" }
-# TODO Zibo 738: the landing light datarefs are overridden every frame, so writes revert
-# and only commands work. Find the paths with DataRefTool, then add
-#   ZLand = "<Zibo landing light switch state dataref>"   to datarefs, and
-#   write_commands = { "<Zibo landing light toggle command>" = "$value 4 & 0 != $ZLand 0 != !=" }
-# The toggle runs once, only when the requested state differs from $ZLand.
-# With separate on and off commands, give each its own entry instead:
-#   "<on command>" = "$value 4 & 0 != $ZLand 0 == &", "<off command>" = "$value 4 & 0 == $ZLand 0 != &"
+write_commands = { "laminar/B738/switch/logo_light_toggle" = "$value 256 & $Logo !=", "laminar/B738/switch/wing_light_toggle" = "$value 128 & $Wing !=", "laminar/B738/toggle_switch/position_light_strobe" = "$value 16 & 0 !=", "laminar/B738/toggle_switch/position_light_steady" = "$value 16 & 0 == $value 1 & 0 != &", "laminar/B738/toggle_switch/position_light_off" = "$value 17 & 0 ==", "laminar/B738/toggle_switch/taxi_light_brightness_on" = "$value 8 & 0 !=", "laminar/B738/toggle_switch/taxi_light_brightness_off" = "$value 8 & 0 =="}
+
 
 [[mapping]]
 offset      = 0x02B4   # Ground velocity
@@ -674,8 +657,6 @@ offset = 0x7b91  # SquawkBox Transponder mode, 0 = normal, 1 = standby: https://
 fsuipc_type = "u8"
 datarefs = { T_Mode = "sim/cockpit2/radios/actuators/transponder_mode" }
 expr = "$T_Mode 2 <"
-writable = true
-write_exprs = { T_Mode = "$value 0 != 1 $T_Mode 2 < 2 $T_Mode ? ?" }  # 1 → standby; 0 → on, keeping an existing on/alt mode
 
 [[mapping]]
 offset = 0x023e  # Zulu day of year (1 indexed)
