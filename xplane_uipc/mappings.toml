@@ -3,6 +3,9 @@
 # =============================================================================
 # Use Plugins ▸ FSUIPC ▸ Reload Mappings to apply changes at runtime.
 #
+# Tables such as datarefs, write_exprs and write_commands can span several lines,
+# one entry per line, with a trailing comma and comments allowed (TOML 1.1).
+#
 # Three mapping forms are supported:
 #
 #   Static value
@@ -24,7 +27,14 @@
 #     [[mapping]]
 #     offset      = 0x0D0C
 #     fsuipc_type = "u16"
-#     datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on" }
+#     datarefs    = {
+#         Nav            = "sim/cockpit2/switches/navigation_lights_on",
+#         Bcn            = "sim/cockpit2/switches/beacon_on",
+#         Land           = "sim/cockpit2/switches/landing_lights_on",
+#         Taxi           = "sim/cockpit2/switches/taxi_light_on",
+#         B738TaxiSwitch = "laminar/B738/toggle_switch/taxi_light_brightness_pos",
+#         Strb           = "sim/cockpit2/switches/strobe_lights_on",
+#     }
 #     expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * +"
 # 
 #   Expressions can also take an optional conditional to determine when the value is updated, e.g.:
@@ -32,7 +42,10 @@
 #     [[mapping]]
 #     offset = 0x030c  # Aircraft vertical speed at touchdown, do not update when on ground, note that bounces will reset this
 #     fsuipc_type = "i32"
-#     datarefs     = { VhInd = "sim/flightmodel/position/vh_ind", OnGround = "sim/flightmodel/failures/onground_any" }
+#     datarefs     = {
+#         VhInd    = "sim/flightmodel/position/vh_ind",
+#         OnGround = "sim/flightmodel/failures/onground_any",
+#     }
 #     update_if_expr = "$OnGround 0 =="
 #     expr = "$VhInd 256.0 *"                    # m/s → 256*m/s
 #
@@ -52,10 +65,15 @@
 #     [[mapping]]
 #     offset      = 0x023B  # Zulu hour
 #     fsuipc_type = "u8"
-#     datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec" }
+#     datarefs    = {
+#         H = "sim/cockpit2/clock_timer/zulu_time_hours",
+#         Z = "sim/time/zulu_time_sec",
+#     }
 #     expr        = "$H"
 #     writable    = true
-#     write_exprs = { Z = "$value 3600 * $Z 3600 % +" }   # new hour, same minutes and seconds
+#     write_exprs = {  # new hour, same minutes and seconds
+#         Z = "$value 3600 * $Z 3600 % +",
+#     }
 #
 #   write_commands is for aircraft that override their datarefs and only respond to
 #   X-Plane commands. Each key is a command path, and each expression (same variables)
@@ -63,7 +81,9 @@
 #   only when it's in the wrong state, compare the requested part of $value with the
 #   switch's state dataref, e.g. for the landing-light bit:
 #
-#     write_commands = { "<toggle command>" = "$value 4 & 0 != $ZLand 0 != !=" }
+#     write_commands = {
+#         "<toggle command>" = "$value 4 & 0 != $ZLand 0 != !=",
+#     }
 #
 #   Every expression is evaluated before anything is written. If any result is not a
 #   finite number, nothing is written and no command runs. Otherwise the datarefs are
@@ -233,49 +253,81 @@ dataref = "sim/flightmodel/position/longitude"
 [[mapping]]
 offset      = 0x3324  # indicated altitude
 fsuipc_type = "i32"
-datarefs     = { "pilot"="sim/cockpit2/gauges/indicators/altitude_ft_pilot", "copilot"="sim/cockpit2/gauges/indicators/altitude_ft_copilot", "standby"="sim/cockpit2/gauges/indicators/altitude_ft_stby"}
+datarefs     = {
+    "pilot"   = "sim/cockpit2/gauges/indicators/altitude_ft_pilot",
+    "copilot" = "sim/cockpit2/gauges/indicators/altitude_ft_copilot",
+    "standby" = "sim/cockpit2/gauges/indicators/altitude_ft_stby",
+}
 expr = "$pilot $copilot | $standby |"
 
 [[mapping]]
 offset      = 0x0580  # TRUE heading at a whacky scale
 fsuipc_type = "u32"
-datarefs    = {Hdg="sim/flightmodel/position/true_psi"}
+datarefs    = {
+    Hdg = "sim/flightmodel/position/true_psi",
+}
 expr = "$Hdg 65536 65536 * * 360 \\"
 
 [[mapping]]
 offset      = 0x0BD0  # Spolier handle position, 4800 = armed
 fsuipc_type = "u32"
-datarefs    = { SB = "sim/cockpit2/controls/speedbrake_ratio" }
+datarefs    = {
+    SB = "sim/cockpit2/controls/speedbrake_ratio",
+}
 expr        = "$SB 0 > $SB 10763 * 5620 + $SB 0 < $SB -9600 * 0 ? ?"     # 0..1 → 4800..16383
 writable    = true
-write_exprs = { SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?" }  # 4800 → armed (-0.5), 5620..16383 → 0..1
+write_exprs = {  # 4800 → armed (-0.5), 5620..16383 → 0..1
+    SB = "$value 4800 == -0.5 $value 5620 - 10763 / 0 max ?",
+}
 
 
 [[mapping]]
 offset      = 0x2E80  # Avionics master switch; an expression mapping so it can also run add-on commands
 fsuipc_type = "u32"
-datarefs    = { Av = "sim/cockpit2/switches/avionics_power_on", CitXAv = "laminar/CitX/electrical/avionics" }
+datarefs    = {
+    Av     = "sim/cockpit2/switches/avionics_power_on",
+    CitXAv = "laminar/CitX/electrical/avionics",
+}
 expr        = "$Av"
 writable    = true
-write_commands = { "sim/systems/avionics_toggle" = "$value $Av !=", "laminar/CitX/electrical/cmd_avionics_toggle" = "$value $CitXAv !=" }
+write_commands = {
+    "sim/systems/avionics_toggle"                 = "$value $Av !=",
+    "laminar/CitX/electrical/cmd_avionics_toggle" = "$value $CitXAv !=",
+}
 
 [[mapping]]
 offset      = 0x281C  # Battery master on, problematic, because generic always seems to be on
 fsuipc_type = "u32"
-datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
+datarefs = {
+    "Zibo738" = "sim/cockpit2/electrical/battery_on[1]",
+    "Generic" = "sim/cockpit/electrical/battery_on",
+}
 expr = "$Zibo738 $Generic |"
 writable    = true
 # The toggle runs once, only when the requested state differs from $ZBat.
-write_commands = { "sim/electrical/battery_all_toggle" = "$value $Generic !=", "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=" , "laminar/B738/switch/battery_dn" = "$value 1 ==", "laminar/B738/switch/battery_up" = "$value 0 ==" }
+write_commands = {
+    "sim/electrical/battery_all_toggle"               = "$value $Generic !=",
+    "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=",
+    "laminar/B738/switch/battery_dn"                  = "$value 1 ==",
+    "laminar/B738/switch/battery_up"                  = "$value 0 ==",
+}
 
 [[mapping]]
 offset      = 0x3102  # ELECTRICAL MASTER BATTERY, problematic, because generic always seems to be on, should be writable
 fsuipc_type = "u8"
-datarefs = { "Zibo738" = "sim/cockpit2/electrical/battery_on[1]", "Generic" = "sim/cockpit/electrical/battery_on" }
+datarefs = {
+    "Zibo738" = "sim/cockpit2/electrical/battery_on[1]",
+    "Generic" = "sim/cockpit/electrical/battery_on",
+}
 expr = "$Zibo738 $Generic |"
 writable    = true
 # The toggle runs once, only when the requested state differs from $ZBat.
-write_commands = { "sim/electrical/battery_all_toggle" = "$value $Generic !=", "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=" , "laminar/B738/switch/battery_dn" = "$value 1 ==", "laminar/B738/switch/battery_up" = "$value 0 ==" }
+write_commands = {
+    "sim/electrical/battery_all_toggle"               = "$value $Generic !=",
+    "laminar/CitX/electrical/cmd_battery_left_toggle" = "$value $Generic !=",
+    "laminar/B738/switch/battery_dn"                  = "$value 1 ==",
+    "laminar/B738/switch/battery_up"                  = "$value 0 ==",
+}
 
 [[mapping]]
 offset      = 0x0366  # SIM ON GROUND
@@ -292,7 +344,10 @@ scale       = 256.0                    # m/s → 256*m/s
 [[mapping]]
 offset = 0x030c  # Aircraft vertical speed at touchdown, do not update when on ground, note that bounces will reset this
 fsuipc_type = "i32"
-datarefs     = { VhInd = "sim/flightmodel/position/vh_ind", OnGround = "sim/flightmodel/failures/onground_any" }
+datarefs     = {
+    VhInd    = "sim/flightmodel/position/vh_ind",
+    OnGround = "sim/flightmodel/failures/onground_any",
+}
 update_if_expr = "$OnGround 0 =="
 expr = "$VhInd 256.0 *"                    # m/s → 256*m/s
 
@@ -311,12 +366,35 @@ scale       = 625.0
 [[mapping]]
 offset      = 0x0D0C
 fsuipc_type = "u16"
-datarefs    = { Nav  = "sim/cockpit2/switches/navigation_lights_on", Bcn  = "sim/cockpit2/switches/beacon_on", Land = "sim/cockpit2/switches/landing_lights_on", Taxi = "sim/cockpit2/switches/taxi_light_on", B738TaxiSwitch="laminar/B738/toggle_switch/taxi_light_brightness_pos", Strb = "sim/cockpit2/switches/strobe_lights_on", Wing = "laminar/B738/toggle_switch/wing_light", Logo = "laminar/B738/toggle_switch/logo_light"}
+datarefs    = {
+    Nav            = "sim/cockpit2/switches/navigation_lights_on",
+    Bcn            = "sim/cockpit2/switches/beacon_on",
+    Land           = "sim/cockpit2/switches/landing_lights_on",
+    Taxi           = "sim/cockpit2/switches/taxi_light_on",
+    B738TaxiSwitch = "laminar/B738/toggle_switch/taxi_light_brightness_pos",
+    Strb           = "sim/cockpit2/switches/strobe_lights_on",
+    Wing           = "laminar/B738/toggle_switch/wing_light",
+    Logo           = "laminar/B738/toggle_switch/logo_light",
+}
 expr        = "$Nav 1 * $Bcn 2 * + $Land 4 * + $B738TaxiSwitch 1 $Taxi ? 8 * + $Strb 16 * + $Wing 128 * + $Logo 256 * +"
 writable    = true
 # NOTE: the write_commands are only partially implemented
-write_exprs = { Nav = "$value 1 & 0 !=", Bcn = "$value 2 & 0 !=", Land = "$value 4 & 0 !=", Taxi = "$value 8 & 0 !=", Strb = "$value 16 & 0 !=" }
-write_commands = { "laminar/B738/switch/logo_light_toggle" = "$value 256 & $Logo !=", "laminar/B738/switch/wing_light_toggle" = "$value 128 & $Wing !=", "laminar/B738/toggle_switch/position_light_strobe" = "$value 16 & 0 !=", "laminar/B738/toggle_switch/position_light_steady" = "$value 16 & 0 == $value 1 & 0 != &", "laminar/B738/toggle_switch/position_light_off" = "$value 17 & 0 ==", "laminar/B738/toggle_switch/taxi_light_brightness_on" = "$value 8 & 0 !=", "laminar/B738/toggle_switch/taxi_light_brightness_off" = "$value 8 & 0 =="}
+write_exprs = {
+    Nav  = "$value 1 & 0 !=",
+    Bcn  = "$value 2 & 0 !=",
+    Land = "$value 4 & 0 !=",
+    Taxi = "$value 8 & 0 !=",
+    Strb = "$value 16 & 0 !=",
+}
+write_commands = {
+    "laminar/B738/switch/logo_light_toggle"                = "$value 256 & $Logo !=",
+    "laminar/B738/switch/wing_light_toggle"                = "$value 128 & $Wing !=",
+    "laminar/B738/toggle_switch/position_light_strobe"     = "$value 16 & 0 !=",
+    "laminar/B738/toggle_switch/position_light_steady"     = "$value 16 & 0 == $value 1 & 0 != &",
+    "laminar/B738/toggle_switch/position_light_off"        = "$value 17 & 0 ==",
+    "laminar/B738/toggle_switch/taxi_light_brightness_on"  = "$value 8 & 0 !=",
+    "laminar/B738/toggle_switch/taxi_light_brightness_off" = "$value 8 & 0 ==",
+}
 
 
 [[mapping]]
@@ -359,7 +437,11 @@ scale       = 32.174                   # G → ft/s²
 [[mapping]]
 offset      = 0x3068  # ACCELERATION BODY Y (vertical up/down)
 fsuipc_type = "f64"
-datarefs = { Bank="sim/flightmodel2/position/true_phi", GNrml="sim/flightmodel/forces/g_nrml", Pitch="sim/flightmodel/position/true_theta" }
+datarefs = {
+    Bank  = "sim/flightmodel2/position/true_phi",
+    GNrml = "sim/flightmodel/forces/g_nrml",
+    Pitch = "sim/flightmodel/position/true_theta",
+}
 expr = "$GNrml $Pitch PI * 180 / cos $Bank PI * 180 / cos * - 32.174 *"
 
 [[mapping]]
@@ -396,7 +478,18 @@ writable    = true
 [[mapping]]  # TODO: double check somehow if this is working
 offset = 0x126C  # Fuel Quantity Total Weight in Pounds
 fsuipc_type = "u32"
-datarefs = { Tank0 = "sim/cockpit2/fuel/fuel_quantity[0]", Tank1 = "sim/cockpit2/fuel/fuel_quantity[1]", Tank2 = "sim/cockpit2/fuel/fuel_quantity[2]", Tank3 = "sim/cockpit2/fuel/fuel_quantity[3]", Tank4 = "sim/cockpit2/fuel/fuel_quantity[4]", Tank5 = "sim/cockpit2/fuel/fuel_quantity[5]", Tank6 = "sim/cockpit2/fuel/fuel_quantity[6]", Tank7 = "sim/cockpit2/fuel/fuel_quantity[7]", Tank8 = "sim/cockpit2/fuel/fuel_quantity[8]", Tank9 = "sim/cockpit2/fuel/fuel_quantity[9]" }
+datarefs = {
+    Tank0 = "sim/cockpit2/fuel/fuel_quantity[0]",
+    Tank1 = "sim/cockpit2/fuel/fuel_quantity[1]",
+    Tank2 = "sim/cockpit2/fuel/fuel_quantity[2]",
+    Tank3 = "sim/cockpit2/fuel/fuel_quantity[3]",
+    Tank4 = "sim/cockpit2/fuel/fuel_quantity[4]",
+    Tank5 = "sim/cockpit2/fuel/fuel_quantity[5]",
+    Tank6 = "sim/cockpit2/fuel/fuel_quantity[6]",
+    Tank7 = "sim/cockpit2/fuel/fuel_quantity[7]",
+    Tank8 = "sim/cockpit2/fuel/fuel_quantity[8]",
+    Tank9 = "sim/cockpit2/fuel/fuel_quantity[9]",
+}
 expr = "$Tank0 $Tank1 + $Tank2 + $Tank3 + $Tank4 + $Tank5 + $Tank6 + $Tank7 + $Tank8 + $Tank9 + 2.20462 *"
 
 [[mapping]]
@@ -496,7 +589,14 @@ scale       = 163.84
 [[mapping]]
 offset      = 0x3367
 fsuipc_type = "u8"
-datarefs    = { 738_L1  = "737u/doors/L1", 738_L2  = "737u/doors/L2", 738_R1  = "737u/doors/R1", 738_R2  = "737u/doors/R2", 738_FwdCgo = "737u/doors/Fwd_Cargo", 738_AftCgo = "737u/doors/aft_Cargo" }
+datarefs    = {
+    738_L1     = "737u/doors/L1",
+    738_L2     = "737u/doors/L2",
+    738_R1     = "737u/doors/R1",
+    738_R2     = "737u/doors/R2",
+    738_FwdCgo = "737u/doors/Fwd_Cargo",
+    738_AftCgo = "737u/doors/aft_Cargo",
+}
 expr        = "$738_L1 $738_L2 | 1 * $738_R2 $738_R1 | 8 * + $738_FwdCgo $738_AftCgo | 32 * +"
 
 [[mapping]]
@@ -535,42 +635,77 @@ writable    = true
 [[mapping]]
 offset      = 0x0238  # Local hour; local_time_sec is read-only, so a write shifts Zulu time
 fsuipc_type = "u8"
-datarefs    = { LH = "sim/cockpit2/clock_timer/local_time_hours", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
+datarefs    = {
+    LH     = "sim/cockpit2/clock_timer/local_time_hours",
+    Z      = "sim/time/zulu_time_sec",
+    UseSys = "sim/time/use_system_time",
+}
 expr        = "$LH"
 writable    = true
-write_exprs = { Z = "$Z $value $LH - 3600 * + 86400 + 86400 %", UseSys = "0" }
+write_exprs = {
+    Z      = "$Z $value $LH - 3600 * + 86400 + 86400 %",
+    UseSys = "0",
+}
 
 [[mapping]]
 offset      = 0x0239  # Local minute; a write shifts Zulu time
 fsuipc_type = "u8"
-datarefs    = { LM = "sim/cockpit2/clock_timer/local_time_minutes", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
+datarefs    = {
+    LM     = "sim/cockpit2/clock_timer/local_time_minutes",
+    Z      = "sim/time/zulu_time_sec",
+    UseSys = "sim/time/use_system_time",
+}
 expr        = "$LM"
 writable    = true
-write_exprs = { Z = "$Z $value $LM - 60 * + 86400 + 86400 %", UseSys = "0" }
+write_exprs = {
+    Z      = "$Z $value $LM - 60 * + 86400 + 86400 %",
+    UseSys = "0",
+}
 
 [[mapping]]
 offset      = 0x023A  # Second
 fsuipc_type = "u8"
-datarefs    = { S = "sim/cockpit2/clock_timer/local_time_seconds", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
+datarefs    = {
+    S      = "sim/cockpit2/clock_timer/local_time_seconds",
+    Z      = "sim/time/zulu_time_sec",
+    UseSys = "sim/time/use_system_time",
+}
 expr        = "$S"
 writable    = true
-write_exprs = { Z = "$Z $Z 60 % - $value +", UseSys = "0" }
+write_exprs = {
+    Z      = "$Z $Z 60 % - $value +",
+    UseSys = "0",
+}
 
 [[mapping]]
 offset      = 0x023B  # Zulu hour
 fsuipc_type = "u8"
-datarefs    = { H = "sim/cockpit2/clock_timer/zulu_time_hours", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
+datarefs    = {
+    H      = "sim/cockpit2/clock_timer/zulu_time_hours",
+    Z      = "sim/time/zulu_time_sec",
+    UseSys = "sim/time/use_system_time",
+}
 expr        = "$H"
 writable    = true
-write_exprs = { Z = "$value 3600 * $Z 3600 % +", UseSys = "0" }
+write_exprs = {
+    Z      = "$value 3600 * $Z 3600 % +",
+    UseSys = "0",
+}
 
 [[mapping]]
 offset      = 0x023C  # Zulu minute
 fsuipc_type = "u8"
-datarefs    = { M = "sim/cockpit2/clock_timer/zulu_time_minutes", Z = "sim/time/zulu_time_sec", UseSys = "sim/time/use_system_time" }
+datarefs    = {
+    M      = "sim/cockpit2/clock_timer/zulu_time_minutes",
+    Z      = "sim/time/zulu_time_sec",
+    UseSys = "sim/time/use_system_time",
+}
 expr        = "$M"
 writable    = true
-write_exprs = { Z = "$Z $Z 3600 % - $value 60 * + $Z 60 % +", UseSys = "0" }
+write_exprs = {
+    Z      = "$Z $Z 3600 % - $value 60 * + $Z 60 % +",
+    UseSys = "0",
+}
 
 # 0x0246 local offset from Zulu minutes, +ve=behind. Handles midnight crossover.
 [[mapping]]
@@ -581,7 +716,10 @@ dataref    = "xplane-uipc-helper/time/offset_minutes_negated"
 [[mapping]]
 offset = 0x115e  # Time of day indicator, 0=Dawn, 1=Day, 2=Dusk, 3=Night. Set according to the local time, read for lighting effects and so on in BGLs
 fsuipc_type = "u8"
-datarefs = { sp = "sim/graphics/scenery/sun_pitch_degrees", lh = "sim/cockpit2/clock_timer/local_time_hours" }
+datarefs = {
+    sp = "sim/graphics/scenery/sun_pitch_degrees",
+    lh = "sim/cockpit2/clock_timer/local_time_hours",
+}
 expr = "$sp 0 <= $sp -6 >= & dup $lh 12 < & 0 swap $lh 12 >= & 2 $sp 0 > 1 3 ? ? ?"
 
 # =============================================================================
@@ -595,13 +733,17 @@ expr = "$sp 0 <= $sp -6 >= & dup $lh 12 < & 0 swap $lh 12 >= & 2 $sp 0 > 1 3 ? ?
 [[mapping]]
 offset      = 0x0560
 fsuipc_type = "i64"
-datarefs     = { Lat="sim/flightmodel/position/latitude" }
+datarefs     = {
+    Lat = "sim/flightmodel/position/latitude",
+}
 expr = "$Lat 90 10001750 65536 * 65536 * / /"
 
 [[mapping]]
 offset      = 0x0568
 fsuipc_type = "i64"
-datarefs     = { Lng="sim/flightmodel/position/longitude" }
+datarefs     = {
+    Lng = "sim/flightmodel/position/longitude",
+}
 expr = "$Lng 360 65536 65536 * 65536 * 65536 * / /"
 
 # =============================================================================
@@ -614,13 +756,17 @@ expr = "$Lng 360 65536 65536 * 65536 * 65536 * / /"
 [[mapping]]
 offset      = 0x0574 # elevation in metres, whole-part only, if specifcally called
 fsuipc_type = "i32"
-datarefs     = { elev = "sim/flightmodel/position/elevation" }
+datarefs     = {
+    elev = "sim/flightmodel/position/elevation",
+}
 expr = "$elev floor"
 
 [[mapping]]
 offset      = 0x0570
 fsuipc_type = "i64"
-datarefs    = { elev = "sim/flightmodel/position/elevation" }
+datarefs    = {
+    elev = "sim/flightmodel/position/elevation",
+}
 expr        = "$elev 3.28084 65536 65536 * / /"  # fractional metres * 2^32
 
 # =============================================================================
@@ -634,13 +780,17 @@ expr        = "$elev 3.28084 65536 65536 * / /"  # fractional metres * 2^32
 [[mapping]]
 offset      = 0x0578
 fsuipc_type = "i32"
-datarefs    = { pitch = "sim/flightmodel/position/theta" }
+datarefs    = {
+    pitch = "sim/flightmodel/position/theta",
+}
 expr        = "$pitch -1 * 360 65536 65536 * / /"   # negate + scale
 
 [[mapping]]
 offset      = 0x057C
 fsuipc_type = "i32"
-datarefs    = { bank = "sim/flightmodel/position/phi" }
+datarefs    = {
+    bank = "sim/flightmodel/position/phi",
+}
 expr        = "$bank -1 * 360 65536 65536 * / /"    # negate + scale
 
 
@@ -649,19 +799,26 @@ expr        = "$bank -1 * 360 65536 65536 * / /"    # negate + scale
 [[mapping]]
 offset = 0x31F0
 fsuipc_type = "u32"
-datarefs = { BP_Started ="bp/started", PB_Attached = "sim/aircraft/overflow/pushback_attached" }
+datarefs = {
+    BP_Started  = "bp/started",
+    PB_Attached = "sim/aircraft/overflow/pushback_attached",
+}
 expr = "$BP_Started $PB_Attached | 0 3 ?"
 
 [[mapping]]
 offset = 0x7b91  # SquawkBox Transponder mode, 0 = normal, 1 = standby: https://squawkbox.ca/doc/sdk/fsuipc.php
 fsuipc_type = "u8"
-datarefs = { T_Mode = "sim/cockpit2/radios/actuators/transponder_mode" }
+datarefs = {
+    T_Mode = "sim/cockpit2/radios/actuators/transponder_mode",
+}
 expr = "$T_Mode 2 <"
 
 [[mapping]]
 offset = 0x023e  # Zulu day of year (1 indexed)
 fsuipc_type = "u16"
-datarefs = { DayZ="sim/time/zulu_date_days" } # 0 indexed but msfs is 1 indexed
+datarefs = {  # 0 indexed but msfs is 1 indexed
+    DayZ = "sim/time/zulu_date_days",
+}
 expr = "$DayZ 1 +"
 
 # provided by custom LUA script
