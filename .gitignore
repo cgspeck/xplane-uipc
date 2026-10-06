@@ -2,3 +2,5 @@
 /**/target
 # the distribution folder for the main plugin
 /dist
+# python
+__pycache__/

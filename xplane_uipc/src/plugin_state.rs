@@ -7,7 +7,7 @@ mod bindings {
 }
 use bindings::*;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::CString;
 use std::sync::{Arc, RwLock};
 
@@ -15,6 +15,7 @@ use ipc_host::USER_AREA;
 use ipc_host::value_table::{Table, Value, get_value_table};
 use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
+use uipc_mapping::eval_writes;
 pub use uipc_mapping::{DatarefMapping, MappingSource};
 
 /// Bound a raw string read to `max_len` bytes, always ending in a NUL.
@@ -46,6 +47,8 @@ pub enum Reading {
 pub struct ResolvedRef {
     pub handle: XPLMDataRef,
     pub array_index: Option<i32>,
+    /// Dataref path, without any `[N]` index, for log messages.
+    pub path: String,
 }
 
 impl ResolvedRef {
@@ -60,6 +63,7 @@ impl ResolvedRef {
         Self {
             handle,
             array_index,
+            path: path.to_string(),
         }
     }
 
@@ -122,9 +126,11 @@ impl ResolvedRef {
         memo
     }
 
-    pub fn write(&self, xplane_value: f64) {
+    /// Write a value to the dataref. Returns false if the handle is invalid or
+    /// the dataref's type can't be written as a number.
+    pub fn write(&self, xplane_value: f64) -> bool {
         if self.handle.is_null() {
-            return;
+            return false;
         }
         let ty = unsafe { XPLMGetDataRefTypes(self.handle) };
         if let Some(array_index) = self.array_index {
@@ -134,6 +140,8 @@ impl ResolvedRef {
             } else if ty & xplmType_FloatArray != 0 {
                 let mut v = xplane_value as f32;
                 unsafe { XPLMSetDatavf(self.handle, &mut v, array_index, 1) };
+            } else {
+                return false;
             }
         } else if ty & xplmType_Double != 0 {
             unsafe {
@@ -147,8 +155,23 @@ impl ResolvedRef {
             unsafe {
                 XPLMSetDatai(self.handle, xplane_value.round() as i32);
             }
+        } else {
+            return false;
         }
+        true
     }
+}
+
+/// Find a command by path. Null (with a warning) if X-Plane has no such command.
+fn find_command(path: &str) -> XPLMCommandRef {
+    let handle = match CString::new(path) {
+        Ok(cs) => unsafe { XPLMFindCommand(cs.as_ptr()) },
+        Err(_) => std::ptr::null_mut(),
+    };
+    if handle.is_null() {
+        tracing::warn!("command not found: '{}'", path);
+    }
+    handle
 }
 
 // ─── Resolved mapping ─────────────────────────────────────────────────────────
@@ -170,6 +193,12 @@ pub enum ResolvedSource {
         refs: HashMap<String, ResolvedRef>,
         expr: Expr,
         update_if_expr: Option<Expr>,
+        /// Target name (a key of `refs`) → expression for the value to write there.
+        write_exprs: BTreeMap<String, Expr>,
+        /// Command path → expression for how many times to run it.
+        write_commands: BTreeMap<String, Expr>,
+        /// Command path → handle, null if X-Plane has no such command.
+        commands: HashMap<String, XPLMCommandRef>,
     },
 }
 
@@ -179,6 +208,10 @@ pub struct ResolvedMapping {
     pub size: usize,
     pub source: ResolvedSource,
     pub writable: bool,
+    /// Write targets already reported as missing, so a repeated skip logs at
+    /// debug instead of flooding the log. Mappings are rebuilt when they're
+    /// resolved again, which clears it.
+    reported_missing: HashSet<String>,
 }
 
 impl ResolvedMapping {
@@ -212,15 +245,37 @@ impl ResolvedMapping {
                 datarefs,
                 expr,
                 update_if_expr,
+                write_exprs,
+                write_commands,
             } => {
-                let refs = datarefs
+                let refs: HashMap<String, ResolvedRef> = datarefs
                     .into_iter()
                     .map(|(name, (path, idx))| (name, ResolvedRef::resolve(&path, idx)))
+                    .collect();
+                for target in write_exprs.keys() {
+                    if let Some(dr) = refs.get(target)
+                        && !dr.handle.is_null()
+                        && unsafe { XPLMCanWriteDataRef(dr.handle) } == 0
+                    {
+                        tracing::warn!(
+                            "Offset {:#06x} writes '{}' but dataref '{}' is read-only; writes to it will have no effect",
+                            mapping.offset,
+                            target,
+                            dr.path
+                        );
+                    }
+                }
+                let commands = write_commands
+                    .keys()
+                    .map(|path| (path.clone(), find_command(path)))
                     .collect();
                 ResolvedSource::Expr {
                     refs,
                     expr,
                     update_if_expr,
+                    write_exprs,
+                    write_commands,
+                    commands,
                 }
             }
             MappingSource::Static { static_value } => ResolvedSource::Static {
@@ -228,9 +283,14 @@ impl ResolvedMapping {
             },
             MappingSource::StaticStr { static_str } => ResolvedSource::StaticStr { static_str },
         };
-        if mapping.writable && !matches!(source, ResolvedSource::Simple { .. }) {
+        if mapping.writable
+            && matches!(
+                source,
+                ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. }
+            )
+        {
             tracing::warn!(
-                "Offset {:#06x} is marked writable but only single-dataref mappings can be written; writes to it will have no effect",
+                "Offset {:#06x} is marked writable but static values can't be written; writes to it will have no effect",
                 mapping.offset
             );
         }
@@ -240,6 +300,7 @@ impl ResolvedMapping {
             size: mapping.size,
             source,
             writable: mapping.writable,
+            reported_missing: HashSet::new(),
         }
     }
 
@@ -274,11 +335,9 @@ impl ResolvedMapping {
                 refs,
                 expr,
                 update_if_expr,
+                ..
             } => {
-                let mut vars = HashMap::new();
-                for (name, dr) in refs {
-                    vars.insert(name.clone(), dr.read().unwrap_or(0.0));
-                }
+                let vars = read_vars(refs);
                 if update_if_expr
                     .as_ref()
                     .is_some_and(|c| c.eval(&vars) <= 0.0)
@@ -296,23 +355,117 @@ impl ResolvedMapping {
         }
     }
 
-    /// Write a value back to X-Plane (simple mappings only; expr write-back
-    /// requires knowledge of which dataref to write and the inverse expression,
-    /// which is not yet supported).
-    pub fn write_xplane(&self, fsuipc_value: f64) {
+    /// Write a client's value back to X-Plane. Returns whether any dataref
+    /// was written or command run.
+    ///
+    /// Simple mappings reverse `scale`/`offset_add`. Expression mappings
+    /// evaluate every write expression and command expression against one
+    /// snapshot of their datarefs (unavailable ones read as 0.0), and do
+    /// nothing if any result isn't finite. Otherwise they write the datarefs,
+    /// then run each command its count of times.
+    pub fn write_xplane(&mut self, fsuipc_value: f64) -> bool {
         if !self.writable {
-            return;
+            return false;
         }
-        if let ResolvedSource::Simple {
-            dr,
-            scale,
-            offset_add,
-        } = &self.source
-        {
-            let s = if scale.abs() < 1e-12 { 1.0 } else { *scale };
-            dr.write((fsuipc_value - offset_add) / s);
+        let mut written = false;
+        // Descriptions of the targets skipped because they're unavailable.
+        let mut skipped = Vec::new();
+        match &self.source {
+            ResolvedSource::Simple {
+                dr,
+                scale,
+                offset_add,
+            } => {
+                debug_assert!(
+                    *scale != 0.0,
+                    "the loader rejects writable mappings with scale = 0"
+                );
+                if dr.write((fsuipc_value - offset_add) / scale) {
+                    written = true;
+                } else {
+                    skipped.push(format!("dataref '{}'", dr.path));
+                }
+            }
+            ResolvedSource::Expr {
+                refs,
+                write_exprs,
+                write_commands,
+                commands,
+                ..
+            } => {
+                let mut vars = read_vars(refs);
+                vars.insert("value".into(), fsuipc_value);
+                let plan = match eval_writes(write_exprs, write_commands, &vars) {
+                    Ok(plan) => plan,
+                    Err(e) => {
+                        tracing::warn!("Offset {:#06x}: {}; nothing written", self.offset, e);
+                        return false;
+                    }
+                };
+                // The loader checks every target names a dataref.
+                for (target, v) in plan.datarefs {
+                    let Some(dr) = refs.get(target) else { continue };
+                    if dr.write(v) {
+                        written = true;
+                    } else {
+                        skipped.push(format!("dataref '{}'", dr.path));
+                    }
+                }
+                for (path, runs) in plan.commands {
+                    if runs == 0 {
+                        continue;
+                    }
+                    match commands.get(path) {
+                        Some(&cmd) if !cmd.is_null() => {
+                            for _ in 0..runs {
+                                unsafe { XPLMCommandOnce(cmd) };
+                            }
+                            tracing::debug!(
+                                "Offset {:#06x}: ran command '{}' {} time(s)",
+                                self.offset,
+                                path,
+                                runs
+                            );
+                            written = true;
+                        }
+                        _ => skipped.push(format!("command '{}'", path)),
+                    }
+                }
+            }
+            ResolvedSource::Static { .. } | ResolvedSource::StaticStr { .. } => {}
+        }
+        for target in skipped {
+            self.report_missing(target);
+        }
+        written
+    }
+
+    /// Log a write target skipped because it's unavailable: an error the first
+    /// time for that target since mappings were resolved, debug after.
+    /// `target` describes it, e.g. "dataref 'sim/a'".
+    fn report_missing(&mut self, target: String) {
+        if self.reported_missing.contains(&target) {
+            tracing::debug!(
+                "Offset {:#06x}: {} is unavailable; skipped",
+                self.offset,
+                target
+            );
+        } else {
+            tracing::error!(
+                "Offset {:#06x}: {} is unavailable; skipped, other targets are still written (repeats are logged at debug level)",
+                self.offset,
+                target
+            );
+            self.reported_missing.insert(target);
         }
     }
+}
+
+/// Current value of each named dataref; unavailable ones read as 0.0.
+fn read_vars(refs: &HashMap<String, ResolvedRef>) -> HashMap<String, f64> {
+    refs.iter()
+        .map(|(name, dr)| (name.clone(), dr.read().unwrap_or(0.0)))
+        .collect()
 }
 
 // ─── Built-in offsets ──────────────────────────────────────────────────────────
@@ -434,10 +587,11 @@ impl PluginState {
     }
 
     pub fn write_offset(&mut self, offset: u16, value: f64, _size: usize) {
-        for m in &self.mappings {
+        for m in &mut self.mappings {
             if m.offset == offset && m.writable {
-                m.write_xplane(value);
-                tracing::debug!("Wrote value {} to offset {:#06x}", value, offset);
+                if m.write_xplane(value) {
+                    tracing::debug!("Wrote value {} to offset {:#06x}", value, offset);
+                }
                 return;
             }
         }
@@ -550,6 +704,7 @@ mod tests {
             size: 4,
             source: ResolvedSource::Static { static_value: None },
             writable: false,
+            reported_missing: HashSet::new(),
         }
     }
 
@@ -583,6 +738,52 @@ mod tests {
             table.get(0x030C).map(|e| &e.value),
             Some(Value::Integer32(-512))
         ));
+    }
+
+    /// Counts error events, to check what a test logs.
+    struct CountErrors(Arc<std::sync::atomic::AtomicUsize>);
+
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for CountErrors {
+        fn on_event(
+            &self,
+            event: &tracing::Event<'_>,
+            _ctx: tracing_subscriber::layer::Context<'_, S>,
+        ) {
+            if *event.metadata().level() == tracing::Level::ERROR {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+    }
+
+    #[test]
+    fn unavailable_target_errors_once_per_load() {
+        use tracing_subscriber::layer::SubscriberExt;
+
+        let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let subscriber = tracing_subscriber::registry().with(CountErrors(errors.clone()));
+        let mut mapping = touchdown_vs_mapping();
+        tracing::subscriber::with_default(subscriber, || {
+            for _ in 0..3 {
+                mapping.report_missing("dataref 'addon/missing'".into());
+            }
+        });
+        assert_eq!(errors.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn each_missing_target_errors_once() {
+        use tracing_subscriber::layer::SubscriberExt;
+
+        let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let subscriber = tracing_subscriber::registry().with(CountErrors(errors.clone()));
+        let mut mapping = touchdown_vs_mapping();
+        tracing::subscriber::with_default(subscriber, || {
+            for _ in 0..2 {
+                mapping.report_missing("command 'addon/land_toggle'".into());
+                mapping.report_missing("dataref 'addon/land_pos'".into());
+            }
+        });
+        assert_eq!(errors.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
     #[test]

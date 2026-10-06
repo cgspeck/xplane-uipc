@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use crate::Expr;
@@ -77,6 +77,13 @@ pub enum MappingSource {
         datarefs: HashMap<String, (String, Option<i32>)>,
         expr: Expr,
         update_if_expr: Option<Expr>,
+        /// Target name (a key of `datarefs`) → expression for the value to
+        /// write there. Sorted so writes go out in a repeatable order; empty
+        /// for read-only mappings.
+        write_exprs: BTreeMap<String, Expr>,
+        /// Command path → expression for how many times to run it. Sorted;
+        /// empty for read-only mappings.
+        write_commands: BTreeMap<String, Expr>,
     },
 }
 
@@ -111,6 +118,8 @@ struct RawMapping {
     datarefs: Option<HashMap<String, String>>,
     expr: Option<String>,
     update_if_expr: Option<String>,
+    write_exprs: Option<HashMap<String, String>>,
+    write_commands: Option<HashMap<String, String>>,
 
     #[serde(default = "default_writable")]
     writable: bool,
@@ -190,6 +199,33 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
             }
         }
 
+        if r.dataref.is_some() && r.expr.is_some() {
+            load_errors.push(format!(
+                "offset 0x{:04X}: cannot have both 'dataref' and 'expr'",
+                r.offset
+            ));
+            continue;
+        }
+        let present_tables = [
+            (WriteTable::Exprs, r.write_exprs.is_some()),
+            (WriteTable::Commands, r.write_commands.is_some()),
+        ];
+        let table_error = present_tables.iter().find_map(|&(table, present)| {
+            if !present {
+                None
+            } else if r.expr.is_none() {
+                Some(format!("'{}' requires 'expr'", table.name()))
+            } else if !r.writable {
+                Some(format!("'{}' requires 'writable = true'", table.name()))
+            } else {
+                None
+            }
+        });
+        if let Some(e) = table_error {
+            load_errors.push(format!("offset 0x{:04X}: {}", r.offset, e));
+            continue;
+        }
+
         let source = if let Some(expr_src) = r.expr {
             let expr = match Expr::parse(&expr_src) {
                 Ok(e) => e,
@@ -223,12 +259,43 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
                 None => None,
             };
 
+            if r.writable && r.write_exprs.is_none() && r.write_commands.is_none() {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: a writable expression mapping needs 'write_exprs' or 'write_commands'",
+                    r.offset
+                ));
+                continue;
+            }
+            let parsed = parse_write_table(WriteTable::Exprs, r.write_exprs, &datarefs).and_then(
+                |write_exprs| {
+                    parse_write_table(WriteTable::Commands, r.write_commands, &datarefs)
+                        .map(|write_commands| (write_exprs, write_commands))
+                },
+            );
+            let (write_exprs, write_commands) = match parsed {
+                Ok(tables) => tables,
+                Err(e) => {
+                    load_errors.push(format!("offset 0x{:04X}: {}", r.offset, e));
+                    continue;
+                }
+            };
+
             MappingSource::Expr {
                 datarefs,
                 expr,
                 update_if_expr,
+                write_exprs,
+                write_commands,
             }
         } else if let Some(dr) = r.dataref {
+            // The read is the constant `offset_add`, so a write can't be reversed.
+            if r.writable && r.scale == 0.0 {
+                load_errors.push(format!(
+                    "offset 0x{:04X}: a writable mapping can't have 'scale = 0'",
+                    r.offset
+                ));
+                continue;
+            }
             let (path, idx) = parse_dataref_with_index(&dr);
             MappingSource::Simple {
                 dataref_path: path,
@@ -275,6 +342,79 @@ pub fn load_mappings<P: AsRef<Path>>(path: P) -> Result<MappingConfig, String> {
         mappings,
         load_errors,
     })
+}
+
+/// The two write tables of an expression mapping.
+#[derive(Clone, Copy)]
+enum WriteTable {
+    /// `write_exprs`: datarefs name → value to write.
+    Exprs,
+    /// `write_commands`: command path → how many times to run it.
+    Commands,
+}
+
+impl WriteTable {
+    fn name(self) -> &'static str {
+        match self {
+            WriteTable::Exprs => "write_exprs",
+            WriteTable::Commands => "write_commands",
+        }
+    }
+}
+
+/// Parse and check one of a mapping's write tables against its `datarefs`.
+/// An absent table is empty.
+///
+/// Unlike read expressions, where an unknown variable quietly reads as 0.0,
+/// a typo here would write zero to a real dataref or run the wrong command,
+/// so it's an error.
+fn parse_write_table(
+    table: WriteTable,
+    raw: Option<HashMap<String, String>>,
+    datarefs: &HashMap<String, (String, Option<i32>)>,
+) -> Result<BTreeMap<String, Expr>, String> {
+    let name = table.name();
+    let Some(raw) = raw else {
+        return Ok(BTreeMap::new());
+    };
+    if raw.is_empty() {
+        return Err(format!("'{}' is empty", name));
+    }
+    if datarefs.contains_key("value") {
+        return Err(format!(
+            "'datarefs' can't have an entry named 'value' when '{}' is present",
+            name
+        ));
+    }
+    let mut parsed = BTreeMap::new();
+    for (key, src) in raw.into_iter().collect::<BTreeMap<_, _>>() {
+        match table {
+            WriteTable::Exprs if !datarefs.contains_key(&key) => {
+                return Err(format!(
+                    "{} target '{}' is not a name in 'datarefs'",
+                    name, key
+                ));
+            }
+            WriteTable::Commands if !key.contains('/') => {
+                return Err(format!("{} key '{}' is not a command path", name, key));
+            }
+            _ => {}
+        }
+        let expr =
+            Expr::parse(&src).map_err(|e| format!("{} '{}' parse error: {}", name, key, e))?;
+        if let Some(var) = expr
+            .vars()
+            .into_iter()
+            .find(|v| v != "value" && !datarefs.contains_key(v))
+        {
+            return Err(format!(
+                "{} '{}' uses unknown variable '${}'",
+                name, key, var
+            ));
+        }
+        parsed.insert(key, expr);
+    }
+    Ok(parsed)
 }
 
 pub fn parse_dataref_with_index(s: &str) -> (String, Option<i32>) {
@@ -633,5 +773,416 @@ static_value_str = \"hello\"
 
         let err = result.unwrap_err();
         assert!(err.contains("cannot have both 'dataref' and 'static_value_str'"));
+    }
+
+    /// Load a file holding one mapping that should be rejected; return the error.
+    fn load_error(content: &str) -> String {
+        let (path, _name) = test_toml(content);
+        let result = load_mappings(&path);
+        let _ = std::fs::remove_file(&path);
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("0x1000"),
+            "error should name the offset: {}",
+            err
+        );
+        err
+    }
+
+    #[test]
+    fn write_exprs_fan_out() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x0D0C
+fsuipc_type = \"u16\"
+datarefs    = { Nav = \"sim/test/nav\", Bcn = \"sim/test/bcn\" }
+expr        = \"$Nav 1 * $Bcn 2 * +\"
+writable    = true
+write_exprs = { Nav = \"$value 1 & 0 !=\", Bcn = \"$value 2 & $Bcn +\" }
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty());
+        match &config.mappings[0].source {
+            MappingSource::Expr { write_exprs, .. } => {
+                let targets: Vec<&str> = write_exprs.keys().map(String::as_str).collect();
+                assert_eq!(targets, vec!["Bcn", "Nav"]);
+            }
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn read_only_expr_has_no_write_exprs() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        match &config.mappings[0].source {
+            MappingSource::Expr { write_exprs, .. } => assert!(write_exprs.is_empty()),
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn write_exprs_without_expr() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+static_value = 1.0
+writable    = true
+write_exprs = { X = \"$value\" }
+",
+        );
+        assert!(err.contains("'write_exprs' requires 'expr'"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_on_simple_mapping() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+writable    = true
+write_exprs = { X = \"$value\" }
+",
+        );
+        assert!(err.contains("'write_exprs' requires 'expr'"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_not_writable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+write_exprs = { X = \"$value\" }
+",
+        );
+        assert!(
+            err.contains("'write_exprs' requires 'writable = true'"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn writable_expr_without_write_exprs() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+",
+        );
+        assert!(
+            err.contains("needs 'write_exprs' or 'write_commands'"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn write_exprs_empty() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_exprs = {}
+",
+        );
+        assert!(err.contains("'write_exprs' is empty"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_unknown_target() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u32\"
+datarefs    = { SB = \"sim/test/dr\" }
+expr        = \"$SB\"
+writable    = true
+write_exprs = { Sb = \"$value\" }
+",
+        );
+        assert!(err.contains("'Sb'"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_unknown_variable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_exprs = { X = \"$valu 2 *\" }
+",
+        );
+        assert!(err.contains("valu"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_parse_error() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_exprs = { X = \"$value @@\" }
+",
+        );
+        assert!(err.contains("parse error"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_dataref_named_value() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { value = \"sim/test/dr\" }
+expr        = \"$value\"
+writable    = true
+write_exprs = { value = \"$value\" }
+",
+        );
+        assert!(err.contains("named 'value'"), "{}", err);
+    }
+
+    #[test]
+    fn write_exprs_without_datarefs() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+expr        = \"5\"
+writable    = true
+write_exprs = { X = \"$value\" }
+",
+        );
+        assert!(err.contains("'X'"), "{}", err);
+    }
+
+    #[test]
+    fn writable_zero_scale() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+scale       = 0.0
+writable    = true
+",
+        );
+        assert!(err.contains("'scale = 0'"), "{}", err);
+    }
+
+    #[test]
+    fn read_only_zero_scale_loads() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+scale       = 0.0
+offset_add  = 5.0
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty());
+        assert_eq!(config.mappings.len(), 1);
+    }
+
+    #[test]
+    fn dataref_and_expr() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/a\"
+scale       = 100.0
+datarefs    = { A = \"sim/a\" }
+expr        = \"$A\"
+",
+        );
+        assert!(
+            err.contains("cannot have both 'dataref' and 'expr'"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn write_commands_only() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x281C
+fsuipc_type = \"u32\"
+datarefs    = { Bat = \"sim/test/bat\" }
+expr        = \"$Bat\"
+writable    = true
+write_commands = { \"addon/battery_toggle\" = \"$value 0 != $Bat 0 != !=\" }
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty(), "{:?}", config.load_errors);
+        match &config.mappings[0].source {
+            MappingSource::Expr {
+                write_exprs,
+                write_commands,
+                ..
+            } => {
+                assert!(write_exprs.is_empty());
+                let paths: Vec<&str> = write_commands.keys().map(String::as_str).collect();
+                assert_eq!(paths, vec!["addon/battery_toggle"]);
+            }
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn write_exprs_and_write_commands() {
+        let (path, _name) = test_toml(
+            "[[mapping]]
+offset      = 0x0D0C
+fsuipc_type = \"u16\"
+datarefs    = { Land = \"sim/test/land\", ZLand = \"addon/land_pos\" }
+expr        = \"$Land\"
+writable    = true
+write_exprs = { Land = \"$value 4 & 0 !=\" }
+write_commands = { \"addon/land_toggle\" = \"$value 4 & 0 != $ZLand 0 != !=\" }
+",
+        );
+        let config = load_mappings(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert!(config.load_errors.is_empty(), "{:?}", config.load_errors);
+        match &config.mappings[0].source {
+            MappingSource::Expr {
+                write_exprs,
+                write_commands,
+                ..
+            } => {
+                assert_eq!(write_exprs.len(), 1);
+                assert_eq!(write_commands.len(), 1);
+            }
+            _ => panic!("expected Expr source"),
+        }
+    }
+
+    #[test]
+    fn write_commands_key_not_a_path() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = { Toggle = \"1\" }
+",
+        );
+        assert!(err.contains("'Toggle' is not a command path"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_unknown_variable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = { \"addon/toggle\" = \"$valu\" }
+",
+        );
+        assert!(err.contains("write_commands"), "{}", err);
+        assert!(err.contains("valu"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_empty() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+writable    = true
+write_commands = {}
+",
+        );
+        assert!(err.contains("'write_commands' is empty"), "{}", err);
+    }
+
+    #[test]
+    fn write_commands_not_writable() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+datarefs    = { X = \"sim/test/dr\" }
+expr        = \"$X\"
+write_commands = { \"addon/toggle\" = \"1\" }
+",
+        );
+        assert!(
+            err.contains("'write_commands' requires 'writable = true'"),
+            "{}",
+            err
+        );
+    }
+
+    #[test]
+    fn write_commands_without_expr() {
+        let err = load_error(
+            "[[mapping]]
+offset      = 0x1000
+fsuipc_type = \"u16\"
+dataref     = \"sim/test/dr\"
+writable    = true
+write_commands = { \"addon/toggle\" = \"1\" }
+",
+        );
+        assert!(err.contains("'write_commands' requires 'expr'"), "{}", err);
+    }
+
+    #[test]
+    fn shipped_mappings_load_cleanly() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../xplane_uipc/mappings.toml");
+        let config = load_mappings(path).unwrap();
+        assert!(
+            config.load_errors.is_empty(),
+            "load errors: {:?}",
+            config.load_errors
+        );
     }
 }
