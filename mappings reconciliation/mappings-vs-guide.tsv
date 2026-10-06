@@ -24,15 +24,15 @@ offset	type	width	doc_size	status	source	doc_description
 0x6018	f64	8	8	ok	sim/flightmodel/position/longitude	FS2004 GPS: aircraft longitude, floating point double, in degrees (+ve = E, -ve = W).
 0x3324	i32	4	4	ok	expr	This is the altimeter reading in feet (or metres, if the user is running with the preferen
 0x0580	u32	4	4	ok	expr	Heading, *360/(65536*65536) for degrees TRUE. [Can be set in slew or pause states]
-0x0BD0	u32	4	4	ok	expr	Spoilers control, 0 off, 4800 arm, then 5620 (7%) to 16383 (100% fully deployed). The 4800
-0x2E80	u32	4	4	ok	sim/cockpit2/switches/avionics_power_on (writable)	Master avionics switch (0=Off, 1=On)
-0x281C	u32	4	4	ok	expr	Master battery switch (1=On, 0=Off)
-0x3102	u16	2	1	SIZE DIFFERS	expr	Battery (1 = on, 0 = off), read for state, write to control [FS2000+]
+0x0BD0	u32	4	4	ok	expr (writable)	Spoilers control, 0 off, 4800 arm, then 5620 (7%) to 16383 (100% fully deployed). The 4800
+0x2E80	u32	4	4	ok	expr (writable)	Master avionics switch (0=Off, 1=On)
+0x281C	u32	4	4	ok	expr (writable)	Master battery switch (1=On, 0=Off)
+0x3102	u8	1	1	ok	expr (writable)	Battery (1 = on, 0 = off), read for state, write to control [FS2000+]
 0x0366	u16	2	2	ok	sim/flightmodel/failures/onground_any	Aircraft on ground flag (0=airborne, 1=on ground). Not updated in Slew mode.
 0x02C8	i32	4	4	ok	sim/flightmodel/position/vh_ind	Vertical speed, signed, as 256 * metres/sec. For the more usual ft/min you need to apply t
 0x030C	i32	4	4	ok	expr	Vertical speed, copy of offset 02C8 whilst airborne, not updated whilst the ""on ground"" 
 0x11BA	u16	2	2	ok	sim/flightmodel/forces/g_nrml	G Force: units unknown, but /625 seems to give quite sensible values.
-0x0D0C	u16	2	2	ok	expr	Lights (FS2k/CFS2), a switch for each one (bits from lo to hi): 0 Navigation 1 Beacon 2 La
+0x0D0C	u16	2	2	ok	expr (writable)	Lights (FS2k/CFS2), a switch for each one (bits from lo to hi): 0 Navigation 1 Beacon 2 La
 0x02B4	i32	4	4	ok	sim/flightmodel/position/groundspeed	GS: Ground Speed, as 65536*metres/sec. Not updated in Slew mode!
 0x2F70	f64	8	8	ok	sim/flightmodel/position/true_theta	Attitude indicator pitch value, in degrees. Double floating point format. This is the ATTI
 0x2F78	f64	8	8	ok	sim/flightmodel2/position/true_phi	Attitude indicator bank value, in degrees. Double floating point format. This is the ATTIT
@@ -47,7 +47,7 @@ offset	type	width	doc_size	status	source	doc_description
 0x3090	f64	8	8	ok	sim/flightmodel/position/local_vz	Z (longitudinal, or forward/backward) GS-velocity in ft/sec relative to the body axes (see
 0x0330	u16	2	2	ok	sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot (writable)	Altimeter pressure setting (""Kollsman"" window). As millibars (hectoPascals) * 16
 0x126C	u32	4	-	NOT IN GUIDE	expr	
-0x0BC8	u16	2	2	ok	sim/cockpit2/controls/wheel_brake_ratio_applied (writable)	Parking brake: 0=off, 32767=on
+0x0BC8	u16	2	2	ok	sim/flightmodel/controls/parkbrake (writable)	Parking brake: 0=off, 32767=on
 0x0BB2	i16	2	2	ok	sim/cockpit2/controls/total_pitch_ratio (writable)	Elevator control input: -16383 to +16383
 0x0BB6	i16	2	2	ok	sim/cockpit2/controls/total_roll_ratio	Aileron control input: -16383 to +16383
 0x0BBA	i16	2	2	ok	sim/cockpit2/controls/total_heading_ratio (writable)	Rudder control input: -16383 to +16383
@@ -65,11 +65,11 @@ offset	type	width	doc_size	status	source	doc_description
 0x028C	u8	1	1	ok	sim/cockpit2/switches/landing_lights_on (writable)	Landing lights. (See also offset 0D0C on FS2000, and maybe CFS2).
 0x0BDC	u32	4	4	ok	sim/cockpit2/controls/flap_handle_request_ratio (writable)	Flaps control, 0=up, 16383=full. The ""notches"" for different aircraft are spaced equally
 0x0BE8	u32	4	4	ok	sim/cockpit/switches/gear_handle_status (writable)	Gear control: 0=Up, 16383=Down
-0x0238	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_hours	Hour of local time in FS (0-23)
-0x0239	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_minutes	Minute of local time in FS (0-59)
-0x023A	u8	1	1	ok	sim/cockpit2/clock_timer/local_time_seconds	Second of time in FS (0-59)
-0x023B	u8	1	1	ok	sim/cockpit2/clock_timer/zulu_time_hours (writable)	Hour of Zulu time in FS (also known at UTC or GMT)
-0x023C	u8	1	1	ok	sim/cockpit2/clock_timer/zulu_time_minutes (writable)	Minute of Zulu time in FS2
+0x0238	u8	1	1	ok	expr (writable)	Hour of local time in FS (0-23)
+0x0239	u8	1	1	ok	expr (writable)	Minute of local time in FS (0-59)
+0x023A	u8	1	1	ok	expr (writable)	Second of time in FS (0-59)
+0x023B	u8	1	1	ok	expr (writable)	Hour of Zulu time in FS (also known at UTC or GMT)
+0x023C	u8	1	1	ok	expr (writable)	Minute of Zulu time in FS2
 0x0246	i16	2	2	ok	xplane-uipc-helper/time/offset_minutes_negated	Local time offset from Zulu (minutes). +ve = behind Zulu, -ve = ahead
 0x115E	u8	1	1	ok	expr	Time of day indicator, 1=Day, 2=Dusk or Dawn, 4=Night. Set according to the local time, re
 0x0560	i64	8	8	ok	expr	Latitude of aircraft in FS units. To convert to Degrees: If your compiler supports long lo
