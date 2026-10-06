@@ -66,7 +66,7 @@ fn plugin_version() -> String {
         None => "unknown",
     };
     let build_date = option_env!("VERGEN_BUILD_DATE").unwrap_or("unknown");
-    let is_dirty = match option_env!("VERGEN_GIT_IS_DIRTY") {
+    let is_dirty = match option_env!("VERGEN_GIT_DIRTY") {
         Some("true") => "dirty",
         Some("false") => "clean",
         _ => "unknown",
