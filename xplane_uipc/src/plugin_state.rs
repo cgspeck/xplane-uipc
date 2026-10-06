@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, RwLock};
 
+use ipc_host::USER_AREA;
 use ipc_host::value_table::{Table, Value, get_value_table};
 use uipc_mapping::Expr;
 use uipc_mapping::FsuipcType;
@@ -340,6 +341,26 @@ pub fn drop_builtin_offsets(mappings: Vec<DatarefMapping>) -> Vec<DatarefMapping
         .collect()
 }
 
+/// Remove mappings that target the user area, which is served by the IPC
+/// window as plain memory, warning about each one.
+pub fn drop_user_area_offsets(mappings: Vec<DatarefMapping>) -> Vec<DatarefMapping> {
+    mappings
+        .into_iter()
+        .filter(|m| {
+            let in_area = USER_AREA.contains(&m.offset);
+            if in_area {
+                tracing::warn!(
+                    "Ignoring mapping for offset {:#06x}: it is in the user area {:#06x}-{:#06x}",
+                    m.offset,
+                    USER_AREA.start(),
+                    USER_AREA.end()
+                );
+            }
+            !in_area
+        })
+        .collect()
+}
+
 /// Put one mapping's reading for this update cycle into the value table.
 ///
 /// `Retain` keeps the previous value. If there is none yet, e.g. an
@@ -487,6 +508,19 @@ mod tests {
         ]);
         let offsets: Vec<u16> = kept.iter().map(|m| m.offset).collect();
         assert_eq!(offsets, vec![0x1000, 0x337C]);
+    }
+
+    #[test]
+    fn mappings_in_user_area_are_dropped() {
+        let kept = drop_user_area_offsets(vec![
+            static_mapping(0x66BF),
+            static_mapping(0x66C0),
+            static_mapping(0x66D0),
+            static_mapping(0x66FF),
+            static_mapping(0x6700),
+        ]);
+        let offsets: Vec<u16> = kept.iter().map(|m| m.offset).collect();
+        assert_eq!(offsets, vec![0x66BF, 0x6700]);
     }
 
     #[test]
