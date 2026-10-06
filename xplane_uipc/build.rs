@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use vergen_git2::{BuildBuilder, Emitter, Git2Builder};
+use vergen_git2::{Build, Emitter, Git2};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("cargo:warning=Building now");
@@ -133,8 +133,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Couldn't write bindings!");
 
     // capture build & version information
-    let build = BuildBuilder::all_build()?;
-    let git2 = Git2Builder::all_git()?;
+    let build = Build::all_build();
+    let git2 = Git2::all_git();
 
     Emitter::default()
         .add_instructions(&build)?

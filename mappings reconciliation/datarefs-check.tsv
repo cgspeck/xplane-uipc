@@ -15,6 +15,7 @@ offset	writable_mapping	dataref	status	xp_type	xp_writable	units	description
 0x0580	no	sim/flightmodel/position/true_psi	ok	float	n	degrees	The heading of the aircraft relative to the earth precisely below the aircraft -
 0x0BD0	yes	sim/cockpit2/controls/speedbrake_ratio	ok	float	y	ratio	How much the speebrake HANDLE is deflected, in ratio, where 0.0 is fully retract
 0x2E80	yes	sim/cockpit2/switches/avionics_power_on	ok	int	y	boolean	Switch, 0 or 1.
+0x2E80	yes	laminar/CitX/electrical/avionics	third-party				
 0x281C	yes	sim/cockpit2/electrical/battery_on[1]	ok	int[8]	y	boolean	Battery turned on, 0 or 1.
 0x281C	yes	sim/cockpit/electrical/battery_on	ok	int	y	boolean	Is the main battery on
 0x3102	yes	sim/cockpit2/electrical/battery_on[1]	ok	int[8]	y	boolean	Battery turned on, 0 or 1.
@@ -106,7 +107,7 @@ offset	writable_mapping	dataref	status	xp_type	xp_writable	units	description
 0x057C	no	sim/flightmodel/position/phi	ok	float	y	degrees	The roll of the aircraft in degrees - OpenGL coordinates
 0x31F0	no	bp/started	third-party				
 0x31F0	no	sim/aircraft/overflow/pushback_attached	ok	int	n	boolean	Pushback tug is attached
-0x7b91	yes	sim/cockpit2/radios/actuators/transponder_mode	ok	int	y	enum	Transponder mode (off=0, stdby=1, on (mode A)=2, alt (mode C)=3, test=4, GND (mo
+0x7b91	no	sim/cockpit2/radios/actuators/transponder_mode	ok	int	y	enum	Transponder mode (off=0, stdby=1, on (mode A)=2, alt (mode C)=3, test=4, GND (mo
 0x023e	no	sim/time/zulu_date_days	ok	int	y	days	Date in days since January 1st in the zulu timezone
 0x0245	no	xplane-uipc-helper/time/local_day_of_month	third-party				
 0x0244	no	xplane-uipc-helper/time/local_month	third-party				

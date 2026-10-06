@@ -66,7 +66,7 @@ fn plugin_version() -> String {
         None => "unknown",
     };
     let build_date = option_env!("VERGEN_BUILD_DATE").unwrap_or("unknown");
-    let is_dirty = match option_env!("VERGEN_GIT_IS_DIRTY") {
+    let is_dirty = match option_env!("VERGEN_GIT_DIRTY") {
         Some("true") => "dirty",
         Some("false") => "clean",
         _ => "unknown",
@@ -598,6 +598,18 @@ pub unsafe extern "C" fn XPluginReceiveMessage(_from: c_int, msg: c_int, param: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plugin_version_includes_build_info() {
+        // The build script emits these with vergen; a wrong name shows as "unknown".
+        let version = plugin_version();
+        assert!(
+            version.ends_with(", clean)") || version.ends_with(", dirty)"),
+            "{}",
+            version
+        );
+        assert!(!version.contains("unknown"), "{}", version);
+    }
 
     #[test]
     fn level_setting_parses_valid_values() {
