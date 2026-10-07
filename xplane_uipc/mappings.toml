@@ -212,7 +212,10 @@ fsuipc_type = "f32"
 dataref = "sim/cockpit2/electrical/APU_N1_percent"
 
 [[mapping]]
-offset = 0x0354  # transponder code
+offset = 0x0354  # transponder code as BCD (Binary Coded Decimal)
+# e.g. code displayed `2777 has:
+# hex value `2777`
+# u16 value `10103`
 fsuipc_type = "u16"
 dataref = "sim/cockpit2/radios/actuators/transponder_code"
 
@@ -432,7 +435,7 @@ dataref     = "sim/flightmodel/position/Rrad"
 offset      = 0x3060  # ACCELERATION BODY X (lateral/side to side)
 fsuipc_type = "f64"
 dataref     = "sim/flightmodel/forces/g_side"
-scale       = 32.174                   # G → ft/s²
+scale       = -3.2174                   # G → ft/s²
 
 [[mapping]]
 offset      = 0x3068  # ACCELERATION BODY Y (vertical up/down)
@@ -442,31 +445,31 @@ datarefs = {
     GNrml = "sim/flightmodel/forces/g_nrml",
     Pitch = "sim/flightmodel/position/true_theta",
 }
-expr = "$GNrml $Pitch PI * 180 / cos $Bank PI * 180 / cos * - 32.174 *"
+expr = "$GNrml $Pitch PI * 180 / cos $Bank PI * 180 / cos * - 3.2174 * -1 *"
 
 [[mapping]]
 offset      = 0x3070  # ACCELERATION BODY Z (longitudinal, forward/backward)
 fsuipc_type = "f64"
 dataref     = "sim/flightmodel/forces/g_axil"
-scale       = 32.174
+scale       = -3.2174
 
-[[mapping]]  # TODO: check sign against OG
+[[mapping]]
 offset      = 0x3098  # X (lateral, or left/right) GS-velocity in ft/sec 
 fsuipc_type = "f64"
 dataref     = "sim/flightmodel/position/local_vx"
-scale       = 3.28084
+scale       = -3.28084
 
-[[mapping]]  # TODO: check sign against OG
+[[mapping]]
 offset      = 0x30A0  # Y (vertical, or up/down) GS-velocity in ft/sec
 fsuipc_type = "f64"
 dataref     = "sim/flightmodel/position/local_vy"
-scale       = 3.28084
+scale       = -3.28084
 
-[[mapping]]  # TODO: check sign against OG
+[[mapping]]
 offset      = 0x3090  # Z (longitudinal, or forward/backward) GS-velocity in ft/sec
 fsuipc_type = "f64"
 dataref     = "sim/flightmodel/position/local_vz"
-scale       = 3.28084                  # m/s → ft/s
+scale       = -3.28084                  # m/s → ft/s
 
 [[mapping]]
 offset      = 0x0330  # Altimeter pressure setting (“Kollsman” window). As millibars (hectoPascals) * 16
