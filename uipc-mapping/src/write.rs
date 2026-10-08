@@ -89,6 +89,23 @@ mod tests {
     }
 
     #[test]
+    fn bcd_frequency_write() {
+        // COM1: a client writes 0x2250 for 122.50 MHz; the dataref is 12250.
+        let w = table(&[("C", "$value frombcd 10000 +")]);
+        let c = no_commands();
+        let plan = eval_writes(&w, &c, &vars(&[("value", 0x2250 as f64)])).unwrap();
+        assert_eq!(plan.datarefs, vec![("C", 12250.0)]);
+    }
+
+    #[test]
+    fn invalid_bcd_write_blocks_everything() {
+        let w = table(&[("C", "$value frombcd 10000 +")]);
+        let c = no_commands();
+        let err = eval_writes(&w, &c, &vars(&[("value", 0x12AB as f64)])).unwrap_err();
+        assert!(err.contains("'C'"), "{}", err);
+    }
+
+    #[test]
     fn results_see_one_snapshot() {
         let w = table(&[("A", "$B"), ("B", "$A")]);
         let c = no_commands();
