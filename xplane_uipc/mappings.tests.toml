@@ -1,0 +1,1133 @@
+# =============================================================================
+# Compound mapping test cases
+# =============================================================================
+# Run with: cargo test -p uipc-mapping --test compound_mappings
+#
+# A compound mapping is an expression mapping in mappings.toml with two or more
+# datarefs, or with write_exprs / write_commands. Every compound mapping needs
+# cases here, or the test fails naming the offset.
+#
+# Every case has an offset, a name and a state. state sets the mapping's
+# datarefs by their names in mappings.toml. Names left out are 0, like an
+# unavailable dataref.
+#
+#   Read case: the value the offset serves (rounded and wrapped like the
+#   plugin does for integer types; floats match to 1e-6 relative).
+#
+#     [[case]]
+#     offset = 0x0D0C
+#     name   = "beacon only"
+#     state  = { Bcn = 1 }
+#     expect = 2
+#
+#   Or, for a mapping with update_if_expr, expect_retain = true when the
+#   offset should keep its previous value.
+#
+#   Write case: what a client write does. expect_datarefs must list every
+#   write_exprs target, so a write that changes another part fails.
+#   expect_commands gives each command that runs and how many times. Any
+#   command left out must not run. expect_blocked = true (instead of
+#   expect_datarefs) when a non-finite result should block the write.
+#
+#     [[case]]
+#     offset = 0x0D0C
+#     name   = "write beacon only"
+#     write  = 2
+#     expect_datarefs = { Nav = 0, Bcn = 1, Land = 0, Taxi = 0, Strb = 0 }
+#     expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, ... }
+#
+# Coverage. For each compound mapping there must be:
+#   - a read case, and a write case if it's writable
+#   - each dataref used by expr or update_if_expr set non-zero in some read case
+#   - each write_exprs target written non-zero in some write case (except
+#     constants such as UseSys = "0")
+#   - each write_commands command run in some write case
+#
+# To check that one part doesn't affect another, add a case for each part
+# with the other parts on (e.g. "all on except beacon").
+#
+# A case for a missing or non-compound offset, an unknown state name, or an
+# unknown target or command is an error.
+
+# =============================================================================
+# LIGHTS 0x0D0C: 1=Nav, 2=Bcn, 4=Land, 8=Taxi, 16=Strobe, 128=Wing, 256=Logo
+# B738 commands: strobe/steady/off position switch, taxi on/off, and logo and
+# wing toggles that should only run when the light isn't already as requested.
+# =============================================================================
+
+[[case]]
+offset = 0x0D0C
+name   = "all off"
+expect = 0
+
+[[case]]
+offset = 0x0D0C
+name   = "nav only"
+state  = { Nav = 1 }
+expect = 1
+
+[[case]]
+offset = 0x0D0C
+name   = "beacon only"
+state  = { Bcn = 1 }
+expect = 2
+
+[[case]]
+offset = 0x0D0C
+name   = "landing only"
+state  = { Land = 1 }
+expect = 4
+
+[[case]]
+offset = 0x0D0C
+name   = "taxi only"
+state  = { Taxi = 1 }
+expect = 8
+
+[[case]]
+offset = 0x0D0C
+name   = "B738 taxi switch on, generic taxi off"
+state  = { B738TaxiSwitch = 2 }
+expect = 8
+
+[[case]]
+offset = 0x0D0C
+name   = "strobe only"
+state  = { Strb = 1 }
+expect = 16
+
+[[case]]
+offset = 0x0D0C
+name   = "wing only"
+state  = { Wing = 1 }
+expect = 128
+
+[[case]]
+offset = 0x0D0C
+name   = "logo only"
+state  = { Logo = 1 }
+expect = 256
+
+[[case]]
+offset = 0x0D0C
+name   = "all on"
+state  = { Nav = 1, Bcn = 1, Land = 1, Taxi = 1, Strb = 1, Wing = 1, Logo = 1 }
+expect = 415
+
+[[case]]
+offset = 0x0D0C
+name   = "all on except beacon"
+state  = { Nav = 1, Land = 1, Taxi = 1, Strb = 1, Wing = 1, Logo = 1 }
+expect = 413
+
+[[case]]
+offset = 0x0D0C
+name   = "all on except taxi (B738 switch off too)"
+state  = { Nav = 1, Bcn = 1, Land = 1, Strb = 1, Wing = 1, Logo = 1 }
+expect = 407
+
+[[case]]
+offset = 0x0D0C
+name   = "write all on from all off"
+write  = 415
+expect_datarefs = { Nav = 1, Bcn = 1, Land = 1, Taxi = 1, Strb = 1 }
+expect_commands = { "laminar/B738/switch/logo_light_toggle" = 1, "laminar/B738/switch/wing_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_strobe" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_on" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write all off from all on"
+state  = { Nav = 1, Bcn = 1, Land = 1, Taxi = 1, Strb = 1, Wing = 1, Logo = 1 }
+write  = 0
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/switch/logo_light_toggle" = 1, "laminar/B738/switch/wing_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write nav only (steady position lights)"
+write  = 1
+expect_datarefs = { Nav = 1, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_steady" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write beacon only"
+write  = 2
+expect_datarefs = { Nav = 0, Bcn = 1, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write landing only"
+write  = 4
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 1, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write taxi only"
+write  = 8
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 1, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_on" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write strobe and nav (strobe position wins)"
+write  = 17
+expect_datarefs = { Nav = 1, Bcn = 0, Land = 0, Taxi = 0, Strb = 1 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_strobe" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write wing on from off"
+write  = 128
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/switch/wing_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write logo on from off"
+write  = 256
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/switch/logo_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write beacon off, everything else stays on (no logo/wing toggles)"
+state  = { Nav = 1, Bcn = 1, Land = 1, Taxi = 1, Strb = 1, Wing = 1, Logo = 1 }
+write  = 413
+expect_datarefs = { Nav = 1, Bcn = 0, Land = 1, Taxi = 1, Strb = 1 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_strobe" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_on" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write logo and wing off when on"
+state  = { Wing = 1, Logo = 1 }
+write  = 0
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/switch/logo_light_toggle" = 1, "laminar/B738/switch/wing_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write logo and wing on when already on (no toggles)"
+state  = { Wing = 1, Logo = 1 }
+write  = 384
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+# =============================================================================
+# AVIONICS 0x2E80: reads the generic switch; each toggle runs only when its
+# aircraft's state differs from the request.
+# =============================================================================
+
+[[case]]
+offset = 0x2E80
+name   = "off"
+expect = 0
+
+[[case]]
+offset = 0x2E80
+name   = "on"
+state  = { Av = 1 }
+expect = 1
+
+[[case]]
+offset = 0x2E80
+name   = "turn on from off: both toggles"
+write  = 1
+expect_datarefs = {}
+expect_commands = { "sim/systems/avionics_toggle" = 1, "laminar/CitX/electrical/cmd_avionics_toggle" = 1 }
+
+[[case]]
+offset = 0x2E80
+name   = "turn on when already on: no toggles"
+state  = { Av = 1, CitXAv = 1 }
+write  = 1
+expect_datarefs = {}
+
+[[case]]
+offset = 0x2E80
+name   = "turn on when only CitX is off: CitX toggle only"
+state  = { Av = 1 }
+write  = 1
+expect_datarefs = {}
+expect_commands = { "laminar/CitX/electrical/cmd_avionics_toggle" = 1 }
+
+[[case]]
+offset = 0x2E80
+name   = "turn off when only generic is on: generic toggle only"
+state  = { Av = 1 }
+write  = 0
+expect_datarefs = {}
+expect_commands = { "sim/systems/avionics_toggle" = 1 }
+
+# =============================================================================
+# BATTERY 0x281C: Zibo OR generic. Generic and CitX toggles run only when the
+# generic state differs; the B738 switch moves on every write.
+# =============================================================================
+
+[[case]]
+offset = 0x281C
+name   = "off"
+expect = 0
+
+[[case]]
+offset = 0x281C
+name   = "Zibo only"
+state  = { Zibo738 = 1 }
+expect = 1
+
+[[case]]
+offset = 0x281C
+name   = "generic only"
+state  = { Generic = 1 }
+expect = 1
+
+[[case]]
+offset = 0x281C
+name   = "both"
+state  = { Zibo738 = 1, Generic = 1 }
+expect = 1
+
+[[case]]
+offset = 0x281C
+name   = "turn on from off"
+write  = 1
+expect_datarefs = {}
+expect_commands = { "sim/electrical/battery_all_toggle" = 1, "laminar/CitX/electrical/cmd_battery_left_toggle" = 1, "laminar/B738/switch/battery_dn" = 1 }
+
+[[case]]
+offset = 0x281C
+name   = "turn on when generic is on: B738 switch only"
+state  = { Generic = 1 }
+write  = 1
+expect_datarefs = {}
+expect_commands = { "laminar/B738/switch/battery_dn" = 1 }
+
+[[case]]
+offset = 0x281C
+name   = "turn off from on"
+state  = { Generic = 1, Zibo738 = 1 }
+write  = 0
+expect_datarefs = {}
+expect_commands = { "sim/electrical/battery_all_toggle" = 1, "laminar/CitX/electrical/cmd_battery_left_toggle" = 1, "laminar/B738/switch/battery_up" = 1 }
+
+[[case]]
+offset = 0x281C
+name   = "turn off when generic is off: B738 switch only"
+write  = 0
+expect_datarefs = {}
+expect_commands = { "laminar/B738/switch/battery_up" = 1 }
+
+# =============================================================================
+# BATTERY 0x3102: Zibo OR generic. Generic and CitX toggles run only when the
+# generic state differs; the B738 switch moves on every write.
+# =============================================================================
+
+[[case]]
+offset = 0x3102
+name   = "off"
+expect = 0
+
+[[case]]
+offset = 0x3102
+name   = "Zibo only"
+state  = { Zibo738 = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3102
+name   = "generic only"
+state  = { Generic = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3102
+name   = "both"
+state  = { Zibo738 = 1, Generic = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3102
+name   = "turn on from off"
+write  = 1
+expect_datarefs = {}
+expect_commands = { "sim/electrical/battery_all_toggle" = 1, "laminar/CitX/electrical/cmd_battery_left_toggle" = 1, "laminar/B738/switch/battery_dn" = 1 }
+
+[[case]]
+offset = 0x3102
+name   = "turn on when generic is on: B738 switch only"
+state  = { Generic = 1 }
+write  = 1
+expect_datarefs = {}
+expect_commands = { "laminar/B738/switch/battery_dn" = 1 }
+
+[[case]]
+offset = 0x3102
+name   = "turn off from on"
+state  = { Generic = 1, Zibo738 = 1 }
+write  = 0
+expect_datarefs = {}
+expect_commands = { "sim/electrical/battery_all_toggle" = 1, "laminar/CitX/electrical/cmd_battery_left_toggle" = 1, "laminar/B738/switch/battery_up" = 1 }
+
+[[case]]
+offset = 0x3102
+name   = "turn off when generic is off: B738 switch only"
+write  = 0
+expect_datarefs = {}
+expect_commands = { "laminar/B738/switch/battery_up" = 1 }
+
+# =============================================================================
+# TIME 0x0238-0x023C: each write changes one field of zulu_time_sec (Z) and
+# keeps the others, and turns off "use system time" (UseSys).
+# Z = 45296.5 is 12:34:56.5 Zulu.
+# =============================================================================
+
+[[case]]
+offset = 0x0238
+name   = "local hour"
+state  = { LH = 22 }
+expect = 22
+
+[[case]]
+offset = 0x0238
+name   = "local hour +1 keeps minutes and seconds"
+state  = { LH = 22, Z = 45296.5, UseSys = 1 }
+write  = 23
+expect_datarefs = { Z = 48896.5, UseSys = 0 }
+
+[[case]]
+offset = 0x0238
+name   = "local hour forward past Zulu midnight"
+state  = { LH = 9, Z = 84600 }
+write  = 10
+expect_datarefs = { Z = 1800, UseSys = 0 }
+
+[[case]]
+offset = 0x0238
+name   = "local hour back past Zulu midnight"
+state  = { LH = 10, Z = 1800 }
+write  = 9
+expect_datarefs = { Z = 84600, UseSys = 0 }
+
+[[case]]
+offset = 0x0239
+name   = "local minute"
+state  = { LM = 34 }
+expect = 34
+
+[[case]]
+offset = 0x0239
+name   = "local minute keeps hour and seconds"
+state  = { LM = 34, Z = 45296.5, UseSys = 1 }
+write  = 50
+expect_datarefs = { Z = 46256.5, UseSys = 0 }
+
+[[case]]
+offset = 0x0239
+name   = "local minute 59 to 0 stays in the same hour"
+state  = { LM = 59, Z = 86390 }
+write  = 0
+expect_datarefs = { Z = 82850, UseSys = 0 }
+
+[[case]]
+offset = 0x0239
+name   = "half-hour time zone wraps back past Zulu midnight"
+state  = { LM = 30, Z = 10 }
+write  = 0
+expect_datarefs = { Z = 84610, UseSys = 0 }
+
+[[case]]
+offset = 0x023A
+name   = "second"
+state  = { S = 56 }
+expect = 56
+
+[[case]]
+offset = 0x023A
+name   = "second keeps hour and minute (drops the fraction)"
+state  = { S = 56, Z = 45296.5, UseSys = 1 }
+write  = 10
+expect_datarefs = { Z = 45250, UseSys = 0 }
+
+[[case]]
+offset = 0x023B
+name   = "Zulu hour"
+state  = { H = 12 }
+expect = 12
+
+[[case]]
+offset = 0x023B
+name   = "Zulu hour keeps minutes and seconds"
+state  = { H = 12, Z = 45296.5, UseSys = 1 }
+write  = 1
+expect_datarefs = { Z = 5696.5, UseSys = 0 }
+
+[[case]]
+offset = 0x023C
+name   = "Zulu minute"
+state  = { M = 34 }
+expect = 34
+
+[[case]]
+offset = 0x023C
+name   = "Zulu minute keeps hour and seconds"
+state  = { M = 34, Z = 45296.5, UseSys = 1 }
+write  = 50
+expect_datarefs = { Z = 46256.5, UseSys = 0 }
+
+# =============================================================================
+# DOORS 0x3367: 1 = L1 or L2, 8 = R1 or R2, 32 = forward or aft cargo.
+# =============================================================================
+
+[[case]]
+offset = 0x3367
+name   = "all closed"
+expect = 0
+
+[[case]]
+offset = 0x3367
+name   = "L1"
+state  = { 738_L1 = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3367
+name   = "L2"
+state  = { 738_L2 = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3367
+name   = "L1 and L2 share a bit"
+state  = { 738_L1 = 1, 738_L2 = 1 }
+expect = 1
+
+[[case]]
+offset = 0x3367
+name   = "R1"
+state  = { 738_R1 = 1 }
+expect = 8
+
+[[case]]
+offset = 0x3367
+name   = "R2"
+state  = { 738_R2 = 1 }
+expect = 8
+
+[[case]]
+offset = 0x3367
+name   = "forward cargo"
+state  = { 738_FwdCgo = 1 }
+expect = 32
+
+[[case]]
+offset = 0x3367
+name   = "aft cargo"
+state  = { 738_AftCgo = 1 }
+expect = 32
+
+[[case]]
+offset = 0x3367
+name   = "all open"
+state  = { 738_L1 = 1, 738_L2 = 1, 738_R1 = 1, 738_R2 = 1, 738_FwdCgo = 1, 738_AftCgo = 1 }
+expect = 41
+
+[[case]]
+offset = 0x3367
+name   = "all open except cargo"
+state  = { 738_L1 = 1, 738_L2 = 1, 738_R1 = 1, 738_R2 = 1 }
+expect = 9
+
+# =============================================================================
+# PUSHBACK 0x31F0: 3 = off, 0 = pushing back (BetterPushback or X-Plane tug).
+# =============================================================================
+
+[[case]]
+offset = 0x31F0
+name   = "no pushback"
+expect = 3
+
+[[case]]
+offset = 0x31F0
+name   = "BetterPushback started"
+state  = { BP_Started = 1 }
+expect = 0
+
+[[case]]
+offset = 0x31F0
+name   = "X-Plane tug attached"
+state  = { PB_Attached = 1 }
+expect = 0
+
+# =============================================================================
+# TIME OF DAY 0x115E: 0 = dawn, 1 = day, 2 = dusk, 3 = night. Twilight is the
+# sun 0-6 degrees below the horizon; before noon it's dawn, after it's dusk.
+# =============================================================================
+
+[[case]]
+offset = 0x115E
+name   = "dawn"
+state  = { sp = -3, lh = 6 }
+expect = 0
+
+[[case]]
+offset = 0x115E
+name   = "day"
+state  = { sp = 30, lh = 12 }
+expect = 1
+
+[[case]]
+offset = 0x115E
+name   = "dusk"
+state  = { sp = -3, lh = 18 }
+expect = 2
+
+[[case]]
+offset = 0x115E
+name   = "night"
+state  = { sp = -20, lh = 23 }
+expect = 3
+
+[[case]]
+offset = 0x115E
+name   = "sun on the horizon after noon is dusk"
+state  = { sp = 0, lh = 19 }
+expect = 2
+
+[[case]]
+offset = 0x115E
+name   = "sun 6 degrees below before noon is still dawn"
+state  = { sp = -6, lh = 5 }
+expect = 0
+
+[[case]]
+offset = 0x115E
+name   = "sun just past 6 degrees below is night"
+state  = { sp = -6.1, lh = 5 }
+expect = 3
+
+[[case]]
+offset = 0x115E
+name   = "sun up in the evening is day"
+state  = { sp = 2, lh = 19 }
+expect = 1
+
+# =============================================================================
+# SPOILERS 0x0BD0: 0 = retracted, 4800 = armed (ratio -0.5),
+# 5620..16383 = deployed (ratio 0..1). Writes below 5620 retract.
+# =============================================================================
+
+[[case]]
+offset = 0x0BD0
+name   = "retracted"
+expect = 0
+
+[[case]]
+offset = 0x0BD0
+name   = "armed"
+state  = { SB = -0.5 }
+expect = 4800
+
+[[case]]
+offset = 0x0BD0
+name   = "half deployed"
+state  = { SB = 0.5 }
+expect = 11002
+
+[[case]]
+offset = 0x0BD0
+name   = "fully deployed"
+state  = { SB = 1 }
+expect = 16383
+
+[[case]]
+offset = 0x0BD0
+name   = "write armed"
+write  = 4800
+expect_datarefs = { SB = -0.5 }
+
+[[case]]
+offset = 0x0BD0
+name   = "write fully deployed"
+write  = 16383
+expect_datarefs = { SB = 1 }
+
+[[case]]
+offset = 0x0BD0
+name   = "write start of deployed range"
+state  = { SB = 1 }
+write  = 5620
+expect_datarefs = { SB = 0 }
+
+[[case]]
+offset = 0x0BD0
+name   = "write retracted"
+state  = { SB = 1 }
+write  = 0
+expect_datarefs = { SB = 0 }
+
+# =============================================================================
+# ALTITUDE 0x3324: pilot, copilot and standby altimeters combined.
+# =============================================================================
+
+[[case]]
+offset = 0x3324
+name   = "pilot only"
+state  = { pilot = 35000 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "copilot only"
+state  = { copilot = 35000 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "standby only"
+state  = { standby = 35000 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "all three agree"
+state  = { pilot = 35000, copilot = 35000, standby = 35000 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "pilot wins when the altimeters disagree"
+state  = { pilot = 35000, copilot = 34990, standby = 35020 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "copilot when pilot reads zero"
+state  = { copilot = 34990, standby = 35020 }
+expect = 34990
+
+[[case]]
+offset = 0x3324
+name   = "fractional altitude rounds"
+state  = { pilot = 1023.6 }
+expect = 1024
+
+# =============================================================================
+# FUEL 0x126C: total of ten tanks, kg → lb (× 2.20462).
+# =============================================================================
+
+[[case]]
+offset = 0x126C
+name   = "empty"
+expect = 0
+
+[[case]]
+offset = 0x126C
+name   = "all ten tanks"
+state  = { Tank0 = 1000, Tank1 = 1000, Tank2 = 1000, Tank3 = 1000, Tank4 = 1000, Tank5 = 1000, Tank6 = 1000, Tank7 = 1000, Tank8 = 1000, Tank9 = 1000 }
+expect = 22046
+
+[[case]]
+offset = 0x126C
+name   = "tank 0 only"
+state  = { Tank0 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 1 only"
+state  = { Tank1 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 2 only"
+state  = { Tank2 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 3 only"
+state  = { Tank3 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 4 only"
+state  = { Tank4 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 5 only"
+state  = { Tank5 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 6 only"
+state  = { Tank6 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 7 only"
+state  = { Tank7 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 8 only"
+state  = { Tank8 = 1000 }
+expect = 2205
+
+[[case]]
+offset = 0x126C
+name   = "tank 9 only"
+state  = { Tank9 = 1000 }
+expect = 2205
+
+# =============================================================================
+# BODY ACCELERATION Y 0x3068: load factor minus the gravity component along
+# the body axis.
+# =============================================================================
+
+[[case]]
+offset = 0x3068
+name   = "level 1 g"
+state  = { GNrml = 1 }
+expect = 0
+
+[[case]]
+offset = 0x3068
+name   = "level 2 g"
+state  = { GNrml = 2 }
+expect = -3.2174
+
+[[case]]
+offset = 0x3068
+name   = "1 g pitched 60 degrees"
+state  = { GNrml = 1, Pitch = 60 }
+expect = -1.6087
+
+[[case]]
+offset = 0x3068
+name   = "1 g banked 60 degrees"
+state  = { GNrml = 1, Bank = 60 }
+expect = -1.6087
+
+[[case]]
+offset = 0x3068
+name   = "pitch and bank 60 degrees, 0.25 g"
+state  = { GNrml = 0.25, Pitch = 60, Bank = 60 }
+expect = 0
+
+# =============================================================================
+# TOUCHDOWN VERTICAL SPEED 0x030C: m/s × 256, held while on the ground.
+# =============================================================================
+
+[[case]]
+offset = 0x030C
+name   = "descending in the air"
+state  = { VhInd = -2.5 }
+expect = -640
+
+[[case]]
+offset = 0x030C
+name   = "on the ground keeps the touchdown value"
+state  = { VhInd = 0, OnGround = 1 }
+expect_retain = true
+
+# =============================================================================
+# RADIOS (BCD): each hex digit is one decimal digit. COM/NAV drop the leading
+# 1 (dataref 12345 = 123.45 MHz → 0x2345). Writes that aren't valid BCD
+# (e.g. 0x12AB) are blocked.
+# =============================================================================
+
+[[case]]
+offset = 0x0354
+name   = "transponder 2770"
+state  = { T = 2770 }
+expect = 0x2770
+
+[[case]]
+offset = 0x0354
+name   = "write transponder 7700"
+state  = { T = 2770 }
+write  = 0x7700
+expect_datarefs = { T = 7700 }
+
+[[case]]
+offset = 0x0354
+name   = "write invalid BCD"
+state  = { T = 2770 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x034E
+name   = "COM1 118.10"
+state  = { F = 11810 }
+expect = 0x1810
+
+[[case]]
+offset = 0x034E
+name   = "write COM1 122.50"
+state  = { F = 11810 }
+write  = 0x2250
+expect_datarefs = { F = 12250 }
+
+[[case]]
+offset = 0x034E
+name   = "write COM1 invalid BCD"
+state  = { F = 11810 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x3118
+name   = "COM2 136.90"
+state  = { F = 13690 }
+expect = 0x3690
+
+[[case]]
+offset = 0x3118
+name   = "write COM2 118.50"
+state  = { F = 13690 }
+write  = 0x1850
+expect_datarefs = { F = 11850 }
+
+[[case]]
+offset = 0x3118
+name   = "write COM2 invalid BCD"
+state  = { F = 13690 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311A
+name   = "COM1 standby 120.15"
+state  = { F = 12015 }
+expect = 0x2015
+
+[[case]]
+offset = 0x311A
+name   = "write COM1 standby 132.77"
+state  = { F = 12015 }
+write  = 0x3277
+expect_datarefs = { F = 13277 }
+
+[[case]]
+offset = 0x311A
+name   = "write COM1 standby invalid BCD"
+state  = { F = 12015 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311C
+name   = "COM2 standby 121.80"
+state  = { F = 12180 }
+expect = 0x2180
+
+[[case]]
+offset = 0x311C
+name   = "write COM2 standby 118.90"
+state  = { F = 12180 }
+write  = 0x1890
+expect_datarefs = { F = 11890 }
+
+[[case]]
+offset = 0x311C
+name   = "write COM2 standby invalid BCD"
+state  = { F = 12180 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0350
+name   = "NAV1 108.15"
+state  = { F = 10815 }
+expect = 0x0815
+
+[[case]]
+offset = 0x0350
+name   = "write NAV1 113.45"
+state  = { F = 10815 }
+write  = 0x1345
+expect_datarefs = { F = 11345 }
+
+[[case]]
+offset = 0x0350
+name   = "write NAV1 invalid BCD"
+state  = { F = 10815 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0352
+name   = "NAV2 113.45"
+state  = { F = 11345 }
+expect = 0x1345
+
+[[case]]
+offset = 0x0352
+name   = "write NAV2 108.00"
+state  = { F = 11345 }
+write  = 0x0800
+expect_datarefs = { F = 10800 }
+
+[[case]]
+offset = 0x0352
+name   = "write NAV2 invalid BCD"
+state  = { F = 11345 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311E
+name   = "NAV1 standby 117.90"
+state  = { F = 11790 }
+expect = 0x1790
+
+[[case]]
+offset = 0x311E
+name   = "write NAV1 standby 109.35"
+state  = { F = 11790 }
+write  = 0x0935
+expect_datarefs = { F = 10935 }
+
+[[case]]
+offset = 0x311E
+name   = "write NAV1 standby invalid BCD"
+state  = { F = 11790 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x3120
+name   = "NAV2 standby 109.35"
+state  = { F = 10935 }
+expect = 0x0935
+
+[[case]]
+offset = 0x3120
+name   = "write NAV2 standby 117.90"
+state  = { F = 10935 }
+write  = 0x1790
+expect_datarefs = { F = 11790 }
+
+[[case]]
+offset = 0x3120
+name   = "write NAV2 standby invalid BCD"
+state  = { F = 10935 }
+write  = 0x12AB
+expect_blocked = true
+
+# ADF (kHz): the main 3 digits are BCD in 0x034C / 0x02D4; the thousands
+# digit is the high byte of 0x0356 / 0x02D6. Each write keeps the digits the
+# other offset holds.
+
+[[case]]
+offset = 0x034C
+name   = "ADF1 414 kHz main digits"
+state  = { Adf = 414 }
+expect = 0x0414
+
+[[case]]
+offset = 0x034C
+name   = "ADF1 1234 kHz main digits"
+state  = { Adf = 1234 }
+expect = 0x0234
+
+[[case]]
+offset = 0x034C
+name   = "write ADF1 main digits keeps the thousands digit"
+state  = { Adf = 1234 }
+write  = 0x0350
+expect_datarefs = { Adf = 1350 }
+
+[[case]]
+offset = 0x034C
+name   = "write ADF1 main digits invalid BCD"
+state  = { Adf = 414 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0356
+name   = "ADF1 1234 kHz thousands digit"
+state  = { Adf = 1234 }
+expect = 0x0100
+
+[[case]]
+offset = 0x0356
+name   = "ADF1 414 kHz has no thousands digit"
+state  = { Adf = 414 }
+expect = 0
+
+[[case]]
+offset = 0x0356
+name   = "write ADF1 thousands digit keeps the main digits"
+state  = { Adf = 414 }
+write  = 0x0100
+expect_datarefs = { Adf = 1414 }
+
+[[case]]
+offset = 0x0356
+name   = "write ADF1 thousands digit 0 keeps the main digits"
+state  = { Adf = 1414 }
+write  = 0
+expect_datarefs = { Adf = 414 }
+
+[[case]]
+offset = 0x02D4
+name   = "ADF2 414 kHz main digits"
+state  = { Adf = 414 }
+expect = 0x0414
+
+[[case]]
+offset = 0x02D4
+name   = "ADF2 1234 kHz main digits"
+state  = { Adf = 1234 }
+expect = 0x0234
+
+[[case]]
+offset = 0x02D4
+name   = "write ADF2 main digits keeps the thousands digit"
+state  = { Adf = 1234 }
+write  = 0x0350
+expect_datarefs = { Adf = 1350 }
+
+[[case]]
+offset = 0x02D4
+name   = "write ADF2 main digits invalid BCD"
+state  = { Adf = 414 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x02D6
+name   = "ADF2 1234 kHz thousands digit"
+state  = { Adf = 1234 }
+expect = 0x0100
+
+[[case]]
+offset = 0x02D6
+name   = "ADF2 414 kHz has no thousands digit"
+state  = { Adf = 414 }
+expect = 0
+
+[[case]]
+offset = 0x02D6
+name   = "write ADF2 thousands digit keeps the main digits"
+state  = { Adf = 414 }
+write  = 0x0100
+expect_datarefs = { Adf = 1414 }
+
+[[case]]
+offset = 0x02D6
+name   = "write ADF2 thousands digit 0 keeps the main digits"
+state  = { Adf = 1414 }
+write  = 0
+expect_datarefs = { Adf = 414 }
