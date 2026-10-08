@@ -39,7 +39,6 @@ If you have MSFS, install FSUIPC7 then use `FSUIPC7\Utils\FSInterrogate2std.exe`
 0x0b52, 1
 0x0b5c, 4
 0x0b54, 4
-0x0354, 2
 0x0c1a, 2
 0x0e8c, 2
 0x0264, 2
@@ -99,6 +98,7 @@ If you have MSFS, install FSUIPC7 then use `FSUIPC7\Utils\FSInterrogate2std.exe`
 # offset, n_bytes
 0x3367, 1  # various exit doors as a bitmask - note: no documentation about which door corresponds with which bit
 0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left (port), 2=pushing back, tail to swing to right (starboard). Only 3 and 0 supported.
+0x0354, 2  # transponder code as BCD: squawk 2770 → 0x2770
 ```
 
 ### Supplied by helper LUA script

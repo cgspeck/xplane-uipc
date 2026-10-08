@@ -57,6 +57,8 @@ fn main() {
         "dup".into(),
         "swap".into(),
         "?".into(),
+        "tobcd".into(),
+        "frombcd".into(),
         "PI".into(),
         "E".into(),
     ];
@@ -82,6 +84,7 @@ fn main() {
     println!("Ternary `?`: cond then else ? — nonzero cond picks then");
     println!("Stack: `dup` duplicates top, `swap` swaps top two");
     println!("Trig functions (sin, cos, atan2) operate in radians");
+    println!("BCD: `2770 tobcd` gives 0x2770 (10096), `9029 frombcd` gives 2345");
     println!();
     let mut line_editor = Reedline::create()
         .with_highlighter(Box::new(ExampleHighlighter::new(commands)))

@@ -1185,4 +1185,86 @@ write_commands = { \"addon/toggle\" = \"1\" }
             config.load_errors
         );
     }
+
+    /// Writing one ADF offset keeps the digits the other offset holds.
+    #[test]
+    fn shipped_adf_writes_keep_other_digits() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../xplane_uipc/mappings.toml");
+        let config = load_mappings(path).unwrap();
+        let write = |offset: u16, current: f64, value: u32| {
+            let m = config.mappings.iter().find(|m| m.offset == offset).unwrap();
+            let MappingSource::Expr {
+                write_exprs,
+                write_commands,
+                ..
+            } = &m.source
+            else {
+                panic!("{:#06X} isn't an expression mapping", offset);
+            };
+            let vars =
+                HashMap::from([("Adf".to_string(), current), ("value".into(), value as f64)]);
+            crate::eval_writes(write_exprs, write_commands, &vars).map(|plan| plan.datarefs[0].1)
+        };
+        // Main digits 350 with 1234 tuned → 1350; thousands digit 1 with 414 → 1414.
+        assert_eq!(write(0x034C, 1234.0, 0x0350), Ok(1350.0));
+        assert_eq!(write(0x0356, 414.0, 0x0100), Ok(1414.0));
+        assert_eq!(write(0x0356, 1414.0, 0x0000), Ok(414.0));
+        assert!(write(0x034C, 414.0, 0x12AB).is_err());
+    }
+
+    /// Each shipped BCD radio mapping serves the dataref as BCD, and writing
+    /// that BCD back gives the same dataref value.
+    #[test]
+    fn shipped_bcd_radios_round_trip() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../xplane_uipc/mappings.toml");
+        let config = load_mappings(path).unwrap();
+        let cases: &[(u16, f64, u32)] = &[
+            (0x0354, 2770.0, 0x2770),  // transponder
+            (0x034E, 12345.0, 0x2345), // COM1 123.45
+            (0x3118, 11850.0, 0x1850), // COM2 118.50
+            (0x311A, 13690.0, 0x3690), // COM1 standby
+            (0x311C, 12180.0, 0x2180), // COM2 standby
+            (0x0350, 11345.0, 0x1345), // NAV1 113.45
+            (0x0352, 10800.0, 0x0800), // NAV2 108.00
+            (0x311E, 11790.0, 0x1790), // NAV1 standby
+            (0x3120, 10935.0, 0x0935), // NAV2 standby
+            (0x034C, 414.0, 0x0414),   // ADF1 414 kHz, main 3 digits
+            (0x034C, 1234.0, 0x0234),  // ADF1 1234 kHz
+            (0x0356, 1234.0, 0x0100),  // ADF1 1234 kHz, thousands digit
+            (0x0356, 414.0, 0x0000),   // ADF1 414 kHz, no thousands digit
+            (0x02D4, 1234.0, 0x0234),  // ADF2
+            (0x02D6, 1234.0, 0x0100),  // ADF2
+        ];
+        for &(offset, dataref, bcd) in cases {
+            let m = config
+                .mappings
+                .iter()
+                .find(|m| m.offset == offset)
+                .unwrap_or_else(|| panic!("no mapping for {:#06X}", offset));
+            assert!(m.writable, "{:#06X} not writable", offset);
+            let MappingSource::Expr {
+                datarefs,
+                expr,
+                write_exprs,
+                write_commands,
+                ..
+            } = &m.source
+            else {
+                panic!("{:#06X} isn't an expression mapping", offset);
+            };
+            let name = datarefs.keys().next().unwrap().clone();
+            let read_vars = HashMap::from([(name.clone(), dataref)]);
+            assert_eq!(expr.eval(&read_vars), bcd as f64, "read {:#06X}", offset);
+
+            let mut write_vars = read_vars.clone();
+            write_vars.insert("value".into(), bcd as f64);
+            let plan = crate::eval_writes(write_exprs, write_commands, &write_vars).unwrap();
+            assert_eq!(
+                plan.datarefs,
+                vec![(name.as_str(), dataref)],
+                "write {:#06X}",
+                offset
+            );
+        }
+    }
 }
