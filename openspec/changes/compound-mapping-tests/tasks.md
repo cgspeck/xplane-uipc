@@ -2,12 +2,12 @@
 
 ## 1. Runner
 
-- [ ] 1.1 Add `uipc-mapping/tests/compound_mappings.rs` with `serde` types for the case file (`deny_unknown_fields`) and a compound-mapping predicate. Verify with an in-file unit test that the lights mapping is compound and a single-dataref read-only `expr` mapping isn't
-- [ ] 1.2 Implement read cases: evaluate `update_if_expr` and `expr` with name-keyed state (missing = 0), and compare against the served value (integer round and wrap, float relative 1e-6). Verify with inline-TOML runner tests: a passing case, an `i32` `1023.9999` → `1024` case, an `expect_retain` case and a mismatching case that reports expected and actual
-- [ ] 1.3 Implement write cases on top of `eval_writes`: exact `expect_datarefs` (every target, 1e-9), `expect_commands` (unlisted means 0 runs) and `expect_blocked`. Verify with inline-TOML runner tests for the missing-target, unexpected-command and blocked scenarios
-- [ ] 1.4 Implement case validation (unknown or non-compound offset, unknown state name, write case on a non-writable mapping, unknown expectation name or command, wrong mix of expect fields). Verify with an inline-TOML test per scenario in the spec's "Invalid cases" requirement
-- [ ] 1.5 Implement coverage (read case, write case if writable, each `expr` var non-zero in a read case, each write target non-zero and each command run in a write case), collecting all failures into one assertion. Verify with an inline-TOML test where the lights mapping lacks a `Logo` case and the message names `0x0D0C` and `Logo`
-- [ ] 1.6 Add the test that runs the shipped `mappings.toml` against `mappings.tests.toml`, starting with an empty case file. Verify it fails and lists every compound offset. That list is the checklist for group 2
+- [x] 1.1 Add `uipc-mapping/tests/compound_mappings.rs` with `serde` types for the case file (`deny_unknown_fields`) and a compound-mapping predicate. Verify with an in-file unit test that the lights mapping is compound and a single-dataref read-only `expr` mapping isn't
+- [x] 1.2 Implement read cases: evaluate `update_if_expr` and `expr` with name-keyed state (missing = 0), and compare against the served value (integer round and wrap, float relative 1e-6). Verify with inline-TOML runner tests: a passing case, an `i32` `1023.9999` → `1024` case, an `expect_retain` case and a mismatching case that reports expected and actual
+- [x] 1.3 Implement write cases on top of `eval_writes`: exact `expect_datarefs` (every target, 1e-9), `expect_commands` (unlisted means 0 runs) and `expect_blocked`. Verify with inline-TOML runner tests for the missing-target, unexpected-command and blocked scenarios
+- [x] 1.4 Implement case validation (unknown or non-compound offset, unknown state name, write case on a non-writable mapping, unknown expectation name or command, wrong mix of expect fields). Verify with an inline-TOML test per scenario in the spec's "Invalid cases" requirement
+- [x] 1.5 Implement coverage (read case, write case if writable, each `expr` var non-zero in a read case, each write target non-zero and each command run in a write case), collecting all failures into one assertion. Verify with an inline-TOML test where the lights mapping lacks a `Logo` case and the message names `0x0D0C` and `Logo`
+- [x] 1.6 Add the test that runs the shipped `mappings.toml` against `mappings.tests.toml`, starting with an empty case file. Verify it fails and lists every compound offset. That list is the checklist for group 2
 
 ## 2. Cases for the shipped mappings
 
