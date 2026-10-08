@@ -77,6 +77,15 @@ Operands are cast to `i64`, the operation is applied, then the result is cast ba
 | `sqrt` | `9 sqrt` | 3.0 (negative inputs return 0.0) |
 | `not` | `0 not` | 1.0 (logical negation: 0.0→1.0, nonzero→0.0) |
 
+#### Binary coded decimal
+
+FSUIPC stores radio frequencies and the transponder code as binary coded decimal (BCD): each hex digit holds one decimal digit, so squawk 2770 is `0x2770`. Both operators round their operand first, and give `NaN` for input they can't convert. A `NaN` read means the offset isn't served, and a `NaN` write result blocks the whole write (see [Write expressions](#write-expressions)).
+
+| Op | Example | Result |
+|---|---|---|
+| `tobcd` | `2770 tobcd` | 10096.0 (`0x2770`). `NaN` if negative, not finite, or more than 13 digits |
+| `frombcd` | `9029 frombcd` | 2345.0 (`0x2345` → 2345). `NaN` if negative, not finite, above 2^53, or a hex digit is above 9 (`0x12AB`) |
+
 #### Binary (min/max)
 
 | Op | Example | Result |
@@ -138,6 +147,17 @@ write_exprs = { Z = "$value 3600 * $Z 3600 % +" }
 
 With `zulu_time_sec` at `45296.5` (12:34:56.5), writing `1` sets it to `5696.5` (01:34:56.5).
 
+BCD offsets (COM1 `0x034E`): FSUIPC drops the leading 1 of the frequency, so 123.45 MHz is `0x2345`. The read takes off the 10000 before encoding, and the write puts it back after decoding.
+
+```toml
+datarefs    = { C = "sim/cockpit2/radios/actuators/com1_frequency_hz" }   # 12345 = 123.45 MHz
+expr        = "$C 10000 - tobcd"
+writable    = true
+write_exprs = { C = "$value frombcd 10000 +" }
+```
+
+Reading gives `0x2345`. Writing `0x2250` sets the radio to 122.50 MHz. A write that isn't valid BCD, such as `0x12AB`, gives `NaN`, so nothing is written.
+
 Rules:
 
 - **All or nothing.** Every write expression is evaluated against the same snapshot of the datarefs before anything is written. If any result isn't a finite number, nothing is written and a warning is logged. So `{ A = "$B", B = "$A" }` swaps the two values.
@@ -183,6 +203,7 @@ Command expressions are evaluated in the same snapshot as `write_exprs`. A non-f
 - Missing variables silently default to `0.0`.
 - Stack underflow for operators is silently ignored.
 - Empty expressions evaluate to `0.0`.
+- `tobcd` and `frombcd` return `NaN` for input they can't convert, rather than a substitute value.
 
 ## License
 
