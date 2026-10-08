@@ -837,3 +837,297 @@ offset = 0x030C
 name   = "on the ground keeps the touchdown value"
 state  = { VhInd = 0, OnGround = 1 }
 expect_retain = true
+
+# =============================================================================
+# RADIOS (BCD): each hex digit is one decimal digit. COM/NAV drop the leading
+# 1 (dataref 12345 = 123.45 MHz → 0x2345). Writes that aren't valid BCD
+# (e.g. 0x12AB) are blocked.
+# =============================================================================
+
+[[case]]
+offset = 0x0354
+name   = "transponder 2770"
+state  = { T = 2770 }
+expect = 0x2770
+
+[[case]]
+offset = 0x0354
+name   = "write transponder 7700"
+state  = { T = 2770 }
+write  = 0x7700
+expect_datarefs = { T = 7700 }
+
+[[case]]
+offset = 0x0354
+name   = "write invalid BCD"
+state  = { T = 2770 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x034E
+name   = "COM1 118.10"
+state  = { F = 11810 }
+expect = 0x1810
+
+[[case]]
+offset = 0x034E
+name   = "write COM1 122.50"
+state  = { F = 11810 }
+write  = 0x2250
+expect_datarefs = { F = 12250 }
+
+[[case]]
+offset = 0x034E
+name   = "write COM1 invalid BCD"
+state  = { F = 11810 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x3118
+name   = "COM2 136.90"
+state  = { F = 13690 }
+expect = 0x3690
+
+[[case]]
+offset = 0x3118
+name   = "write COM2 118.50"
+state  = { F = 13690 }
+write  = 0x1850
+expect_datarefs = { F = 11850 }
+
+[[case]]
+offset = 0x3118
+name   = "write COM2 invalid BCD"
+state  = { F = 13690 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311A
+name   = "COM1 standby 120.15"
+state  = { F = 12015 }
+expect = 0x2015
+
+[[case]]
+offset = 0x311A
+name   = "write COM1 standby 132.77"
+state  = { F = 12015 }
+write  = 0x3277
+expect_datarefs = { F = 13277 }
+
+[[case]]
+offset = 0x311A
+name   = "write COM1 standby invalid BCD"
+state  = { F = 12015 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311C
+name   = "COM2 standby 121.80"
+state  = { F = 12180 }
+expect = 0x2180
+
+[[case]]
+offset = 0x311C
+name   = "write COM2 standby 118.90"
+state  = { F = 12180 }
+write  = 0x1890
+expect_datarefs = { F = 11890 }
+
+[[case]]
+offset = 0x311C
+name   = "write COM2 standby invalid BCD"
+state  = { F = 12180 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0350
+name   = "NAV1 108.15"
+state  = { F = 10815 }
+expect = 0x0815
+
+[[case]]
+offset = 0x0350
+name   = "write NAV1 113.45"
+state  = { F = 10815 }
+write  = 0x1345
+expect_datarefs = { F = 11345 }
+
+[[case]]
+offset = 0x0350
+name   = "write NAV1 invalid BCD"
+state  = { F = 10815 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0352
+name   = "NAV2 113.45"
+state  = { F = 11345 }
+expect = 0x1345
+
+[[case]]
+offset = 0x0352
+name   = "write NAV2 108.00"
+state  = { F = 11345 }
+write  = 0x0800
+expect_datarefs = { F = 10800 }
+
+[[case]]
+offset = 0x0352
+name   = "write NAV2 invalid BCD"
+state  = { F = 11345 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x311E
+name   = "NAV1 standby 117.90"
+state  = { F = 11790 }
+expect = 0x1790
+
+[[case]]
+offset = 0x311E
+name   = "write NAV1 standby 109.35"
+state  = { F = 11790 }
+write  = 0x0935
+expect_datarefs = { F = 10935 }
+
+[[case]]
+offset = 0x311E
+name   = "write NAV1 standby invalid BCD"
+state  = { F = 11790 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x3120
+name   = "NAV2 standby 109.35"
+state  = { F = 10935 }
+expect = 0x0935
+
+[[case]]
+offset = 0x3120
+name   = "write NAV2 standby 117.90"
+state  = { F = 10935 }
+write  = 0x1790
+expect_datarefs = { F = 11790 }
+
+[[case]]
+offset = 0x3120
+name   = "write NAV2 standby invalid BCD"
+state  = { F = 10935 }
+write  = 0x12AB
+expect_blocked = true
+
+# ADF (kHz): the main 3 digits are BCD in 0x034C / 0x02D4; the thousands
+# digit is the high byte of 0x0356 / 0x02D6. Each write keeps the digits the
+# other offset holds.
+
+[[case]]
+offset = 0x034C
+name   = "ADF1 414 kHz main digits"
+state  = { Adf = 414 }
+expect = 0x0414
+
+[[case]]
+offset = 0x034C
+name   = "ADF1 1234 kHz main digits"
+state  = { Adf = 1234 }
+expect = 0x0234
+
+[[case]]
+offset = 0x034C
+name   = "write ADF1 main digits keeps the thousands digit"
+state  = { Adf = 1234 }
+write  = 0x0350
+expect_datarefs = { Adf = 1350 }
+
+[[case]]
+offset = 0x034C
+name   = "write ADF1 main digits invalid BCD"
+state  = { Adf = 414 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x0356
+name   = "ADF1 1234 kHz thousands digit"
+state  = { Adf = 1234 }
+expect = 0x0100
+
+[[case]]
+offset = 0x0356
+name   = "ADF1 414 kHz has no thousands digit"
+state  = { Adf = 414 }
+expect = 0
+
+[[case]]
+offset = 0x0356
+name   = "write ADF1 thousands digit keeps the main digits"
+state  = { Adf = 414 }
+write  = 0x0100
+expect_datarefs = { Adf = 1414 }
+
+[[case]]
+offset = 0x0356
+name   = "write ADF1 thousands digit 0 keeps the main digits"
+state  = { Adf = 1414 }
+write  = 0
+expect_datarefs = { Adf = 414 }
+
+[[case]]
+offset = 0x02D4
+name   = "ADF2 414 kHz main digits"
+state  = { Adf = 414 }
+expect = 0x0414
+
+[[case]]
+offset = 0x02D4
+name   = "ADF2 1234 kHz main digits"
+state  = { Adf = 1234 }
+expect = 0x0234
+
+[[case]]
+offset = 0x02D4
+name   = "write ADF2 main digits keeps the thousands digit"
+state  = { Adf = 1234 }
+write  = 0x0350
+expect_datarefs = { Adf = 1350 }
+
+[[case]]
+offset = 0x02D4
+name   = "write ADF2 main digits invalid BCD"
+state  = { Adf = 414 }
+write  = 0x12AB
+expect_blocked = true
+
+[[case]]
+offset = 0x02D6
+name   = "ADF2 1234 kHz thousands digit"
+state  = { Adf = 1234 }
+expect = 0x0100
+
+[[case]]
+offset = 0x02D6
+name   = "ADF2 414 kHz has no thousands digit"
+state  = { Adf = 414 }
+expect = 0
+
+[[case]]
+offset = 0x02D6
+name   = "write ADF2 thousands digit keeps the main digits"
+state  = { Adf = 414 }
+write  = 0x0100
+expect_datarefs = { Adf = 1414 }
+
+[[case]]
+offset = 0x02D6
+name   = "write ADF2 thousands digit 0 keeps the main digits"
+state  = { Adf = 1414 }
+write  = 0
+expect_datarefs = { Adf = 414 }
