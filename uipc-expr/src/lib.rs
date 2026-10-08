@@ -45,6 +45,58 @@ enum Op {
     Dup,
     Swap,
     Tern,
+    ToBcd,
+    FromBcd,
+}
+
+/// The largest number `to_bcd` encodes: 13 decimal digits, whose 52-bit BCD
+/// form is still exact in an f64.
+const MAX_BCD_DECIMAL: f64 = 9_999_999_999_999.0;
+
+/// The largest number `from_bcd` decodes: 2^53, the end of the exact f64
+/// integers.
+const MAX_BCD_ENCODED: f64 = 9_007_199_254_740_992.0;
+
+/// Encode a number as binary coded decimal: the result's hex digits are the
+/// input's decimal digits, so `2770` gives `0x2770`. Rounds first. Negative,
+/// non-finite or more than 13 digits gives NaN.
+pub fn to_bcd(value: f64) -> f64 {
+    let value = value.round();
+    if !(0.0..=MAX_BCD_DECIMAL).contains(&value) {
+        return f64::NAN;
+    }
+    let mut n = value as u64;
+    let mut bcd = 0u64;
+    let mut shift = 0;
+    while n > 0 {
+        bcd |= (n % 10) << shift;
+        n /= 10;
+        shift += 4;
+    }
+    bcd as f64
+}
+
+/// Decode binary coded decimal: the input's hex digits are read as decimal
+/// digits, so `0x2345` gives `2345`. Rounds first. Negative, non-finite,
+/// above 2^53 or a hex digit above 9 gives NaN.
+pub fn from_bcd(value: f64) -> f64 {
+    let value = value.round();
+    if !(0.0..=MAX_BCD_ENCODED).contains(&value) {
+        return f64::NAN;
+    }
+    let mut n = value as u64;
+    let mut decimal = 0u64;
+    let mut place = 1u64;
+    while n > 0 {
+        let digit = n & 0xF;
+        if digit > 9 {
+            return f64::NAN;
+        }
+        decimal += digit * place;
+        place *= 10;
+        n >>= 4;
+    }
+    decimal as f64
 }
 
 impl Expr {
@@ -83,6 +135,8 @@ impl Expr {
                 "dup" => Token::Op(Op::Dup),
                 "swap" => Token::Op(Op::Swap),
                 "?" => Token::Op(Op::Tern),
+                "tobcd" => Token::Op(Op::ToBcd),
+                "frombcd" => Token::Op(Op::FromBcd),
                 "PI" => Token::Num(std::f64::consts::PI),
                 "E" => Token::Num(std::f64::consts::E),
                 s if s.starts_with('$') => Token::Var(s[1..].to_string()),
@@ -150,6 +204,16 @@ impl Expr {
                     Op::Cos => {
                         if let Some(a) = stack.pop() {
                             stack.push(a.cos());
+                        }
+                    }
+                    Op::ToBcd => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(to_bcd(a));
+                        }
+                    }
+                    Op::FromBcd => {
+                        if let Some(a) = stack.pop() {
+                            stack.push(from_bcd(a));
                         }
                     }
                     Op::Dup => {
@@ -266,7 +330,9 @@ impl Expr {
                                 | Op::Cos
                                 | Op::Dup
                                 | Op::Swap
-                                | Op::Tern => {
+                                | Op::Tern
+                                | Op::ToBcd
+                                | Op::FromBcd => {
                                     unreachable!()
                                 }
                             };
@@ -342,6 +408,8 @@ impl std::fmt::Display for Op {
             Op::Dup => "dup",
             Op::Swap => "swap",
             Op::Tern => "?",
+            Op::ToBcd => "tobcd",
+            Op::FromBcd => "frombcd",
         };
         write!(f, "{}", s)
     }
@@ -912,5 +980,82 @@ mod tests {
         let src = "$IAS 128 *";
         let e = Expr::parse(src).unwrap();
         assert_eq!(e.to_string(), src);
+    }
+
+    // --- BCD ---
+
+    #[test]
+    fn test_to_bcd() {
+        assert_eq!(to_bcd(2770.0), 10096.0); // 0x2770
+        assert_eq!(to_bcd(2344.5), 9029.0); // rounds to 2345 → 0x2345
+        assert_eq!(to_bcd(0.0), 0.0);
+        assert_eq!(to_bcd(9_999_999_999_999.0), 0x9_999_999_999_999_u64 as f64);
+    }
+
+    #[test]
+    fn test_to_bcd_invalid() {
+        assert!(to_bcd(-1.0).is_nan());
+        assert!(to_bcd(10_000_000_000_000.0).is_nan()); // 14 digits
+        assert!(to_bcd(f64::NAN).is_nan());
+        assert!(to_bcd(f64::INFINITY).is_nan());
+    }
+
+    #[test]
+    fn test_from_bcd() {
+        assert_eq!(from_bcd(9029.0), 2345.0); // 0x2345
+        assert_eq!(from_bcd(0.0), 0.0);
+        assert_eq!(
+            from_bcd(0x9_999_999_999_999_u64 as f64),
+            9_999_999_999_999.0
+        );
+    }
+
+    #[test]
+    fn test_from_bcd_invalid() {
+        assert!(from_bcd(4779.0).is_nan()); // 0x12AB
+        assert!(from_bcd(-1.0).is_nan());
+        assert!(from_bcd(2f64.powi(54)).is_nan()); // above 2^53
+        assert!(from_bcd(f64::NAN).is_nan());
+        assert!(from_bcd(f64::INFINITY).is_nan());
+    }
+
+    #[test]
+    fn test_bcd_round_trip() {
+        for n in 0..=9999 {
+            assert_eq!(from_bcd(to_bcd(n as f64)), n as f64, "{}", n);
+        }
+    }
+
+    #[test]
+    fn test_tobcd_operator() {
+        assert_eq!(eval("2770 tobcd", &[]), 10096.0);
+        assert_eq!(eval("2344.5 tobcd", &[]), 9029.0);
+        assert_eq!(eval("0 tobcd", &[]), 0.0);
+        assert!(eval("-1 tobcd", &[]).is_nan());
+        assert!(eval("10000000000000 tobcd", &[]).is_nan());
+    }
+
+    #[test]
+    fn test_frombcd_operator() {
+        assert_eq!(eval("9029 frombcd", &[]), 2345.0);
+        assert_eq!(eval("7700 tobcd frombcd", &[]), 7700.0);
+        assert!(eval("4779 frombcd", &[]).is_nan());
+    }
+
+    #[test]
+    fn test_bcd_com_pattern() {
+        // COM1 123.45 MHz: read drops the leading 1, write adds it back.
+        assert_eq!(eval("$C 10000 - tobcd", &[("C", 12345.0)]), 0x2345 as f64);
+        assert_eq!(
+            eval("$value frombcd 10000 +", &[("value", 0x2250 as f64)]),
+            12250.0
+        );
+    }
+
+    #[test]
+    fn test_display_bcd_roundtrip() {
+        for src in ["2770 tobcd", "$value frombcd 10000 +"] {
+            assert_eq!(Expr::parse(src).unwrap().to_string(), src);
+        }
     }
 }
