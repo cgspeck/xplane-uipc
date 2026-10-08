@@ -11,11 +11,11 @@
 
 - [x] 2.1 Document the BCD read/write pattern in the `mappings.toml` header (Expression and Writes sections), including the COM/NAV `10000 -` / `10000 +` pair
 - [x] 2.2 Rewrite `0x0354` (transponder) as a writable expression mapping (`$T tobcd` / `$value frombcd`) and correct its comment. Add writable mappings for COM1 `0x034E`, COM2 `0x3118`, NAV1 `0x0350`, NAV2 `0x0352` and standbys `0x311A`/`0x311C`/`0x311E`/`0x3120` using the `*_frequency_hz` datarefs. Verify with `shipped_mappings_load_cleanly` and `shipped_bcd_radios_round_trip` in `uipc-mapping` (transponder `2770` → `0x2770`, COM `12345` → `0x2345`, and each write back gives the original dataref value)
-- [ ] 2.3 Check in the sim (DataRefTool) what `adf1_frequency_hz` holds for a known NDB frequency (e.g. 362 kHz), and adjust the ADF expressions in 2.4 if it isn't plain kHz
-- [ ] 2.4 Add ADF1 `0x034C` (expr `$Adf 1000 % tobcd`, write `$value frombcd $Adf 1000 \ 1000 * +`) and `0x0356` (expr `$Adf 1000 \ 256 *`, write `$value 256 \ 1000 * $Adf 1000 % +`). Verify in `uipc-debug` offline mode that `Adf = 1234` gives `0x0234` / `0x0100`. Add ADF2 `0x02D4` / `0x02D6` the same way using `adf2_frequency_hz`
+- [x] 2.3 Check in the sim (DataRefTool) what `adf1_frequency_hz` holds for a known NDB frequency (e.g. 362 kHz), and adjust the ADF expressions in 2.4 if it isn't plain kHz (it is plain kHz: 414 = 414 kHz)
+- [x] 2.4 Add ADF1 `0x034C` (expr `$Adf 1000 % tobcd`, write `$value frombcd $Adf 1000 \ 1000 * +`) and `0x0356` (expr `$Adf 1000 \ 256 *`, write `$value 256 \ 1000 * $Adf 1000 % +`). Verify with `shipped_bcd_radios_round_trip` and `shipped_adf_writes_keep_other_digits` that `Adf = 1234` gives `0x0234` / `0x0100` and each write keeps the other offset's digits. Add ADF2 `0x02D4` / `0x02D6` the same way using `adf2_frequency_hz`
 - [x] 2.5 Add the new offsets to `docs/OFFSETS.md` if it lists supported offsets (it only lists SLC's offsets, so `0x0354` moved from Equivalent to Derived)
 
 ## 3. Integration
 
-- [ ] 3.1 Run `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test` and `cargo xtask dist`. All pass
+- [x] 3.1 Run `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test` and `cargo xtask dist`. All pass
 - [ ] 3.2 In X-Plane with a FSUIPC client (e.g. `fsuipc-test-client` or SPAD.neXt): read `0x0354`/`0x034E` and see BCD values, then write `0x7700` to `0x0354` and `0x2250` to `0x034E` and see the cockpit show 7700 and 122.50
