@@ -733,7 +733,7 @@ datarefs = {
     sp = "sim/graphics/scenery/sun_pitch_degrees",
     lh = "sim/cockpit2/clock_timer/local_time_hours",
 }
-expr = "$sp 0 <= $sp -6 >= & dup $lh 12 < & 0 swap $lh 12 >= & 2 $sp 0 > 1 3 ? ? ?"
+expr = "$sp 0 > 1 $sp -6 >= $lh 12 < 0 2 ? 3 ? ?"  # day if the sun is up; twilight (0-6 degrees below) is dawn before noon, dusk after; else night
 
 # =============================================================================
 # POSITION
