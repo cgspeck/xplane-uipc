@@ -18,4 +18,4 @@
 ## 3. Integration
 
 - [x] 3.1 Run `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test` and `cargo xtask dist`. All pass
-- [ ] 3.2 In X-Plane with a FSUIPC client (e.g. `fsuipc-test-client` or SPAD.neXt): read `0x0354`/`0x034E` and see BCD values, then write `0x7700` to `0x0354` and `0x2250` to `0x034E` and see the cockpit show 7700 and 122.50
+- [x] 3.2 In X-Plane with a FSUIPC client (e.g. `fsuipc-test-client` or SPAD.neXt): read `0x0354`/`0x034E` and see BCD values, then write `0x7700` to `0x0354` and `0x2250` to `0x034E` and see the cockpit show 7700 and 122.50
