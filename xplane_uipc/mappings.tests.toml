@@ -198,6 +198,22 @@ write  = 413
 expect_datarefs = { Nav = 1, Bcn = 0, Land = 1, Taxi = 1, Strb = 1 }
 expect_commands = { "laminar/B738/toggle_switch/position_light_strobe" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_on" = 1 }
 
+[[case]]
+offset = 0x0D0C
+name   = "write logo and wing off when on"
+state  = { Wing = 1, Logo = 1 }
+write  = 0
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/switch/logo_light_toggle" = 1, "laminar/B738/switch/wing_light_toggle" = 1, "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
+[[case]]
+offset = 0x0D0C
+name   = "write logo and wing on when already on (no toggles)"
+state  = { Wing = 1, Logo = 1 }
+write  = 384
+expect_datarefs = { Nav = 0, Bcn = 0, Land = 0, Taxi = 0, Strb = 0 }
+expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, "laminar/B738/toggle_switch/taxi_light_brightness_off" = 1 }
+
 # =============================================================================
 # AVIONICS 0x2E80: reads the generic switch; each toggle runs only when its
 # aircraft's state differs from the request.
@@ -572,6 +588,30 @@ name   = "night"
 state  = { sp = -20, lh = 23 }
 expect = 3
 
+[[case]]
+offset = 0x115E
+name   = "sun on the horizon after noon is dusk"
+state  = { sp = 0, lh = 19 }
+expect = 2
+
+[[case]]
+offset = 0x115E
+name   = "sun 6 degrees below before noon is still dawn"
+state  = { sp = -6, lh = 5 }
+expect = 0
+
+[[case]]
+offset = 0x115E
+name   = "sun just past 6 degrees below is night"
+state  = { sp = -6.1, lh = 5 }
+expect = 3
+
+[[case]]
+offset = 0x115E
+name   = "sun up in the evening is day"
+state  = { sp = 2, lh = 19 }
+expect = 1
+
 # =============================================================================
 # SPOILERS 0x0BD0: 0 = retracted, 4800 = armed (ratio -0.5),
 # 5620..16383 = deployed (ratio 0..1). Writes below 5620 retract.
@@ -653,6 +693,24 @@ offset = 0x3324
 name   = "all three agree"
 state  = { pilot = 35000, copilot = 35000, standby = 35000 }
 expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "pilot wins when the altimeters disagree"
+state  = { pilot = 35000, copilot = 34990, standby = 35020 }
+expect = 35000
+
+[[case]]
+offset = 0x3324
+name   = "copilot when pilot reads zero"
+state  = { copilot = 34990, standby = 35020 }
+expect = 34990
+
+[[case]]
+offset = 0x3324
+name   = "fractional altitude rounds"
+state  = { pilot = 1023.6 }
+expect = 1024
 
 # =============================================================================
 # FUEL 0x126C: total of ten tanks, kg → lb (× 2.20462).
