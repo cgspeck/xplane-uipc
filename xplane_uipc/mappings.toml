@@ -227,14 +227,6 @@ fsuipc_type = "f32"
 dataref = "sim/cockpit2/electrical/APU_N1_percent"
 
 [[mapping]]
-offset = 0x0354  # transponder code as BCD (Binary Coded Decimal)
-# e.g. code displayed `2777 has:
-# hex value `2777`
-# u16 value `10103`
-fsuipc_type = "u16"
-dataref = "sim/cockpit2/radios/actuators/transponder_code"
-
-[[mapping]]
 offset      = 0x0C1A  # sim rate
 fsuipc_type = "u16"
 dataref     = "sim/time/sim_speed"
@@ -869,3 +861,82 @@ dataref = "xplane-uipc-helper/time/zulu_day_of_month"
 offset = 0x0242  # zulu day of month
 fsuipc_type = "u8"
 dataref = "xplane-uipc-helper/time/zulu_month"
+
+# =============================================================================
+# RADIOS (BCD)
+# Each hex digit is one decimal digit. COM/NAV drop the leading 1, so the
+# dataref (10 kHz units, 12345 = 123.45 MHz) has 10000 taken off before
+# encoding: 123.45 → 0x2345. 8.33 kHz channels can't be represented here.
+# =============================================================================
+
+[[mapping]]
+offset      = 0x0354  # transponder code, BCD: squawk 2770 → 0x2770 (u16 10096)
+fsuipc_type = "u16"
+datarefs    = { T = "sim/cockpit2/radios/actuators/transponder_code" }
+expr        = "$T tobcd"
+writable    = true
+write_exprs = { T = "$value frombcd" }
+
+[[mapping]]
+offset      = 0x034E  # COM1, BCD: 123.45 → 0x2345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/com1_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x3118  # COM2, BCD: 123.45 → 0x2345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/com2_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x311A  # COM1 standby, BCD: 123.45 → 0x2345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/com1_standby_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x311C  # COM2 standby, BCD: 123.45 → 0x2345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/com2_standby_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x0350  # NAV1, BCD: 113.45 → 0x1345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/nav1_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x0352  # NAV2, BCD: 113.45 → 0x1345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/nav2_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x311E  # NAV1 standby, BCD: 113.45 → 0x1345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/nav1_standby_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
+
+[[mapping]]
+offset      = 0x3120  # NAV2 standby, BCD: 113.45 → 0x1345
+fsuipc_type = "u16"
+datarefs    = { F = "sim/cockpit2/radios/actuators/nav2_standby_frequency_hz" }
+expr        = "$F 10000 - tobcd"
+writable    = true
+write_exprs = { F = "$value frombcd 10000 +" }
