@@ -11,8 +11,9 @@
 
 - [ ] 2.1 Document the BCD read/write pattern in the `mappings.toml` header (Expression and Writes sections), including the COM/NAV `10000 -` / `10000 +` pair
 - [ ] 2.2 Rewrite `0x0354` (transponder) as a writable expression mapping (`$T tobcd` / `$value frombcd`) and correct its comment. Add writable mappings for COM1 `0x034E`, COM2 `0x3118`, NAV1 `0x0350`, NAV2 `0x0352` and standbys `0x311A`/`0x311C`/`0x311E`/`0x3120` using the `*_frequency_hz` datarefs. Verify that `uipc-debug` offline mode loads the file with no load errors and gives `0x2770` for transponder `2770` and `0x2345` for COM `12345`
-- [ ] 2.3 Add ADF1 `0x034C` (expr `$Adf 1000 % tobcd`, write `$value frombcd $Adf 1000 \ 1000 * +`) and `0x0356` (expr `$Adf 1000 \ 256 *`, write `$value 256 \ 1000 * $Adf 1000 % +`). Verify in `uipc-debug` offline mode that `Adf = 1234` gives `0x0234` / `0x0100`
-- [ ] 2.4 Add the new offsets to `docs/OFFSETS.md` if it lists supported offsets
+- [ ] 2.3 Check in the sim (DataRefTool) what `adf1_frequency_hz` holds for a known NDB frequency (e.g. 362 kHz), and adjust the ADF expressions in 2.4 if it isn't plain kHz
+- [ ] 2.4 Add ADF1 `0x034C` (expr `$Adf 1000 % tobcd`, write `$value frombcd $Adf 1000 \ 1000 * +`) and `0x0356` (expr `$Adf 1000 \ 256 *`, write `$value 256 \ 1000 * $Adf 1000 % +`). Verify in `uipc-debug` offline mode that `Adf = 1234` gives `0x0234` / `0x0100`. Add ADF2 `0x02D4` / `0x02D6` the same way using `adf2_frequency_hz`
+- [ ] 2.5 Add the new offsets to `docs/OFFSETS.md` if it lists supported offsets
 
 ## 3. Integration
 

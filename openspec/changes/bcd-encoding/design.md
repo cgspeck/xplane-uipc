@@ -15,6 +15,11 @@ The relevant X-Plane datarefs are all writable `int`s:
 | `0x311E` / `0x3120` | NAV1 / NAV2 standby | `nav1_standby_frequency_hz` / `nav2_...` | `11345` |
 | `0x034C` | ADF1 main 3 digits (1234.5 → `0x0234`) | `adf1_frequency_hz` (kHz) | `1234` |
 | `0x0356` | ADF1 thousands digit in the high byte, fraction in the low byte (1234.5 → `0x0105`) | same | |
+| `0x02D4` / `0x02D6` | ADF2, same layout as `0x034C` / `0x0356` (the guide marks them "FS2004 only") | `adf2_frequency_hz` | `1234` |
+
+`DataRefs.txt` lists the ADF datarefs' unit as "10kHz", the same label the COM/NAV datarefs use. Whether X-Plane actually holds 362 kHz as `362` or as something else needs checking in the sim (DataRefTool) before the ADF expressions are written.
+
+The guide has two other BCD fields, both version numbers rather than radio values. `0x3304`/`0x3306` (FSUIPC version) is already served as a hex `static_value`. `0x3322` (WideServer version) isn't relevant to this plugin. Neither needs the operators. The guide's other table (`panels-token`, 182 rows) has no BCD fields.
 
 ## Goals / Non-Goals
 
