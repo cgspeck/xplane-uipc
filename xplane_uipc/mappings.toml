@@ -75,6 +75,21 @@
 #         Z = "$value 3600 * $Z 3600 % +",
 #     }
 #
+#   Radio frequencies and the transponder code are binary coded decimal (BCD): each
+#   hex digit is one decimal digit, so squawk 2770 is 0x2770. tobcd encodes on read
+#   and frombcd decodes on write. COM and NAV frequencies drop their leading 1
+#   (123.45 MHz is 0x2345), so take 10000 off before encoding and add it back after
+#   decoding. A write that isn't valid BCD (e.g. 0x12AB) gives NaN, so nothing is
+#   written:
+#
+#     [[mapping]]
+#     offset      = 0x034E  # COM1
+#     fsuipc_type = "u16"
+#     datarefs    = { C = "sim/cockpit2/radios/actuators/com1_frequency_hz" }
+#     expr        = "$C 10000 - tobcd"
+#     writable    = true
+#     write_exprs = { C = "$value frombcd 10000 +" }
+#
 #   write_commands is for aircraft that override their datarefs and only respond to
 #   X-Plane commands. Each key is a command path, and each expression (same variables)
 #   gives how many times to run it: 0 = don't, 1 = once, up to 10. To toggle a switch
