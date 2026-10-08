@@ -89,7 +89,7 @@ The test SHALL fail, listing each gap by offset, when a compound mapping in the 
 - has no read case;
 - is writable and has no write case;
 - has a `datarefs` name used by its `expr` or `update_if_expr` that is not non-zero in any of its read cases;
-- has a `write_exprs` target not expected non-zero in any of its write cases;
+- has a `write_exprs` target not expected non-zero in any of its write cases, unless its write expression is a constant (such as `UseSys = "0"`);
 - has a `write_commands` command not expected to run in any of its write cases.
 
 #### Scenario: New compound mapping without cases

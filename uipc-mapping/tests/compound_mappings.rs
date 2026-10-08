@@ -322,7 +322,12 @@ fn coverage(mappings: &[DatarefMapping], cases: &[Case]) -> Vec<String> {
                 ));
             }
         }
-        for target in e.write_exprs.keys() {
+        for (target, expr) in e.write_exprs {
+            // A constant target (such as `UseSys = "0"`) can't be anything
+            // else, and every write case already checks it.
+            if expr.vars().is_empty() {
+                continue;
+            }
             let exercised = writes.iter().any(|c| {
                 c.expect_datarefs
                     .as_ref()
@@ -732,4 +737,34 @@ fn empty_case_file_lists_every_compound_offset() {
             "0x3324: no read case".to_string(),
         ]
     );
+}
+
+#[test]
+fn constant_write_target_needs_no_non_zero_case() {
+    let mappings = inline_mappings(
+        r#"
+[[mapping]]
+offset      = 0x023B
+fsuipc_type = "u8"
+datarefs    = { H = "sim/test/h", Z = "sim/test/z", UseSys = "sim/test/use_sys" }
+expr        = "$H"
+writable    = true
+write_exprs = { Z = "$value 3600 * $Z 3600 % +", UseSys = "0" }
+"#,
+    );
+    let cases = r#"
+[[case]]
+offset = 0x023B
+name   = "hour"
+state  = { H = 12 }
+expect = 12
+
+[[case]]
+offset = 0x023B
+name   = "write hour"
+state  = { Z = 45296.5, UseSys = 1 }
+write  = 1
+expect_datarefs = { Z = 5696.5, UseSys = 0 }
+"#;
+    assert_no_failures(&run(&mappings, &parse_cases(cases)));
 }
