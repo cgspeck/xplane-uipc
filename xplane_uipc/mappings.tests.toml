@@ -1,4 +1,53 @@
-# Cases for compound mappings; see the header added in task 3.1.
+# =============================================================================
+# Compound mapping test cases
+# =============================================================================
+# Run with: cargo test -p uipc-mapping --test compound_mappings
+#
+# A compound mapping is an expression mapping in mappings.toml with two or more
+# datarefs, or with write_exprs / write_commands. Every compound mapping needs
+# cases here, or the test fails naming the offset.
+#
+# Every case has an offset, a name and a state. state sets the mapping's
+# datarefs by their names in mappings.toml. Names left out are 0, like an
+# unavailable dataref.
+#
+#   Read case: the value the offset serves (rounded and wrapped like the
+#   plugin does for integer types; floats match to 1e-6 relative).
+#
+#     [[case]]
+#     offset = 0x0D0C
+#     name   = "beacon only"
+#     state  = { Bcn = 1 }
+#     expect = 2
+#
+#   Or, for a mapping with update_if_expr, expect_retain = true when the
+#   offset should keep its previous value.
+#
+#   Write case: what a client write does. expect_datarefs must list every
+#   write_exprs target, so a write that changes another part fails.
+#   expect_commands gives each command that runs and how many times. Any
+#   command left out must not run. expect_blocked = true (instead of
+#   expect_datarefs) when a non-finite result should block the write.
+#
+#     [[case]]
+#     offset = 0x0D0C
+#     name   = "write beacon only"
+#     write  = 2
+#     expect_datarefs = { Nav = 0, Bcn = 1, Land = 0, Taxi = 0, Strb = 0 }
+#     expect_commands = { "laminar/B738/toggle_switch/position_light_off" = 1, ... }
+#
+# Coverage. For each compound mapping there must be:
+#   - a read case, and a write case if it's writable
+#   - each dataref used by expr or update_if_expr set non-zero in some read case
+#   - each write_exprs target written non-zero in some write case (except
+#     constants such as UseSys = "0")
+#   - each write_commands command run in some write case
+#
+# To check that one part doesn't affect another, add a case for each part
+# with the other parts on (e.g. "all on except beacon").
+#
+# A case for a missing or non-compound offset, an unknown state name, or an
+# unknown target or command is an error.
 
 # =============================================================================
 # LIGHTS 0x0D0C: 1=Nav, 2=Bcn, 4=Land, 8=Taxi, 16=Strobe, 128=Wing, 256=Logo

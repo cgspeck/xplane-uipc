@@ -115,6 +115,9 @@
 #     - both dataref and expr on one mapping
 #
 #
+# Tests: an expression mapping with two or more datarefs, or with writes, needs
+# cases in mappings.tests.toml (see its header). cargo test fails without them.
+#
 # RPN operators: see README-EXPR.md
 # Variable references: $name  (reads the named dataref)
 #
