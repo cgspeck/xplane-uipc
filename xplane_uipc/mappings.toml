@@ -271,7 +271,7 @@ datarefs     = {
     "copilot" = "sim/cockpit2/gauges/indicators/altitude_ft_copilot",
     "standby" = "sim/cockpit2/gauges/indicators/altitude_ft_stby",
 }
-expr = "$pilot $copilot | $standby |"
+expr = "$pilot 0 != $pilot $copilot 0 != $copilot $standby ? ?"  # first non-zero altimeter
 
 [[mapping]]
 offset      = 0x0580  # TRUE heading at a whacky scale
