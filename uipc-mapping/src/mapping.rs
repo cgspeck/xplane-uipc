@@ -1185,4 +1185,54 @@ write_commands = { \"addon/toggle\" = \"1\" }
             config.load_errors
         );
     }
+
+    /// Each shipped BCD radio mapping serves the dataref as BCD, and writing
+    /// that BCD back gives the same dataref value.
+    #[test]
+    fn shipped_bcd_radios_round_trip() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../xplane_uipc/mappings.toml");
+        let config = load_mappings(path).unwrap();
+        let cases: &[(u16, f64, u32)] = &[
+            (0x0354, 2770.0, 0x2770),  // transponder
+            (0x034E, 12345.0, 0x2345), // COM1 123.45
+            (0x3118, 11850.0, 0x1850), // COM2 118.50
+            (0x311A, 13690.0, 0x3690), // COM1 standby
+            (0x311C, 12180.0, 0x2180), // COM2 standby
+            (0x0350, 11345.0, 0x1345), // NAV1 113.45
+            (0x0352, 10800.0, 0x0800), // NAV2 108.00
+            (0x311E, 11790.0, 0x1790), // NAV1 standby
+            (0x3120, 10935.0, 0x0935), // NAV2 standby
+        ];
+        for &(offset, dataref, bcd) in cases {
+            let m = config
+                .mappings
+                .iter()
+                .find(|m| m.offset == offset)
+                .unwrap_or_else(|| panic!("no mapping for {:#06X}", offset));
+            assert!(m.writable, "{:#06X} not writable", offset);
+            let MappingSource::Expr {
+                datarefs,
+                expr,
+                write_exprs,
+                write_commands,
+                ..
+            } = &m.source
+            else {
+                panic!("{:#06X} isn't an expression mapping", offset);
+            };
+            let name = datarefs.keys().next().unwrap().clone();
+            let read_vars = HashMap::from([(name.clone(), dataref)]);
+            assert_eq!(expr.eval(&read_vars), bcd as f64, "read {:#06X}", offset);
+
+            let mut write_vars = read_vars.clone();
+            write_vars.insert("value".into(), bcd as f64);
+            let plan = crate::eval_writes(write_exprs, write_commands, &write_vars).unwrap();
+            assert_eq!(
+                plan.datarefs,
+                vec![(name.as_str(), dataref)],
+                "write {:#06X}",
+                offset
+            );
+        }
+    }
 }
