@@ -940,3 +940,40 @@ datarefs    = { F = "sim/cockpit2/radios/actuators/nav2_standby_frequency_hz" }
 expr        = "$F 10000 - tobcd"
 writable    = true
 write_exprs = { F = "$value frombcd 10000 +" }
+
+# ADF datarefs are plain kHz (414 = 414 kHz). FSUIPC splits the frequency over
+# two offsets: the main 3 digits as BCD, and the thousands digit (high byte)
+# plus fraction (low byte). X-Plane has no fraction, so the low byte is 0.
+# Each write keeps the part of the frequency the other offset holds.
+
+[[mapping]]
+offset      = 0x034C  # ADF1 main 3 digits, BCD: 1234 kHz → 0x0234
+fsuipc_type = "u16"
+datarefs    = { Adf = "sim/cockpit2/radios/actuators/adf1_frequency_hz" }
+expr        = "$Adf 1000 % tobcd"
+writable    = true
+write_exprs = { Adf = "$value frombcd $Adf 1000 \\ 1000 * +" }
+
+[[mapping]]
+offset      = 0x0356  # ADF1 extended: 1234 kHz → 0x0100
+fsuipc_type = "u16"
+datarefs    = { Adf = "sim/cockpit2/radios/actuators/adf1_frequency_hz" }
+expr        = "$Adf 1000 \\ 256 *"
+writable    = true
+write_exprs = { Adf = "$value 256 \\ 1000 * $Adf 1000 % +" }
+
+[[mapping]]
+offset      = 0x02D4  # ADF2 main 3 digits, BCD (FSUIPC guide: FS2004 only)
+fsuipc_type = "u16"
+datarefs    = { Adf = "sim/cockpit2/radios/actuators/adf2_frequency_hz" }
+expr        = "$Adf 1000 % tobcd"
+writable    = true
+write_exprs = { Adf = "$value frombcd $Adf 1000 \\ 1000 * +" }
+
+[[mapping]]
+offset      = 0x02D6  # ADF2 extended (FSUIPC guide: FS2004 only)
+fsuipc_type = "u16"
+datarefs    = { Adf = "sim/cockpit2/radios/actuators/adf2_frequency_hz" }
+expr        = "$Adf 1000 \\ 256 *"
+writable    = true
+write_exprs = { Adf = "$value 256 \\ 1000 * $Adf 1000 % +" }
