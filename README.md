@@ -19,13 +19,15 @@ Non-goals:
 Check the `mapping.toml`.
 
 * [ZIBO mod B737-800x](https://forums.x-plane.org/forums/topic/138974-b737-800x-zibo-mod-info-installation-download-links/)
-* [FlyWithLUA NG+](https://forums.x-plane.org/files/file/82888-flywithlua-ng-next-generation-plus-edition-for-x-plane-12-win-lin-mac/) to run accompanying script to inject dates and utc offsets
-* [BetterPushback](https://forums.x-plane.org/files/file/90556-better-pushback-for-x-plane-1112/)
+* [FlyWithLUA NG+](https://forums.x-plane.org/files/file/82888-flywithlua-ng-next-generation-plus-edition-for-x-plane-12-win-lin-mac/) to run the accompanying scripts that inject dates and UTC offsets and control pushback
+* [BetterPushback](https://forums.x-plane.org/files/file/90556-better-pushback-for-x-plane-1112/) (optional): with it, pushback offsets `0x31F0`/`0x31F4` support turning pushes; without it, X-Plane's own tug pushes straight only
 
 ## Installation
 
-1. copy `lua\Xplane_Uipc_Helper_Set_Date_Datarefs.lua` to `C:\X-Plane 12\Resources\plugins\FlyWithLua\Scripts`
+1. copy `lua\Xplane_Uipc_Helper_Set_Date_Datarefs.lua` and `lua\Xplane_Uipc_Helper_Pushback.lua` to `C:\X-Plane 12\Resources\plugins\FlyWithLua\Scripts`
 2. extract plugin zip to `C:\X-Plane 12\Resources\plugins`
+
+The pushback script's settings (how hard a turning push steers, and which BetterPushback command swings the tail which way) are at the top of the file.
 
 ## Logs and Debugging
 
