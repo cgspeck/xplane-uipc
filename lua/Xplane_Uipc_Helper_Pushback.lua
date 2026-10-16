@@ -21,6 +21,9 @@
 --
 -- Without BPM, it falls back to X-Plane's own tug, which only pushes straight:
 -- 1 and 2 push straight and the status reads 0.
+--
+-- A push only starts with the aircraft on the ground and stopped; other start
+-- requests are ignored and logged once.
 
 -- ── Settings ──────────────────────────────────────────────────────
 -- Steer presses for a turning push (1..10; 10 is BPM's full lock).
@@ -33,6 +36,8 @@ local TAIL_RIGHT_CMD = "BetterPushback/manual_push_right"
 local START_TIMEOUT = 5
 -- Ground speed (m/s) that shows BPM has moved past its starting step.
 local MOVING_SPEED = 0.2
+-- A push only starts below this ground speed (m/s), as BPM requires.
+local START_MAX_SPEED = 1
 
 -- ── Constants ─────────────────────────────────────────────────────
 local OFF = 3
@@ -41,6 +46,7 @@ local TAIL_LEFT = 1
 local TAIL_RIGHT = 2
 
 DataRef("xplane_uipc_pb_groundspeed", "sim/flightmodel/position/groundspeed")
+DataRef("xplane_uipc_pb_onground", "sim/flightmodel/failures/onground_any")
 
 define_shared_DataRef("xplane-uipc-helper/pushback/available", "Int")
 define_shared_DataRef("xplane-uipc-helper/pushback/status", "Int")
@@ -57,9 +63,26 @@ local stopping = false        -- stop sent, waiting for BPM to finish
 local start_requested_at = nil
 local steering_live = false   -- BPM keeps steer presses from now on
 local steer_applied = 0       -- net presses sent: + = tail left, - = tail right
+local refusal_logged = false  -- a refused start has been logged
 
 local function log(msg)
     logMsg("xplane-uipc pushback: " .. msg)
+end
+
+-- A start is only sent on the ground and (nearly) stopped. BPM refuses
+-- otherwise, and a refused manual push leaves BPM unable to start one until
+-- the aircraft or airport is reloaded.
+local function can_start()
+    if xplane_uipc_pb_onground ~= 1
+        or math.abs(xplane_uipc_pb_groundspeed) >= START_MAX_SPEED then
+        if not refusal_logged then
+            log("ignoring pushback start: aircraft not on the ground and stopped")
+            refusal_logged = true
+        end
+        return false
+    end
+    refusal_logged = false
+    return true
 end
 
 local function find_bpm()
@@ -125,6 +148,9 @@ local function bpm_request(value)
     end
 
     if not started then
+        if not can_start() then
+            return
+        end
         -- manual_push_start_no_yoke pauses a running manual push, so only
         -- send it when nothing is running.
         reset_push()
@@ -142,11 +168,11 @@ local function default_request(value)
     if value == OFF then
         command_once("sim/ground_ops/pushback_stop")
         status = OFF
-    else
-        if status == OFF then
+    elseif status == OFF then
+        if can_start() then
             command_once("sim/ground_ops/pushback_straight")
+            status = STRAIGHT
         end
-        status = STRAIGHT
     end
 end
 
