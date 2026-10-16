@@ -97,7 +97,7 @@ If you have MSFS, install FSUIPC7 then use `FSUIPC7\Utils\FSInterrogate2std.exe`
 ```
 # offset, n_bytes
 0x3367, 1  # various exit doors as a bitmask - note: no documentation about which door corresponds with which bit
-0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left (port), 2=pushing back, tail to swing to right (starboard). Only 3 and 0 supported.
+0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left (port), 2=pushing back, tail to swing to right (starboard). Without the pushback helper script, only 3 and 0.
 0x0354, 2  # transponder code as BCD: squawk 2770 → 0x2770
 ```
 
@@ -113,6 +113,9 @@ If you have MSFS, install FSUIPC7 then use `FSUIPC7\Utils\FSInterrogate2std.exe`
 0x0240, 2  # zulu year
 0x023d, 1  # zulu day of month
 0x0242, 1  # zulu month of year
+# pushback - Xplane_Uipc_Helper_Pushback.lua
+0x31F0, 4  # pushback status 0-3 (1 and 2 need BetterPushback)
+0x31F4, 4  # pushback control: write 0-3 (without BetterPushback, 1 and 2 push straight)
 ```
 
 ### Statically Faked

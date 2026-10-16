@@ -539,25 +539,136 @@ state  = { 738_L1 = 1, 738_L2 = 1, 738_R1 = 1, 738_R2 = 1 }
 expect = 9
 
 # =============================================================================
-# PUSHBACK 0x31F0: 3 = off, 0 = pushing back (BetterPushback or X-Plane tug).
+# PUSHBACK 0x31F0 status / 0x31F4 control: 3 = off, 0 = straight, 1 = tail
+# left, 2 = tail right. The pushback Lua helper serves Status when it's running
+# (Helper = 1). Without it, BetterPushback or the X-Plane tug pushing reads 0.
 # =============================================================================
 
 [[case]]
 offset = 0x31F0
-name   = "no pushback"
+name   = "no helper, no pushback"
 expect = 3
 
 [[case]]
 offset = 0x31F0
-name   = "BetterPushback started"
+name   = "no helper, BetterPushback started"
 state  = { BP_Started = 1 }
 expect = 0
 
 [[case]]
 offset = 0x31F0
-name   = "X-Plane tug attached"
+name   = "no helper, X-Plane tug attached"
 state  = { PB_Attached = 1 }
 expect = 0
+
+[[case]]
+offset = 0x31F0
+name   = "helper off"
+state  = { Helper = 1, Status = 3, BP_Started = 1 }
+expect = 3
+
+[[case]]
+offset = 0x31F0
+name   = "helper straight"
+state  = { Helper = 1, Status = 0 }
+expect = 0
+
+[[case]]
+offset = 0x31F0
+name   = "helper tail right"
+state  = { Helper = 1, Status = 2, PB_Attached = 1 }
+expect = 2
+
+[[case]]
+offset = 0x31F4
+name   = "no helper, no pushback"
+expect = 3
+
+[[case]]
+offset = 0x31F4
+name   = "no helper, BetterPushback started"
+state  = { BP_Started = 1 }
+expect = 0
+
+[[case]]
+offset = 0x31F4
+name   = "no helper, X-Plane tug attached"
+state  = { PB_Attached = 1 }
+expect = 0
+
+[[case]]
+offset = 0x31F4
+name   = "helper tail left"
+state  = { Helper = 1, Status = 1 }
+expect = 1
+
+[[case]]
+offset = 0x31F4
+name   = "helper off"
+state  = { Helper = 1, Status = 3, BP_Started = 1 }
+expect = 3
+
+[[case]]
+offset = 0x31F4
+name   = "write straight with helper"
+state  = { Helper = 1 }
+write  = 0
+expect_datarefs = {}
+expect_commands = { "xplane-uipc-helper/pushback/straight" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write tail left with helper"
+state  = { Helper = 1 }
+write  = 1
+expect_datarefs = {}
+expect_commands = { "xplane-uipc-helper/pushback/tail_left" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write tail right with helper"
+state  = { Helper = 1, Status = 1 }
+write  = 2
+expect_datarefs = {}
+expect_commands = { "xplane-uipc-helper/pushback/tail_right" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write off with helper"
+state  = { Helper = 1, Status = 0 }
+write  = 3
+expect_datarefs = {}
+expect_commands = { "xplane-uipc-helper/pushback/stop" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write straight without helper"
+write  = 0
+expect_datarefs = {}
+expect_commands = { "sim/ground_ops/pushback_straight" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write tail left without helper pushes straight"
+write  = 1
+expect_datarefs = {}
+expect_commands = { "sim/ground_ops/pushback_straight" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write off without helper"
+state  = { PB_Attached = 1 }
+write  = 3
+expect_datarefs = {}
+expect_commands = { "sim/ground_ops/pushback_stop" = 1 }
+
+[[case]]
+offset = 0x31F4
+name   = "write out of range runs nothing"
+state  = { Helper = 1 }
+write  = 4
+expect_datarefs = {}
+expect_commands = {}
 
 # =============================================================================
 # TIME OF DAY 0x115E: 0 = dawn, 1 = day, 2 = dusk, 3 = night. Twilight is the

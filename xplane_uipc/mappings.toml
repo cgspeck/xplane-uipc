@@ -809,14 +809,42 @@ expr        = "$bank -1 * 360 65536 65536 * / /"    # negate + scale
 
 # 0x31F0, 4  - pushback status 3=off, 0=pushing back, 1=pushing back, tail to swing to left
 #             (port), 2=pushing back, tail to swing to right (starboard)
+# 0x31F4, 4  - pushback control: write 0-3 as for the status.
+#
+# Served by lua/Xplane_Uipc_Helper_Pushback.lua, which drives Better Pushback Mod
+# (all four values) or X-Plane's own tug (straight and stop only). Without the
+# script, 0x31F0 reports 0 while either tug is pushing, and writes to 0x31F4 go
+# to X-Plane's tug.
 [[mapping]]
 offset = 0x31F0
 fsuipc_type = "u32"
 datarefs = {
+    Helper      = "xplane-uipc-helper/pushback/available",
+    Status      = "xplane-uipc-helper/pushback/status",
     BP_Started  = "bp/started",
     PB_Attached = "sim/aircraft/overflow/pushback_attached",
 }
-expr = "$BP_Started $PB_Attached | 0 3 ?"
+expr = "$Helper $Status $BP_Started $PB_Attached | 0 3 ? ?"
+
+[[mapping]]
+offset = 0x31F4
+fsuipc_type = "u32"
+datarefs = {
+    Helper      = "xplane-uipc-helper/pushback/available",
+    Status      = "xplane-uipc-helper/pushback/status",
+    BP_Started  = "bp/started",
+    PB_Attached = "sim/aircraft/overflow/pushback_attached",
+}
+expr = "$Helper $Status $BP_Started $PB_Attached | 0 3 ? ?"
+writable = true
+write_commands = {
+    "xplane-uipc-helper/pushback/straight"   = "$Helper $value 0 == &",
+    "xplane-uipc-helper/pushback/tail_left"  = "$Helper $value 1 == &",
+    "xplane-uipc-helper/pushback/tail_right" = "$Helper $value 2 == &",
+    "xplane-uipc-helper/pushback/stop"       = "$Helper $value 3 == &",
+    "sim/ground_ops/pushback_straight"       = "$Helper not $value 3 < &",
+    "sim/ground_ops/pushback_stop"           = "$Helper not $value 3 == &",
+}
 
 [[mapping]]
 offset = 0x7b91  # SquawkBox Transponder mode, 0 = normal, 1 = standby: https://squawkbox.ca/doc/sdk/fsuipc.php
